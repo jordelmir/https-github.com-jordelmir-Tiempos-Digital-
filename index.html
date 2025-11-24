@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TIEMPOSPRO v3.3 | Phront Maestro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              cyber: {
+                black: '#02040a',
+                dark: '#050a14',
+                panel: '#0a1124',
+                border: '#1e3a8a',
+                neon: '#00f0ff',   // CYAN (Mediodía)
+                purple: '#bc13fe', // MORADO (Tarde)
+                orange: '#ff5f00', // NARANJA (Legacy/Alerts)
+                blue: '#2463eb',   // BLUE BLACK CRYSTAL (Noche - Nuevo)
+                gold: '#ffd700',   // ORO (Solo Premios)
+                danger: '#ff003c', // ROJO NEON
+                success: '#0aff60' // VERDE NEON
+              }
+            },
+            fontFamily: {
+              sans: ['Rajdhani', 'sans-serif'],
+              display: ['Orbitron', 'sans-serif'],
+              mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+            },
+            boxShadow: {
+              'neon-cyan': '0 0 5px #00f0ff, 0 0 20px rgba(0, 240, 255, 0.4), inset 0 0 10px rgba(0, 240, 255, 0.1)',
+              'neon-purple': '0 0 5px #bc13fe, 0 0 20px rgba(188, 19, 254, 0.4), inset 0 0 10px rgba(188, 19, 254, 0.1)',
+              'neon-orange': '0 0 5px #ff5f00, 0 0 20px rgba(255, 95, 0, 0.4), inset 0 0 10px rgba(255, 95, 0, 0.1)',
+              'neon-blue': '0 0 10px #2463eb, 0 0 30px rgba(36, 99, 235, 0.5), inset 0 0 15px rgba(36, 99, 235, 0.2)',
+              'neon-gold': '0 0 10px #ffd700, 0 0 40px rgba(255, 215, 0, 0.6)', // Solo para winners
+              'neon-red': '0 0 5px #ff003c, 0 0 30px rgba(255, 0, 60, 0.5), inset 0 0 10px rgba(255, 0, 60, 0.2)',
+              'neon-green': '0 0 5px #0aff60, 0 0 20px rgba(10, 255, 96, 0.4), inset 0 0 10px rgba(10, 255, 96, 0.1)',
+              'panel-glow': '0 0 50px rgba(0, 0, 0, 0.9), inset 0 0 30px rgba(255,255,255,0.02)',
+            },
+            animation: {
+              'spin-slow': 'spin 3s linear infinite',
+              'breathe': 'breathe 6s ease-in-out infinite',
+              'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'scanline': 'scanline 8s linear infinite',
+              'float': 'float 20s linear infinite',
+              'network-pulse': 'networkPulse 4s ease-in-out infinite',
+            },
+            keyframes: {
+              breathe: {
+                '0%, 100%': { opacity: '0.4', transform: 'scale(1)' },
+                '50%': { opacity: '0.8', transform: 'scale(1.1)' },
+              },
+              float: {
+                '0%': { backgroundPosition: '0% 0%' },
+                '100%': { backgroundPosition: '100% 100%' },
+              },
+              networkPulse: {
+                '0%, 100%': { strokeOpacity: '0.1' },
+                '50%': { strokeOpacity: '0.4' }
+              },
+              scanline: {
+                '0%': { transform: 'translateY(-100%)' },
+                '100%': { transform: 'translateY(100%)' }
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        background-color: #02040a;
+        color: #e2e8f0;
+        /* Removed overflow-x hidden to allow natural sticky behavior if needed, but keeping for horizontal safety */
+        overflow-x: hidden; 
+        min-height: 100vh;
+      }
+
+      /* --- NEURAL NETWORK BACKGROUND --- */
+      .neural-bg {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: -1;
+        background-color: #02040a;
+        /* Deep Space Gradient Base */
+        background-image: radial-gradient(circle at 50% 50%, #050a14 0%, #000000 100%);
+        transition: background-image 1s ease-in-out;
+      }
+
+      /* The Web Connections (Simulated with SVG Data URI for performance) */
+      .neural-web {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 200%;
+        height: 200%;
+        background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%2300f0ff' stroke-width='0.5' stroke-opacity='0.15'%3E%3Cpath d='M10 10 L30 30 M30 30 L60 10 M60 10 L90 30 M30 30 L10 60 M10 60 L40 80 M40 80 L30 30 M60 10 L80 50 M80 50 L40 80 M80 50 L90 90 M90 90 L40 80'/%3E%3Ccircle cx='10' cy='10' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='30' cy='30' r='1.5' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='60' cy='10' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='90' cy='30' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='10' cy='60' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='40' cy='80' r='1.5' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='80' cy='50' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='90' cy='90' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3C/g%3E%3C/svg%3E");
+        opacity: 0.6;
+        animation: float 60s linear infinite;
+        mask-image: radial-gradient(circle at 50% 50%, black 40%, transparent 80%);
+      }
+
+      /* The Breathing Light (The Soul) */
+      .neural-breath {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 60vw;
+        height: 60vw;
+        background: radial-gradient(circle, rgba(0, 240, 255, 0.15) 0%, rgba(188, 19, 254, 0.05) 40%, transparent 70%);
+        border-radius: 50%;
+        filter: blur(60px);
+        animation: breathe 8s ease-in-out infinite;
+      }
+      
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #02040a; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #1e3a8a; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #00f0ff; 
+      }
+      
+      .text-glow { text-shadow: 0 0 10px currentColor; }
+      .text-glow-sm { text-shadow: 0 0 5px currentColor; }
+      
+      /* Efecto cristal ultra */
+      .glass-panel {
+        background: rgba(5, 10, 20, 0.85);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      /* Clases de utilidad para transiciones suaves de tema */
+      .theme-transition {
+        transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform, filter;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 700ms;
+      }
+    </style>
+    <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@18.2.0/",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "react/": "https://esm.sh/react@18.2.0/",
+    "react": "https://esm.sh/react@18.2.0",
+    "react-router-dom": "https://esm.sh/react-router-dom@6.22.3?external=react,react-dom",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.7",
+    "zustand": "https://esm.sh/zustand@4.5.2?external=react",
+    "zustand/middleware": "https://esm.sh/zustand@4.5.2/middleware?external=react",
+    "zustand/": "https://aistudiocdn.com/zustand@^5.0.8/",
+    "next/": "https://aistudiocdn.com/next@^16.0.3/"
+  }
+}
+</script>
+  </head>
+  <body>
+    <div class="neural-bg">
+      <div class="neural-web"></div>
+      <div class="neural-breath"></div>
+    </div>
+    <div id="root" style="position: relative; z-index: 1;"></div>
+  </body>
+</html>
