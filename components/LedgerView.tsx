@@ -90,19 +90,19 @@ export default function LedgerView() {
 
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="p-8 space-y-8 relative">
       {/* Header */}
       <header className="mb-6 flex flex-col md:flex-row justify-between items-end">
         <div>
-            <h2 className="text-4xl font-display font-black text-white italic tracking-tighter uppercase mb-2">
+            <h2 className="text-4xl font-display font-black text-white italic tracking-tighter uppercase mb-2 drop-shadow-lg">
             <span className="text-cyber-success text-glow-green">LIBRO</span> FINANCIERO
             </h2>
-            <p className="text-cyber-success/60 text-xs font-mono uppercase tracking-[0.3em]">
+            <p className="text-cyber-success/80 text-xs font-mono uppercase tracking-[0.3em] font-bold">
             Cadena de Transacciones Inmutable
             </p>
         </div>
         <div className="text-right hidden md:block">
-            <div className="text-[10px] font-mono text-slate-500 uppercase">Balance Actual</div>
+            <div className="text-[10px] font-mono text-cyber-blue uppercase font-bold">Balance Actual</div>
             <div className="text-2xl font-mono font-bold text-cyber-neon text-glow">
                 {formatCurrency(chartData[chartData.length - 1].saldoAcumulado)}
             </div>
@@ -110,7 +110,7 @@ export default function LedgerView() {
       </header>
 
       {/* --- EXECUTIVE CASH FLOW CHART (MANDATO v3.1) --- */}
-      <div className="bg-cyber-panel/80 border border-cyber-border rounded-xl p-6 shadow-panel-glow relative overflow-hidden group">
+      <div className="bg-cyber-panel/60 border border-cyber-border rounded-xl p-6 shadow-panel-glow relative overflow-hidden group backdrop-blur-md">
         
         {/* Header del Gráfico */}
         <div className="flex justify-between items-center mb-6 border-b border-slate-800 pb-4 relative z-10">
@@ -124,11 +124,11 @@ export default function LedgerView() {
             </div>
             <div className="flex gap-4 text-[10px] font-mono">
                 <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-cyber-success/20 border border-cyber-success"></div>
+                    <div className="w-3 h-3 bg-cyber-success/20 border border-cyber-success shadow-[0_0_5px_lime]"></div>
                     <span className="text-slate-400">Superávit</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-cyber-danger/20 border border-cyber-danger"></div>
+                    <div className="w-3 h-3 bg-cyber-danger/20 border border-cyber-danger shadow-[0_0_5px_red]"></div>
                     <span className="text-slate-400">Déficit</span>
                 </div>
             </div>
@@ -136,17 +136,17 @@ export default function LedgerView() {
 
         {/* Chart Container */}
         <div className="relative w-full h-[350px] select-none">
-            {/* Tooltip Overlay */}
+            {/* Tooltip Overlay - CENTERED TOP */}
             {hoverIndex !== null && (
                 <div 
-                    className="absolute z-20 bg-cyber-black/95 border border-slate-600 p-3 rounded shadow-xl pointer-events-none text-xs font-mono min-w-[180px]"
+                    className="absolute z-30 bg-cyber-black/95 border border-cyber-border p-3 rounded shadow-[0_0_20px_rgba(0,0,0,0.8)] pointer-events-none text-xs font-mono min-w-[200px]"
                     style={{ 
-                        left: `${(hoverIndex / 11) * 90}%`, 
-                        top: '10%',
+                        left: '50%', 
+                        top: '0px',
                         transform: 'translateX(-50%)'
                     }}
                 >
-                    <div className="font-bold text-white mb-2 border-b border-slate-700 pb-1">{chartData[hoverIndex].mes} 2024</div>
+                    <div className="font-bold text-white mb-2 border-b border-slate-700 pb-1 text-center uppercase tracking-widest">{chartData[hoverIndex].mes} 2024</div>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                         <span className="text-slate-400">Ingresos:</span>
                         <span className="text-right text-cyber-success">{formatCurrency(chartData[hoverIndex].ingresos)}</span>
@@ -202,10 +202,10 @@ export default function LedgerView() {
                                 width={barWidth}
                                 height={Math.max(height, 2)} // Min height 2px for visibility
                                 fill={isNegative ? '#ff003c' : '#0aff60'}
-                                fillOpacity="0.6"
+                                fillOpacity={hoverIndex === i ? "1" : "0.6"}
                                 stroke={isRisk ? '#8B0000' : (isNegative ? '#ff003c' : '#0aff60')}
                                 strokeWidth={isRisk ? 3 : 1}
-                                className="transition-all duration-300 hover:fill-opacity-100 cursor-crosshair"
+                                className="transition-all duration-300 cursor-crosshair"
                             />
                             {/* X Axis Label */}
                             <text 
@@ -266,11 +266,11 @@ export default function LedgerView() {
           { label: 'Créditos Totales', val: 'CRC 8,500,000', icon: 'fa-arrow-up', color: 'text-cyber-success', border: 'border-cyber-success', glow: 'shadow-neon-green' },
           { label: 'Débitos Totales', val: 'CRC 6,100,000', icon: 'fa-arrow-down', color: 'text-cyber-danger', border: 'border-cyber-danger', glow: 'shadow-neon-red' },
         ].map((card, idx) => (
-            <div key={idx} className={`bg-cyber-panel/60 border ${card.border}/30 p-6 rounded-xl backdrop-blur-sm shadow-[0_0_20px_rgba(0,0,0,0.3)] hover:${card.glow} transition-all group`}>
+            <div key={idx} className={`bg-cyber-panel/60 border ${card.border}/30 p-6 rounded-xl backdrop-blur-md shadow-[0_0_20px_rgba(0,0,0,0.3)] hover:${card.glow} transition-all group`}>
                 <div className="flex justify-between items-start">
                     <div>
                         <div className="text-[10px] font-mono text-slate-400 uppercase tracking-widest mb-1">{card.label}</div>
-                        <div className={`text-2xl font-mono font-bold text-white group-hover:${card.color} transition-colors`}>{card.val}</div>
+                        <div className={`text-2xl font-mono font-bold text-white group-hover:${card.color} transition-colors group-hover:text-glow`}>{card.val}</div>
                     </div>
                     <div className={`w-8 h-8 rounded bg-black/50 flex items-center justify-center ${card.color} border border-white/10`}>
                         <i className={`fas ${card.icon}`}></i>
@@ -281,7 +281,7 @@ export default function LedgerView() {
       </div>
 
       {/* Ledger Table */}
-      <div className="bg-cyber-black/80 border border-cyber-success/20 rounded-xl overflow-hidden shadow-panel-glow relative">
+      <div className="bg-cyber-black/80 border border-cyber-success/20 rounded-xl overflow-hidden shadow-panel-glow relative backdrop-blur-md">
         <div className="absolute top-0 right-0 w-32 h-32 bg-cyber-success/5 blur-3xl pointer-events-none"></div>
 
         <div className="overflow-x-auto">
@@ -305,20 +305,20 @@ export default function LedgerView() {
                     <td className="p-5">{formatDate(tx.created_at)}</td>
                     <td className="p-5">
                         <span className={`px-2 py-1 rounded text-[10px] font-bold border ${
-                            tx.type === 'CREDIT' ? 'border-cyber-success text-cyber-success' : 
-                            tx.type === 'DEBIT' ? 'border-cyber-danger text-cyber-danger' : 
-                            'border-cyber-neon text-cyber-neon'
+                            tx.type === 'CREDIT' ? 'border-cyber-success text-cyber-success bg-cyber-success/10 shadow-[0_0_5px_lime]' : 
+                            tx.type === 'DEBIT' ? 'border-cyber-danger text-cyber-danger bg-cyber-danger/10 shadow-[0_0_5px_red]' : 
+                            'border-cyber-neon text-cyber-neon bg-cyber-neon/10'
                         }`}>
                             {tx.type}
                         </span>
                     </td>
-                    <td className="p-5 text-xs">{tx.reference_id || '-'}</td>
+                    <td className="p-5 text-xs text-cyber-blue">{tx.reference_id || '-'}</td>
                     <td className={`p-5 text-right font-bold ${
-                        tx.amount_bigint > 0 ? 'text-cyber-success' : 'text-cyber-danger'
+                        tx.amount_bigint > 0 ? 'text-cyber-success text-shadow-green' : 'text-cyber-danger text-shadow-red'
                     }`}>
                         {formatCurrency(tx.amount_bigint)}
                     </td>
-                    <td className="p-5 text-right text-slate-400">
+                    <td className="p-5 text-right text-slate-400 font-bold">
                         {formatCurrency(tx.balance_after)}
                     </td>
                 </tr>

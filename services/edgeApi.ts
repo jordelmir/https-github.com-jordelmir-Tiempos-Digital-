@@ -1,9 +1,22 @@
 
 import { supabase } from '../lib/supabaseClient';
-import { ApiResponse, AppUser, TransactionResponse, DrawResultPayload } from '../types';
+import { ApiResponse, AppUser, TransactionResponse, DrawResultPayload, GameMode } from '../types';
 
 // In a real deployment, these would point to your deployed Edge Functions
 const FUNCTION_BASE_URL = '/functions/v1'; 
+
+// Helper to generate Cyberpunk Ticket IDs
+const generateTicketCode = (prefix: string) => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let result = '';
+    for (let i = 0; i < 6; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `${prefix}-${result.substring(0,3)}-${result.substring(3,6)}`;
+};
+
+// Simulate simple hashing for demo purposes (In prod: use bcrypt)
+const mockHash = (pin: string) => `hash_sha256_${pin.split('').reverse().join('')}_salt_${Date.now()}`;
 
 async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<ApiResponse<T>> {
   try {
@@ -11,26 +24,124 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
     
     // DEMO MODE INTERCEPTION
     // @ts-ignore - access internal property for demo check
-    if (supabase.supabaseUrl === 'https://demo.local') {
+    if ((supabase as any).supabaseUrl === 'https://demo.local' || (supabase as any).supabaseUrl.includes('mock')) {
         console.log(`[DEMO EDGE] Invocando ${functionName}`, body);
-        await new Promise(r => setTimeout(r, 1000)); // Simulate Edge latency
+        await new Promise(r => setTimeout(r, 800)); // Simulate Edge latency
 
         if (!session) return { error: 'No autorizado (Demo)' };
 
-        // Mock Logic for Demo
+        // 1. PLACE BET LOGIC (Full Simulation)
+        if (functionName === 'placeBet') {
+             // A. Get User
+             const { data: profile } = await supabase
+                .from('app_users')
+                .select('*')
+                .eq('auth_uid', session.user.id)
+                .single();
+
+             if (!profile) return { error: 'Usuario no encontrado' };
+
+             // B. Check Balance
+             if (profile.balance_bigint < body.amount) {
+                 return { error: 'Saldo insuficiente en el Núcleo (Demo)' };
+             }
+
+             // C. Deduct Balance (Atomic Simulation)
+             const newBalance = profile.balance_bigint - body.amount;
+             await supabase
+                .from('app_users')
+                .update({ balance_bigint: newBalance })
+                .eq('id', profile.id)
+                .select()
+                .single();
+
+             // D. Insert Bet with TICKET CODE
+             const ticketCode = generateTicketCode('BET');
+             const { data: bet } = await supabase.from('bets').insert([{
+                 user_id: profile.id,
+                 ticket_code: ticketCode,
+                 amount_bigint: body.amount,
+                 numbers: body.numbers,
+                 draw_id: body.draw_id, // e.g. 'Noche (19:30)'
+                 status: 'PENDING'
+             }]).select().single();
+
+             return { data: { bet_id: bet.id, ticket_code: ticketCode } as any };
+        }
+
+        // 2. CREATE USER LOGIC (IDENTITY PROVISIONING - ENHANCED ANTI-DUPLICATION)
         if (functionName === 'createUser') {
+            const { name, email, phone, cedula, role, balance_bigint, pin, issuer_id } = body;
+
+            // A. Validation Rules
+            if (role === 'SuperAdmin') return { error: "PROHIBIDO: Creación de SuperAdmin no autorizada por consola." };
+            if (role === 'Vendedor' && !email) return { error: "Requerido: Email obligatorio para Vendedores." };
+            if (!cedula || !phone || !pin) return { error: "Datos incompletos." };
+
+            // B. Uniqueness & Role Integrity Check (Simulated against MOCK DB)
+            const { data: existingUsers } = await supabase.from('app_users').select('*');
+            const usersList = existingUsers as any[];
+            
+            // Check CI Collision
+            const duplicateCI = usersList.find(u => u.cedula === cedula);
+            
+            if (duplicateCI) {
+                // REGLA DE ORO: Bloqueo de Doble Rol
+                if (duplicateCI.role === role) {
+                    return { error: `IDENTIDAD DUPLICADA: La cédula ${cedula} ya está activa como ${role}.` };
+                } else {
+                    // Cross-Role Collision (Critical)
+                    return { 
+                        error: `CONFLICTO DE ROL CRÍTICO: Esta identidad ya existe como [${duplicateCI.role.toUpperCase()}]. Solo el SuperAdministrador puede liberar la identidad para cambiar de rol.` 
+                    };
+                }
+            }
+
+            const duplicatePhone = usersList.find(u => u.phone === phone);
+            if (duplicatePhone) return { error: `ERROR: Teléfono ${phone} ya vinculado a otra identidad.` };
+
+            // C. PIN Hashing
+            const pin_hash = mockHash(pin);
+
+            // D. Creation
+            const { data: newUser, error } = await supabase
+                .from('app_users')
+                .insert([{
+                    name,
+                    email: email || `no-email-${Date.now()}@phront.local`, // Dummy email for auth linkage if missing
+                    phone,
+                    cedula,
+                    role,
+                    balance_bigint: balance_bigint || 0,
+                    pin_hash,
+                    issuer_id,
+                    auth_uid: `auth-${cedula}-${Date.now()}`, // Mock Auth Link
+                    status: 'Active'
+                }])
+                .select()
+                .single();
+            
+            if (error) return { error: error.message };
+
             return { 
                 data: { 
-                    user: { 
-                        id: `demo-user-${Date.now()}`, 
-                        ...body, 
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString(),
-                        status: 'Active',
-                        currency: 'CRC'
-                    } as AppUser
+                    user: newUser as AppUser
                 } as any 
             };
+        }
+
+        // REAL-TIME CHECK IDENTITY (For UI Warnings)
+        if (functionName === 'checkIdentity') {
+            const { cedula } = body;
+            // Global Fetch from mock
+            const { data: existingUsers } = await supabase.from('app_users').select('*');
+            const usersList = existingUsers as any[];
+            const found = usersList.find(u => u.cedula === cedula);
+            
+            if (found) {
+                return { data: found as any };
+            }
+            return { data: null as any };
         }
 
         if (functionName === 'purgeSystem') {
@@ -40,26 +151,223 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
              return { data: { ok: true, message: 'Purga Simulada: Snapshot creado, multisig pendiente.' } as any };
         }
 
-        if (functionName === 'placeBet') {
-             return { data: { bet_id: `bet-${Date.now()}` } as any };
+        if (functionName === 'rechargeUser') {
+          const { data: target } = await supabase.from('app_users').select('*').eq('id', body.target_user_id).single();
+          if (target) {
+             const newBalance = target.balance_bigint + body.amount;
+             const ticketCode = generateTicketCode('DEP');
+
+             // 1. Update User
+             await supabase.from('app_users').update({ balance_bigint: newBalance }).eq('id', body.target_user_id);
+             
+             // 2. Create Ledger Entry
+             await supabase.from('ledger_transactions').insert([{
+                 user_id: body.target_user_id,
+                 ticket_code: ticketCode,
+                 amount_bigint: body.amount,
+                 balance_before: target.balance_bigint,
+                 balance_after: newBalance,
+                 type: 'CREDIT',
+                 reference_id: `DEP-${Date.now().toString().slice(-6)}`,
+                 meta: { actor: body.actor_id }
+             }]);
+
+             return { 
+                data: { 
+                  tx_id: `tx-rec-${Date.now()}`,
+                  ticket_code: ticketCode,
+                  new_balance: newBalance, 
+                  timestamp: new Date().toISOString()
+                } as any 
+              };
+          }
+          return { error: "Usuario destino no encontrado" };
         }
 
-        if (functionName === 'rechargeUser') {
-          return { 
-            data: { 
-              tx_id: `tx-rec-${Date.now()}`,
-              new_balance: 0, 
-              timestamp: new Date().toISOString()
-            } as any 
-          };
+        if (functionName === 'withdrawUser') {
+            // 1. Fetch Target User
+            const { data: target } = await supabase
+                .from('app_users')
+                .select('*')
+                .eq('id', body.target_user_id)
+                .single();
+            
+            if (!target) return { error: 'Usuario no encontrado en la red.' };
+            
+            // 2. Validate Funds
+            if (target.balance_bigint < body.amount) {
+                return { error: 'FONDOS INSUFICIENTES: Operación cancelada por el Núcleo.' };
+            }
+
+            // 3. Calculate New Balance
+            const newBalance = target.balance_bigint - body.amount;
+            const ticketCode = generateTicketCode('RET');
+
+            // 4. Update User Balance (Atomic Update Simulation)
+            await supabase
+                .from('app_users')
+                .update({ balance_bigint: newBalance })
+                .eq('id', body.target_user_id);
+            
+            // 5. Create Ledger Transaction
+            await supabase.from('ledger_transactions').insert([{
+                user_id: body.target_user_id,
+                ticket_code: ticketCode,
+                amount_bigint: -body.amount, // Negative for debit visual logic
+                balance_before: target.balance_bigint,
+                balance_after: newBalance,
+                type: 'DEBIT',
+                reference_id: `LIQ-${Date.now().toString().slice(-6)}`,
+                meta: { actor: body.actor_id, device: 'TERMINAL_V3', method: 'CASH_OUT' }
+            }]);
+  
+            return { 
+              data: { 
+                tx_id: `tx-wd-${Date.now()}`,
+                ticket_code: ticketCode,
+                new_balance: newBalance, 
+                timestamp: new Date().toISOString()
+              } as any 
+            };
+        }
+
+        if (functionName === 'payVendor') {
+            const { target_user_id, amount, concept, notes, actor_id } = body;
+
+            const { data: target } = await supabase.from('app_users').select('*').eq('id', target_user_id).single();
+            const { data: admin } = await supabase.from('app_users').select('*').eq('id', actor_id).single();
+
+            if (!target || !admin) return { error: "Entidad no encontrada" };
+
+            if (admin.balance_bigint < amount) {
+                return { error: "Fondos insuficientes en Caja Central (Admin)." };
+            }
+
+            const newAdminBalance = admin.balance_bigint - amount;
+            const newTargetBalance = target.balance_bigint + amount;
+            const ticketCode = generateTicketCode('PAY');
+
+            await supabase.from('app_users').update({ balance_bigint: newAdminBalance }).eq('id', actor_id);
+            await supabase.from('app_users').update({ balance_bigint: newTargetBalance }).eq('id', target_user_id);
+
+            await supabase.from('ledger_transactions').insert([{
+                user_id: target_user_id,
+                ticket_code: ticketCode,
+                amount_bigint: amount,
+                balance_before: target.balance_bigint,
+                balance_after: newTargetBalance,
+                type: 'COMMISSION_PAYOUT',
+                reference_id: `PAY-${Date.now().toString().slice(-6)}`,
+                meta: { 
+                    concept, 
+                    notes, 
+                    payer: actor_id,
+                    system_debit: amount 
+                }
+            }]);
+
+            return {
+                data: {
+                    success: true,
+                    ticket_code: ticketCode,
+                    timestamp: new Date().toISOString()
+                } as any
+            };
         }
 
         if (functionName === 'updateGlobalMultiplier') {
             return { message: 'Multiplicador Global actualizado en la red.' } as any;
         }
 
+        // --- LOGICA DE LIQUIDACIÓN DE RESULTADOS ---
         if (functionName === 'publishDrawResult') {
-            return { message: 'Resultado inyectado en la línea temporal exitosamente.' } as any;
+            const { drawTime, winningNumber, isReventado, reventadoNumber, actor_id } = body;
+            console.log(`[EDGE] LIQUIDANDO RESULTADOS: ${drawTime} - Número: ${winningNumber}`);
+
+            // 1. Get all Pending Bets for this Draw
+            const { data: allBets } = await supabase.from('bets').select('*');
+            const pendingBets = (allBets as any[]).filter(b => 
+                b.status === 'PENDING' && b.draw_id === drawTime
+            );
+
+            let processedCount = 0;
+
+            // 2. Iterate and Settle
+            for (const bet of pendingBets) {
+                const isWin = bet.numbers === winningNumber;
+                
+                if (isWin) {
+                    // Calculate Prize
+                    // Logic: 200x if GameMode is Reventados AND isReventado is true. 
+                    // Note: In simple mode, Reventados bet pays 200x if matching winning number.
+                    // Or standard 90x.
+                    let multiplier = 90; // Standard
+                    if (isReventado && bet.mode === GameMode.REVENTADOS) {
+                        multiplier = 200;
+                    }
+                    // For the demo, we simplify: If bet was Reventados, we assume they wanted 200x risk.
+                    
+                    const prizeAmount = bet.amount_bigint * multiplier;
+
+                    // Update User Balance
+                    const { data: winner } = await supabase.from('app_users').select('*').eq('id', bet.user_id).single();
+                    if (winner) {
+                        const newBalance = winner.balance_bigint + prizeAmount;
+                        await supabase.from('app_users').update({ balance_bigint: newBalance }).eq('id', winner.id);
+                        
+                        // Update Bet Status
+                        bet.status = 'WON'; // Mock update in memory happens via reference, but ideally utilize update
+                        // Mock DB hack to update array item:
+                        const betIndex = (allBets as any[]).findIndex(b => b.id === bet.id);
+                        if (betIndex >= 0) (allBets as any[])[betIndex].status = 'WON';
+
+                        // Log Transaction
+                        await supabase.from('ledger_transactions').insert([{
+                            user_id: winner.id,
+                            ticket_code: generateTicketCode('WIN'),
+                            amount_bigint: prizeAmount,
+                            balance_before: winner.balance_bigint,
+                            balance_after: newBalance,
+                            type: 'CREDIT', // Prize is a credit
+                            reference_id: `WIN-${drawTime.split(' ')[0].toUpperCase()}-${winningNumber}`,
+                            meta: { notes: 'PREMIO LOTERIA', draw: drawTime }
+                        }]);
+                        
+                        processedCount++;
+                    }
+                } else {
+                    // Mark as LOST
+                    const betIndex = (allBets as any[]).findIndex(b => b.id === bet.id);
+                    if (betIndex >= 0) (allBets as any[])[betIndex].status = 'LOST';
+                }
+            }
+
+            return { 
+                data: { 
+                    success: true, 
+                    message: 'Liquidación completada',
+                    processed: processedCount
+                } as any 
+            };
+        }
+
+        if (functionName === 'updateUserStatus') {
+            const { data, error } = await supabase
+                .from('app_users')
+                .update({ status: body.status })
+                .eq('id', body.target_user_id)
+                .select()
+                .single();
+            
+            if (error) return { error: "Error actualizando estado del nodo." };
+            return { data: { success: true, user: data } as any };
+        }
+
+        if (functionName === 'deleteUser') {
+            if (!body.confirmation) return { error: "Confirmación requerida." };
+            const { error } = await supabase.from('app_users').delete().eq('id', body.target_user_id);
+            if (error) return { error: "Error eliminando nodo." };
+            return { data: { success: true } as any };
         }
 
         return { message: 'Función ejecutada exitosamente (Modo Demo)' };
@@ -70,7 +378,7 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
       return { error: 'No autorizado: Sin sesión activa' };
     }
 
-    const response = await fetch(`${supabase.supabaseUrl}${FUNCTION_BASE_URL}/${functionName}`, {
+    const response = await fetch(`${(supabase as any).supabaseUrl}${FUNCTION_BASE_URL}/${functionName}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -93,8 +401,13 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
 }
 
 export const api = {
-  createUser: async (payload: { name: string; email: string; role: string; balance_bigint: number; issuer_id?: string }) => {
+  createUser: async (payload: { name: string; email?: string; phone: string; cedula: string; role: string; balance_bigint: number; pin: string; issuer_id?: string }) => {
     return invokeEdgeFunction<{ user: AppUser }>('createUser', payload);
+  },
+
+  // New helper for Real-Time UX checks
+  checkIdentityAvailability: async (cedula: string) => {
+    return invokeEdgeFunction<AppUser | null>('checkIdentity', { cedula });
   },
 
   purgeSystem: async (payload: { confirm_phrase: string; actor_id?: string }) => {
@@ -102,19 +415,34 @@ export const api = {
   },
 
   placeBet: async (payload: { numbers: string; amount: number; draw_id?: string }) => {
-    return invokeEdgeFunction<{ bet_id: string }>('placeBet', payload);
+    return invokeEdgeFunction<{ bet_id: string; ticket_code: string }>('placeBet', payload);
   },
 
   rechargeUser: async (payload: { target_user_id: string; amount: number; actor_id: string }) => {
     return invokeEdgeFunction<TransactionResponse>('rechargeUser', payload);
   },
 
-  // NEW ADMIN FUNCTIONS
+  withdrawUser: async (payload: { target_user_id: string; amount: number; actor_id: string }) => {
+    return invokeEdgeFunction<TransactionResponse>('withdrawUser', payload);
+  },
+  
+  payVendor: async (payload: { target_user_id: string; amount: number; concept: string; notes: string; actor_id: string }) => {
+    return invokeEdgeFunction<{ ticket_code: string }>('payVendor', payload);
+  },
+
   updateGlobalMultiplier: async (payload: { newValue: number; actor_id: string }) => {
     return invokeEdgeFunction<any>('updateGlobalMultiplier', payload);
   },
 
   publishDrawResult: async (payload: DrawResultPayload) => {
     return invokeEdgeFunction<any>('publishDrawResult', payload);
+  },
+
+  updateUserStatus: async (payload: { target_user_id: string; status: 'Active' | 'Suspended'; actor_id: string }) => {
+    return invokeEdgeFunction<any>('updateUserStatus', payload);
+  },
+
+  deleteUser: async (payload: { target_user_id: string; confirmation: string; actor_id: string }) => {
+    return invokeEdgeFunction<any>('deleteUser', payload);
   }
 };

@@ -7,7 +7,7 @@ interface AuthState {
   user: AppUser | null;
   loading: boolean;
   setUser: (u: AppUser | null) => void;
-  fetchUser: () => Promise<void>;
+  fetchUser: (silent?: boolean) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -15,9 +15,10 @@ export const useAuthStore = create<AuthState>()(persist((set) => ({
   user: null,
   loading: true,
   setUser: (u) => set({ user: u }),
-  fetchUser: async () => {
+  fetchUser: async (silent = false) => {
     try {
-      set({ loading: true });
+      if (!silent) set({ loading: true });
+      
       const { data: authData, error: authError } = await supabase.auth.getUser();
       
       if (authError || !authData?.user) {

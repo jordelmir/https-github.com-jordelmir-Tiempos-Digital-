@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from '../services/edgeApi';
 import { AppUser, UserRole } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
@@ -12,20 +12,52 @@ interface RechargeModalProps {
   onSuccess?: () => void;
 }
 
+type ChargeStatus = 'IDLE' | 'CONNECTING' | 'CHARGING' | 'INJECTING' | 'COMPLETED' | 'ERROR';
+
 export default function RechargeModal({ isOpen, onClose, targetUser, onSuccess }: RechargeModalProps) {
   const currentUser = useAuthStore(s => s.user);
   const [amount, setAmount] = useState<number | ''>('');
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<'IDLE' | 'PROCESSING' | 'SUCCESS' | 'ERROR'>('IDLE');
+  const [status, setStatus] = useState<ChargeStatus>('IDLE');
+  const [finalBalance, setFinalBalance] = useState<number>(0);
+  
+  // FIX: Reset state when modal opens to allow multiple consecutive operations
+  useEffect(() => {
+    if (isOpen) {
+        setStatus('IDLE');
+        setAmount('');
+        setLoading(false);
+        setFinalBalance(0);
+    }
+  }, [isOpen]);
   
   if (!isOpen || !targetUser || !currentUser) return null;
 
+  const handleClose = () => {
+      if (status === 'COMPLETED') {
+          onSuccess?.();
+      }
+      setStatus('IDLE');
+      setAmount('');
+      onClose();
+  };
+
   const handleRecharge = async () => {
     if (!amount || amount <= 0) return;
+    
     setLoading(true);
-    setStatus('PROCESSING');
+    setStatus('CONNECTING');
 
     try {
+        // 1. Connection Phase (Docking)
+        await new Promise(r => setTimeout(r, 1000));
+        setStatus('CHARGING');
+
+        // 2. Charging Phase (Fill up energy bar)
+        await new Promise(r => setTimeout(r, 1500));
+        setStatus('INJECTING');
+
+        // 3. API Call (While injecting)
         const res = await api.rechargeUser({
             target_user_id: targetUser.id,
             amount: Number(amount) * 100, // Convert to cents
@@ -33,105 +65,185 @@ export default function RechargeModal({ isOpen, onClose, targetUser, onSuccess }
         });
 
         if (res.error) {
-            setStatus('ERROR');
-            setTimeout(() => setStatus('IDLE'), 2000);
-            alert(res.error);
-        } else {
-            setStatus('SUCCESS');
-            setTimeout(() => {
+            throw new Error(res.error);
+        }
+
+        if (res.data) {
+            setFinalBalance(res.data.new_balance);
+        }
+
+        // 4. Completion Phase
+        await new Promise(r => setTimeout(r, 800));
+        setStatus('COMPLETED');
+
+        // Auto-close after a moment to admire the completed state
+        setTimeout(() => {
+            if (isOpen) { // Check if still open to avoid state update on unmount
                 onSuccess?.();
                 onClose();
-                setAmount('');
-                setStatus('IDLE');
-            }, 1500);
-        }
-    } catch (e) {
+            }
+        }, 6000);
+
+    } catch (e: any) {
         setStatus('ERROR');
-    } finally {
+        alert(e.message || "Error crítico en transferencia.");
         setLoading(false);
+    } finally {
+        if(status === 'ERROR') setLoading(false);
     }
   };
 
+  // --- VISUAL HELPERS ---
+  const getContainerClass = () => {
+      switch(status) {
+          case 'IDLE': return 'scale-100 opacity-100';
+          case 'CONNECTING': return 'scale-95 opacity-80 border-cyber-emerald/50';
+          case 'CHARGING': return 'scale-100 border-cyber-emerald shadow-[0_0_50px_#10b981]';
+          case 'INJECTING': return 'scale-[1.02] border-white shadow-[0_0_80px_white]';
+          case 'COMPLETED': return 'scale-100 border-cyber-emerald shadow-[0_0_30px_#10b981]';
+          default: return '';
+      }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-        <div className="bg-cyber-panel border border-cyber-success/50 p-1 rounded-2xl max-w-md w-full shadow-[0_0_50px_rgba(10,255,96,0.2)] relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-xl animate-in fade-in duration-300">
+        <div className="relative max-w-md w-full mx-4 perspective-1000">
             
-            {/* Inner Content */}
-            <div className="bg-[#050a14] rounded-xl p-8 relative overflow-hidden">
-                
-                {/* Close Button */}
-                <button onClick={onClose} className="absolute top-4 right-4 text-slate-500 hover:text-white transition-colors">
-                    <i className="fas fa-times"></i>
-                </button>
-
-                {/* Header */}
-                <div className="flex items-center gap-4 mb-8">
-                    <div className="w-12 h-12 rounded-full bg-cyber-success/10 flex items-center justify-center border border-cyber-success/30 shadow-neon-green">
-                        <i className={`fas fa-bolt text-xl text-cyber-success ${status === 'PROCESSING' ? 'animate-pulse' : ''}`}></i>
-                    </div>
-                    <div>
-                        <h3 className="font-display font-bold text-white text-lg uppercase tracking-wider">Recarga de Saldo</h3>
-                        <p className="text-[10px] font-mono text-cyber-success uppercase tracking-[0.2em]">Protocolo de Transferencia</p>
-                    </div>
-                </div>
-
-                {/* Target Info */}
-                <div className="bg-white/5 rounded-lg p-4 mb-6 border border-white/5">
-                    <div className="text-[10px] text-slate-500 font-mono uppercase tracking-wider mb-1">Destinatario</div>
-                    <div className="text-white font-bold flex justify-between items-center">
-                        <span>{targetUser.name}</span>
-                        <span className="text-xs bg-white/10 px-2 py-1 rounded text-slate-300">{targetUser.role}</span>
-                    </div>
-                    <div className="text-xs text-slate-500 font-mono mt-1">{targetUser.email}</div>
-                </div>
-
-                {/* Input Amount */}
-                <div className="mb-8">
-                    <label className="block text-[10px] font-mono font-bold text-slate-500 mb-2 uppercase tracking-wider">Monto a Transferir (CRC)</label>
-                    <div className="relative group">
-                        <input 
-                            type="number" 
-                            value={amount}
-                            onChange={e => setAmount(Number(e.target.value))}
-                            className="w-full bg-black border border-slate-700 rounded-lg py-4 pl-4 pr-12 text-2xl font-mono text-white focus:border-cyber-success focus:shadow-neon-green focus:outline-none transition-all placeholder-slate-800"
-                            placeholder="0.00"
-                            autoFocus
-                        />
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">CRC</div>
-                    </div>
-                </div>
-
-                {/* Action Button */}
+            {/* --- CLOSE BUTTON (Always available except during critical injection) --- */}
+            {status !== 'INJECTING' && (
                 <button 
-                    onClick={handleRecharge}
-                    disabled={loading || !amount}
-                    className={`
-                        w-full py-4 rounded-lg font-display font-black uppercase tracking-widest text-sm transition-all duration-300 relative overflow-hidden group
-                        ${status === 'SUCCESS' ? 'bg-cyber-success text-black' : 'bg-white/10 text-white hover:bg-cyber-success hover:text-black border border-cyber-success'}
-                    `}
+                    onClick={handleClose}
+                    className="absolute -top-12 right-0 text-slate-500 hover:text-white transition-colors z-50"
                 >
-                    <div className="relative z-10 flex items-center justify-center gap-2">
-                        {status === 'PROCESSING' && <i className="fas fa-circle-notch fa-spin"></i>}
-                        {status === 'SUCCESS' && <i className="fas fa-check"></i>}
-                        {status === 'IDLE' && <i className="fas fa-paper-plane"></i>}
-                        
-                        <span>
-                            {status === 'PROCESSING' ? 'PROCESANDO...' : 
-                             status === 'SUCCESS' ? 'TRANSFERENCIA COMPLETADA' : 
-                             'AUTORIZAR RECARGA'}
-                        </span>
-                    </div>
-                    
-                    {/* Hover Glow */}
-                    <div className="absolute inset-0 bg-cyber-success/20 opacity-0 group-hover:opacity-100 blur-xl transition-opacity"></div>
+                    <i className="fas fa-times text-2xl"></i>
                 </button>
+            )}
+
+            {/* --- MAIN ENERGY CORE --- */}
+            <div className={`bg-[#050a14] border-2 border-white/10 rounded-3xl overflow-hidden relative transition-all duration-500 ${getContainerClass()}`}>
                 
-                {currentUser.role === UserRole.Vendedor && (
-                    <p className="mt-4 text-center text-[10px] text-slate-500 font-mono">
-                        Tu saldo actual: <span className="text-white">{formatCurrency(currentUser.balance_bigint)}</span>
-                    </p>
+                {/* Background Effects */}
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none"></div>
+                
+                {/* STATUS: IDLE (Input Form) */}
+                {(status === 'IDLE' || status === 'ERROR') && (
+                    <div className="p-8 animate-in slide-in-from-bottom-4 duration-300">
+                        <div className="text-center mb-8">
+                            <div className="w-20 h-20 mx-auto bg-cyber-emerald/10 rounded-full border border-cyber-emerald/30 flex items-center justify-center mb-4 shadow-neon-emerald relative group">
+                                <div className="absolute inset-0 rounded-full bg-cyber-emerald opacity-20 blur-md group-hover:opacity-40 transition-opacity"></div>
+                                <i className="fas fa-bolt text-4xl text-cyber-emerald"></i>
+                            </div>
+                            <h3 className="text-2xl font-display font-black text-white uppercase tracking-wider">Inyector de Saldo</h3>
+                            <p className="text-xs font-mono text-cyber-emerald uppercase tracking-widest">
+                                Destino: {targetUser.name}
+                            </p>
+                        </div>
+
+                        <div className="relative group/input mb-8">
+                            <div className="absolute -inset-0.5 bg-cyber-emerald rounded-lg blur opacity-0 group-focus-within/input:opacity-50 transition-opacity duration-500"></div>
+                            <input 
+                                type="number" 
+                                value={amount}
+                                onChange={e => setAmount(Number(e.target.value))}
+                                className="relative w-full bg-black border border-slate-700 rounded-lg py-4 pl-6 pr-12 text-3xl font-mono text-white placeholder-slate-800 focus:border-cyber-emerald focus:outline-none focus:shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all z-10"
+                                placeholder="0.00"
+                                autoFocus
+                            />
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xs z-20">CRC</div>
+                        </div>
+
+                        <button 
+                            onClick={handleRecharge}
+                            disabled={!amount || loading}
+                            className="w-full py-4 bg-cyber-emerald text-black font-display font-black uppercase tracking-[0.2em] rounded-lg hover:bg-white hover:shadow-[0_0_30px_rgba(16,185,129,0.6)] transition-all disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden group/btn"
+                        >
+                            <div className="absolute inset-0 bg-white/20 -translate-x-full group-hover/btn:animate-[shine_0.5s_ease-in-out]"></div>
+                            INICIAR CARGA
+                        </button>
+                    </div>
+                )}
+
+                {/* STATUS: ACTIVE CHARGING ANIMATION */}
+                {status !== 'IDLE' && status !== 'ERROR' && (
+                    <div className="relative h-[400px] flex flex-col items-center justify-center overflow-hidden">
+                        
+                        {/* 1. THE ENERGY CELL (Visual Metaphor) */}
+                        <div className="relative w-32 h-64 bg-black border-4 border-slate-800 rounded-2xl overflow-hidden shadow-inner flex flex-col-reverse">
+                            
+                            {/* Liquid Fill */}
+                            <div 
+                                className={`w-full bg-cyber-emerald transition-all ease-linear shadow-[0_0_30px_#10b981] relative ${
+                                    status === 'INJECTING' ? 'animate-pulse bg-white' : ''
+                                }`}
+                                style={{ 
+                                    height: status === 'CONNECTING' ? '10%' : status === 'CHARGING' ? '100%' : status === 'INJECTING' ? '0%' : '100%',
+                                    transitionDuration: status === 'CHARGING' ? '1.5s' : '0.5s'
+                                }}
+                            >
+                                {/* Bubbles */}
+                                <div className="absolute inset-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-50 mix-blend-overlay animate-pan-up"></div>
+                                <div className="absolute top-0 left-0 w-full h-2 bg-white opacity-50 blur-sm"></div>
+                            </div>
+
+                            {/* Glass Reflection */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent pointer-events-none"></div>
+                            
+                            {/* Tick Marks */}
+                            <div className="absolute right-0 top-0 bottom-0 w-4 flex flex-col justify-between py-2 pr-1">
+                                {[1,2,3,4,5,6].map(i => <div key={i} className="w-2 h-0.5 bg-slate-600/50"></div>)}
+                            </div>
+                        </div>
+
+                        {/* 2. DOCKING CLAMPS (Top/Bottom) */}
+                        <div className={`absolute top-10 w-40 h-4 bg-slate-800 rounded-b-xl transition-all duration-500 ${status === 'CONNECTING' ? '-translate-y-full opacity-0' : 'translate-y-0 opacity-100'}`}></div>
+                        <div className={`absolute bottom-10 w-40 h-4 bg-slate-800 rounded-t-xl transition-all duration-500 ${status === 'CONNECTING' ? 'translate-y-full opacity-0' : 'translate-y-0 opacity-100'}`}></div>
+
+                        {/* 3. CONNECTION ARCS (Electricity) */}
+                        {status === 'INJECTING' && (
+                            <div className="absolute inset-0 pointer-events-none">
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-60 h-60 border-4 border-white rounded-full animate-ping opacity-50"></div>
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-1 bg-white blur-md animate-pulse"></div>
+                            </div>
+                        )}
+
+                        {/* 4. TEXT FEEDBACK */}
+                        <div className="absolute bottom-8 w-full text-center">
+                            <div className={`font-display font-bold text-xl uppercase tracking-widest ${status === 'COMPLETED' ? 'text-cyber-emerald' : 'text-white'}`}>
+                                {status === 'CONNECTING' && 'ACOPLANDO...'}
+                                {status === 'CHARGING' && 'ENERGIZANDO...'}
+                                {status === 'INJECTING' && 'TRANSFIRIENDO...'}
+                                {status === 'COMPLETED' && 'CARGA COMPLETA'}
+                            </div>
+                        </div>
+
+                        {/* SUCCESS CHECKMARK (Overlay) */}
+                        {status === 'COMPLETED' && (
+                            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-500 z-20 p-6">
+                                <div className="w-24 h-24 bg-cyber-emerald rounded-full flex items-center justify-center shadow-[0_0_60px_#10b981] animate-in zoom-in duration-300 mb-6">
+                                    <i className="fas fa-check text-5xl text-black"></i>
+                                </div>
+                                
+                                <div className="bg-black/50 border border-white/10 p-4 rounded-xl backdrop-blur-md text-center w-full">
+                                    <div className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">Nuevo Saldo Disponible</div>
+                                    <div className="text-2xl font-mono font-bold text-white text-glow-sm">{formatCurrency(finalBalance)}</div>
+                                </div>
+                            </div>
+                        )}
+
+                    </div>
                 )}
             </div>
+            
+            <style>{`
+                @keyframes shine {
+                    0% { transform: translateX(-100%) skewX(-15deg); }
+                    100% { transform: translateX(200%) skewX(-15deg); }
+                }
+                @keyframes pan-up {
+                    from { background-position: 0 0; }
+                    to { background-position: 0 -100px; }
+                }
+            `}</style>
         </div>
     </div>
   );

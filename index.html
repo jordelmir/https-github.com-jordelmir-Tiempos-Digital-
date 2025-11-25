@@ -24,9 +24,10 @@
                 purple: '#bc13fe', // MORADO (Tarde)
                 orange: '#ff5f00', // NARANJA (Legacy/Alerts)
                 blue: '#2463eb',   // BLUE BLACK CRYSTAL (Noche - Nuevo)
-                gold: '#ffd700',   // ORO (Solo Premios)
+                emerald: '#10b981', // NEW: EMERALD (Historical/Secure/Recharge)
+                'emerald-dark': '#064e3b', // NEW: DEEP EMERALD
                 danger: '#ff003c', // ROJO NEON
-                success: '#0aff60' // VERDE NEON
+                success: '#0aff60' // VERDE NEON (Action)
               }
             },
             fontFamily: {
@@ -39,7 +40,7 @@
               'neon-purple': '0 0 5px #bc13fe, 0 0 20px rgba(188, 19, 254, 0.4), inset 0 0 10px rgba(188, 19, 254, 0.1)',
               'neon-orange': '0 0 5px #ff5f00, 0 0 20px rgba(255, 95, 0, 0.4), inset 0 0 10px rgba(255, 95, 0, 0.1)',
               'neon-blue': '0 0 10px #2463eb, 0 0 30px rgba(36, 99, 235, 0.5), inset 0 0 15px rgba(36, 99, 235, 0.2)',
-              'neon-gold': '0 0 10px #ffd700, 0 0 40px rgba(255, 215, 0, 0.6)', // Solo para winners
+              'neon-emerald': '0 0 20px #10b981, 0 0 80px rgba(16, 185, 129, 0.9), inset 0 0 30px rgba(16, 185, 129, 0.5)', 
               'neon-red': '0 0 5px #ff003c, 0 0 30px rgba(255, 0, 60, 0.5), inset 0 0 10px rgba(255, 0, 60, 0.2)',
               'neon-green': '0 0 5px #0aff60, 0 0 20px rgba(10, 255, 96, 0.4), inset 0 0 10px rgba(10, 255, 96, 0.1)',
               'panel-glow': '0 0 50px rgba(0, 0, 0, 0.9), inset 0 0 30px rgba(255,255,255,0.02)',
@@ -51,6 +52,7 @@
               'scanline': 'scanline 8s linear infinite',
               'float': 'float 20s linear infinite',
               'network-pulse': 'networkPulse 4s ease-in-out infinite',
+              'plasma-pulse': 'plasma 4s ease-in-out infinite',
             },
             keyframes: {
               breathe: {
@@ -68,6 +70,10 @@
               scanline: {
                 '0%': { transform: 'translateY(-100%)' },
                 '100%': { transform: 'translateY(100%)' }
+              },
+              plasma: {
+                '0%, 100%': { opacity: '0.5', transform: 'scale(0.98)', filter: 'blur(20px)' },
+                '50%': { opacity: '0.8', transform: 'scale(1.01)', filter: 'blur(30px)' }
               }
             }
           }

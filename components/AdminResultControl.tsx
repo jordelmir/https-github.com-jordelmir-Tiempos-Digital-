@@ -21,6 +21,13 @@ export default function AdminResultControl({ isOpen, onClose }: AdminResultContr
   
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [processedCount, setProcessedCount] = useState(0);
+
+  // Computed: Is this historical?
+  const isHistorical = date !== new Date().toISOString().split('T')[0];
+  // THEME SWITCH: Uses Emerald for History, Neon for Live
+  const activeTheme = isHistorical ? 'text-cyber-emerald border-cyber-emerald/50' : 'text-cyber-neon border-cyber-neon/50';
+  const glowColor = isHistorical ? 'bg-cyber-emerald' : 'bg-cyber-neon';
 
   if (!isOpen || !user) return null;
 
@@ -41,11 +48,14 @@ export default function AdminResultControl({ isOpen, onClose }: AdminResultContr
         if (res.error) {
             alert(res.error);
         } else {
+            setProcessedCount(res.data?.processed || 0);
             setSuccess(true);
             setTimeout(() => {
                 setSuccess(false);
+                setWinningNumber('');
+                setProcessedCount(0);
                 onClose();
-            }, 2000);
+            }, 2500);
         }
     } catch (e) {
         alert("Error de conexión al Núcleo.");
@@ -54,145 +64,156 @@ export default function AdminResultControl({ isOpen, onClose }: AdminResultContr
     }
   };
 
+  const getDrawIcon = (draw: DrawTime) => {
+      if (draw.includes('Mediodía')) return 'fa-sun';
+      if (draw.includes('Tarde')) return 'fa-cloud-sun';
+      return 'fa-moon';
+  };
+
+  const getDrawColor = (draw: DrawTime) => {
+      if (draw.includes('Mediodía')) return 'text-cyber-neon border-cyber-neon shadow-neon-cyan';
+      if (draw.includes('Tarde')) return 'text-cyber-purple border-cyber-purple shadow-neon-purple';
+      return 'text-cyber-blue border-cyber-blue shadow-neon-blue';
+  };
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-xl animate-in fade-in zoom-in duration-300">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/90 backdrop-blur-xl animate-in fade-in zoom-in duration-300">
         
         {/* Container */}
-        <div className="bg-[#050a14] border border-white/10 rounded-2xl w-full max-w-2xl relative shadow-[0_0_100px_rgba(36,99,235,0.2)] overflow-hidden group">
+        <div className="relative w-full max-w-4xl mx-4">
             
-            {/* Holographic Top Border */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyber-blue to-transparent animate-[scanline_3s_ease-in-out_infinite]"></div>
+            {/* Time Machine Backlight */}
+            <div className={`absolute -inset-2 ${glowColor} rounded-3xl opacity-20 blur-2xl animate-pulse transition-colors duration-700`}></div>
 
-            {/* Header */}
-            <div className="p-8 border-b border-white/5 flex justify-between items-center bg-black/40">
-                <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-cyber-blue/10 rounded-lg border border-cyber-blue/30 flex items-center justify-center shadow-neon-blue">
-                        <i className="fas fa-history text-2xl text-cyber-blue"></i>
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-display font-black text-white uppercase tracking-widest">
-                            Inyección de Resultados
-                        </h2>
-                        <p className="text-[10px] font-mono text-cyber-blue uppercase tracking-[0.2em]">Acceso de Nivel: SuperAdmin</p>
-                    </div>
-                </div>
-                <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
-                    <i className="fas fa-times text-xl"></i>
-                </button>
-            </div>
-
-            <div className="p-8 space-y-8">
+            <div className="bg-[#050a14] border border-white/10 rounded-3xl w-full relative shadow-2xl overflow-hidden z-10 flex flex-col md:flex-row min-h-[500px]">
                 
-                {/* 1. Time Machine Selector */}
-                <div className="bg-white/5 rounded-xl p-6 border border-white/5 relative overflow-hidden group/time">
-                    <div className="absolute inset-0 bg-cyber-blue/5 opacity-0 group-hover/time:opacity-100 transition-opacity pointer-events-none"></div>
-                    <label className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest mb-4">
-                        <i className="fas fa-calendar-alt mr-2"></i> Selector Temporal (Pasado/Presente)
-                    </label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Left Side: Info Panel */}
+                <div className="bg-black/40 p-8 md:w-1/3 border-b md:border-b-0 md:border-r border-white/10 relative overflow-hidden flex flex-col justify-between">
+                    <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-${isHistorical ? 'cyber-emerald' : 'cyber-neon'} to-transparent opacity-50`}></div>
+                    
+                    <div>
+                        <h2 className="text-2xl font-display font-black text-white uppercase tracking-tighter mb-1 leading-none">
+                            Control <br/> <span className={isHistorical ? 'text-cyber-emerald' : 'text-cyber-neon'}>{isHistorical ? 'Histórico' : 'En Vivo'}</span>
+                        </h2>
+                        <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-8">Estación de Inyección</p>
+
+                        <div className="space-y-6">
+                            <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+                                <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-1">Modo Operativo</div>
+                                <div className={`font-mono font-bold text-sm flex items-center gap-2 ${isHistorical ? 'text-cyber-emerald' : 'text-cyber-neon'}`}>
+                                    <i className={`fas ${isHistorical ? 'fa-clock' : 'fa-satellite-dish'} ${!isHistorical && 'animate-pulse'}`}></i>
+                                    {isHistorical ? 'RE-ESCRITURA' : 'TRANSMISIÓN REAL'}
+                                </div>
+                            </div>
+
+                            <div className="bg-white/5 p-4 rounded-xl border border-white/5">
+                                <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-1">Impacto en Ledger</div>
+                                <div className="font-mono font-bold text-white text-xs">LIQUIDACIÓN AUTOMÁTICA</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-auto pt-6">
+                        <label className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-2 block">Fecha Objetivo</label>
                         <input 
                             type="date" 
                             value={date}
                             onChange={e => setDate(e.target.value)}
-                            className="bg-black border border-slate-700 rounded-lg p-3 text-white font-mono uppercase focus:border-cyber-blue focus:shadow-neon-blue outline-none"
+                            className={`w-full bg-black border ${activeTheme} rounded-xl p-3 text-white font-mono text-sm focus:outline-none shadow-inner`}
                         />
-                        <select 
-                            value={selectedDraw}
-                            onChange={e => setSelectedDraw(e.target.value as DrawTime)}
-                            className="bg-black border border-slate-700 rounded-lg p-3 text-white font-mono uppercase focus:border-cyber-blue focus:shadow-neon-blue outline-none appearance-none"
-                        >
-                            {Object.values(DrawTime).map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
                     </div>
                 </div>
 
-                {/* 2. Winning Number Core */}
-                <div className="flex flex-col md:flex-row gap-8">
-                    
-                    {/* Main Number */}
-                    <div className="flex-1">
-                        <label className="block text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest mb-2">
-                             Número Ganador (00-99)
-                        </label>
-                        <div className="relative">
-                            <input 
-                                type="text" 
-                                maxLength={2}
-                                value={winningNumber}
-                                onChange={e => setWinningNumber(e.target.value.replace(/[^0-9]/g, ''))}
-                                className="w-full bg-black border-2 border-white/10 rounded-xl py-4 text-center text-5xl font-mono text-white focus:border-cyber-blue focus:shadow-[0_0_30px_rgba(36,99,235,0.3)] outline-none transition-all placeholder-slate-800"
-                                placeholder="--"
-                            />
-                            <div className="absolute inset-0 rounded-xl border border-white/5 pointer-events-none"></div>
+                {/* Right Side: Controls */}
+                <div className="p-8 md:w-2/3 bg-[#0a0a0f] relative flex flex-col">
+                    <button onClick={onClose} className="absolute top-4 right-4 text-slate-600 hover:text-white transition-colors"><i className="fas fa-times text-lg"></i></button>
+
+                    {/* 1. Draw Selector (Visual Cards) */}
+                    <div className="mb-8">
+                        <label className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-3 block">Seleccionar Sorteo</label>
+                        <div className="grid grid-cols-3 gap-4">
+                            {Object.values(DrawTime).map((t) => {
+                                const isActive = selectedDraw === t;
+                                return (
+                                    <button
+                                        key={t}
+                                        onClick={() => setSelectedDraw(t)}
+                                        className={`relative py-4 rounded-xl border transition-all duration-300 flex flex-col items-center gap-2 overflow-hidden group ${isActive ? getDrawColor(t) + ' bg-white/5' : 'border-white/10 text-slate-500 hover:bg-white/5'}`}
+                                    >
+                                        {isActive && <div className={`absolute inset-0 opacity-10 ${t.includes('Noche') ? 'bg-blue-600' : t.includes('Tarde') ? 'bg-purple-600' : 'bg-cyan-400'} animate-pulse`}></div>}
+                                        <i className={`fas ${getDrawIcon(t)} text-xl ${isActive ? 'animate-bounce' : ''}`}></i>
+                                        <span className="text-[10px] font-black uppercase tracking-wider">{t.split(' ')[0]}</span>
+                                    </button>
+                                )
+                            })}
                         </div>
                     </div>
 
-                    {/* Reventados Module */}
-                    <div className="flex-1 bg-red-950/10 border border-red-900/30 rounded-xl p-4 relative overflow-hidden">
-                        
-                        <div className="flex justify-between items-center mb-4">
-                            <label className="text-[10px] font-mono font-bold text-red-400 uppercase tracking-widest flex items-center gap-2">
-                                <i className="fas fa-bomb"></i> Protocolo Reventados
-                            </label>
-                            
-                            {/* Cyber Switch */}
-                            <button 
-                                onClick={() => setIsReventado(!isReventado)}
-                                className={`w-12 h-6 rounded-full relative transition-colors duration-300 ${isReventado ? 'bg-red-600 shadow-neon-red' : 'bg-slate-800'}`}
-                            >
-                                <div className={`absolute top-1 bottom-1 w-4 h-4 bg-white rounded-full shadow-md transition-all duration-300 ${isReventado ? 'left-7' : 'left-1'}`}></div>
-                            </button>
-                        </div>
-
-                        {/* Collapsible Input */}
-                        <div className={`transition-all duration-500 overflow-hidden ${isReventado ? 'max-h-32 opacity-100' : 'max-h-0 opacity-50'}`}>
-                             <input 
-                                type="text" 
-                                maxLength={2}
-                                value={reventadoNumber}
-                                onChange={e => setReventadoNumber(e.target.value.replace(/[^0-9]/g, ''))}
-                                className="w-full bg-black border border-red-800 rounded-lg py-3 text-center text-3xl font-mono text-red-500 focus:border-red-500 focus:shadow-neon-red outline-none placeholder-red-900/50"
-                                placeholder="--"
-                            />
-                            <p className="text-[9px] text-red-400/60 mt-2 text-center font-mono">
-                                * Se aplicará multiplicador 200x
-                            </p>
-                        </div>
-                        
-                        {!isReventado && (
-                            <div className="text-center text-slate-500 text-xs font-mono py-4">
-                                MÓDULO INACTIVO
+                    {/* 2. Main Number Reactor */}
+                    <div className="flex gap-6 items-stretch mb-8">
+                        <div className="flex-1 relative">
+                            <div className={`absolute -inset-1 ${glowColor} rounded-2xl opacity-10 blur-xl`}></div>
+                            <div className="bg-black/80 border border-white/10 rounded-2xl p-6 flex flex-col items-center relative z-10 h-full justify-center">
+                                <label className="text-[10px] font-mono font-bold text-white uppercase tracking-[0.3em] mb-2 opacity-50">Número Ganador</label>
+                                <input 
+                                    type="text" 
+                                    maxLength={2}
+                                    value={winningNumber}
+                                    onChange={e => setWinningNumber(e.target.value.replace(/[^0-9]/g, ''))}
+                                    className={`bg-transparent text-7xl font-mono font-bold text-center focus:outline-none w-full placeholder-white/10 ${isHistorical ? 'text-cyber-emerald drop-shadow-[0_0_10px_#10b981]' : 'text-cyber-neon drop-shadow-[0_0_10px_cyan]'}`}
+                                    placeholder="00"
+                                    autoFocus
+                                />
                             </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Footer Actions */}
-                <div className="pt-4 border-t border-white/5">
-                     <button 
-                        onClick={handleSubmit}
-                        disabled={loading || !winningNumber || (isReventado && !reventadoNumber)}
-                        className={`
-                            w-full py-5 rounded-xl font-display font-black uppercase tracking-[0.2em] text-sm relative overflow-hidden group
-                            ${success ? 'bg-cyber-success text-black' : 'bg-white/5 text-white border border-white/10 hover:bg-cyber-blue hover:text-black hover:border-cyber-blue hover:shadow-neon-blue'}
-                            transition-all duration-300
-                        `}
-                     >
-                        {/* Inner status */}
-                        <div className="relative z-10 flex items-center justify-center gap-3">
-                            {loading ? <i className="fas fa-circle-notch fa-spin"></i> : 
-                             success ? <i className="fas fa-check-circle"></i> : 
-                             <i className="fas fa-upload"></i>}
-                             
-                            <span>
-                                {loading ? 'ESCRIBIENDO EN LEDGER...' : 
-                                 success ? 'RESULTADO PUBLICADO' : 
-                                 'EJECUTAR INYECCIÓN'}
-                            </span>
                         </div>
-                     </button>
-                </div>
 
+                        {/* Reventados Toggle Column */}
+                        <div className="w-32 flex flex-col justify-center bg-red-950/10 border border-red-900/30 rounded-2xl p-4 gap-4">
+                            <div className="text-center">
+                                <div className="text-[9px] font-bold text-red-500 uppercase tracking-widest mb-2">Reventados</div>
+                                <button 
+                                    onClick={() => setIsReventado(!isReventado)}
+                                    className={`w-12 h-6 rounded-full relative transition-colors mx-auto ${isReventado ? 'bg-red-600 shadow-neon-red' : 'bg-slate-800'}`}
+                                >
+                                    <div className={`absolute top-1 bottom-1 w-4 h-4 bg-white rounded-full transition-all ${isReventado ? 'left-7' : 'left-1'}`}></div>
+                                </button>
+                            </div>
+                            
+                            <div className={`transition-all duration-300 ${isReventado ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+                                <input 
+                                    type="text"
+                                    maxLength={2}
+                                    value={reventadoNumber}
+                                    onChange={e => setReventadoNumber(e.target.value.replace(/[^0-9]/g, ''))}
+                                    className="w-full bg-black border border-red-500 rounded-lg py-3 text-center text-2xl text-red-500 font-mono font-bold focus:outline-none shadow-neon-red"
+                                    placeholder="--"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Submit */}
+                    <button 
+                        onClick={handleSubmit}
+                        disabled={loading || !winningNumber}
+                        className={`w-full py-5 rounded-xl font-display font-black uppercase tracking-[0.2em] transition-all relative overflow-hidden group mt-auto ${success ? 'bg-green-500 text-black' : isHistorical ? 'bg-cyber-emerald text-black hover:bg-white' : 'bg-cyber-neon text-black hover:bg-white'}`}
+                    >
+                        {loading ? (
+                            <div className="flex items-center justify-center gap-3">
+                                <i className="fas fa-circle-notch fa-spin"></i>
+                                <span>LIQUIDANDO APUESTAS...</span>
+                            </div>
+                        ) : success ? (
+                            <div className="flex items-center justify-center gap-3 animate-in zoom-in">
+                                <i className="fas fa-check-circle"></i>
+                                <span>RESULTADO PUBLICADO ({processedCount} Pagos)</span>
+                            </div>
+                        ) : (
+                            <span>EJECUTAR RESULTADO</span>
+                        )}
+                    </button>
+
+                </div>
             </div>
         </div>
     </div>
