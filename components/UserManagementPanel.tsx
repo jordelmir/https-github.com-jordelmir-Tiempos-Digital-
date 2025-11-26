@@ -21,8 +21,9 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
   const [controlUser, setControlUser] = useState<AppUser | null>(null);
   const [payUser, setPayUser] = useState<AppUser | null>(null);
 
+  // THEME ENGINE: Updated 'CLIENTES' to Deep Neon Blue
   const theme = activeTab === 'CLIENTES' 
-    ? { name: 'neon', hex: '#00f0ff', bg: 'bg-cyber-neon', text: 'text-cyber-neon', border: 'border-cyber-neon', shadow: 'shadow-neon-cyan', icon: 'fa-users' }
+    ? { name: 'blue', hex: '#2463eb', bg: 'bg-cyber-blue', text: 'text-cyber-blue', border: 'border-cyber-blue', shadow: 'shadow-neon-blue', icon: 'fa-users' }
     : { name: 'purple', hex: '#bc13fe', bg: 'bg-cyber-purple', text: 'text-cyber-purple', border: 'border-cyber-purple', shadow: 'shadow-neon-purple', icon: 'fa-user-tie' };
 
   const sourceList = activeTab === 'CLIENTES' ? players : vendors;
@@ -54,15 +55,14 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
       <UserControlModal isOpen={!!controlUser} targetUser={controlUser} onClose={() => setControlUser(null)} onSuccess={onRefresh} />
       <VendorPaymentModal isOpen={!!payUser} targetUser={payUser} onClose={() => setPayUser(null)} onSuccess={onRefresh} />
       
-      {/* --- DOUBLE PLASMA LAYER --- */}
-      {/* 1. Deep Ambient Layer */}
-      <div className={`absolute -inset-2 ${theme.bg} rounded-[2.5rem] opacity-20 blur-3xl animate-[pulse_5s_infinite] transition-colors duration-700`}></div>
-      {/* 2. Active Surface Layer */}
-      <div className={`absolute -inset-1 ${theme.bg} rounded-3xl opacity-40 blur-xl animate-[pulse_3s_infinite] transition-colors duration-500`}></div>
-
-      <div className={`relative bg-cyber-panel/40 border border-white/10 rounded-3xl backdrop-blur-xl overflow-hidden transition-all duration-500 hover:border-white/20 z-10`}>
+      {/* --- SOLID BACKLIGHT SYSTEM --- */}
+      {/* Only light coming from behind the borders */}
+      <div className={`absolute -inset-0.5 ${theme.bg} rounded-[1.7rem] opacity-60 blur-lg transition-colors duration-700`}></div>
+      
+      {/* Main Container - SOLID & OPAQUE */}
+      <div className={`relative bg-[#050a14] border border-white/10 rounded-3xl overflow-hidden transition-all duration-500 z-10 shadow-2xl`}>
         
-        <div className="border-b border-white/5 bg-black/20">
+        <div className="border-b border-white/5 bg-[#02040a]">
             <div className="flex flex-col md:flex-row items-center justify-between p-6 pb-0 md:pb-0">
                 <h3 className="text-xl font-display font-black text-white uppercase tracking-widest flex items-center gap-3 mb-6 md:mb-0">
                     <div className={`w-10 h-10 rounded-lg ${theme.bg}/10 border ${theme.border}/30 flex items-center justify-center ${theme.shadow}`}>
@@ -72,7 +72,7 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
                 </h3>
 
                 <div className="flex bg-black/40 p-1 rounded-xl border border-white/10">
-                    <button onClick={() => setActiveTab('CLIENTES')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all duration-300 ${activeTab === 'CLIENTES' ? 'bg-cyber-neon/20 text-cyber-neon border border-cyber-neon/50 shadow-[0_0_15px_rgba(0,240,255,0.2)]' : 'text-slate-500 hover:text-white'}`}>Jugadores</button>
+                    <button onClick={() => setActiveTab('CLIENTES')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all duration-300 ${activeTab === 'CLIENTES' ? 'bg-cyber-blue/20 text-cyber-blue border border-cyber-blue/50 shadow-[0_0_15px_rgba(36,99,235,0.3)]' : 'text-slate-500 hover:text-white'}`}>Jugadores</button>
                     <button onClick={() => setActiveTab('VENDEDORES')} className={`px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-widest transition-all duration-300 ${activeTab === 'VENDEDORES' ? 'bg-cyber-purple/20 text-cyber-purple border border-cyber-purple/50 shadow-[0_0_15px_rgba(188,19,254,0.2)]' : 'text-slate-500 hover:text-white'}`}>Vendedores</button>
                 </div>
             </div>
@@ -80,15 +80,16 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
             <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-end">
                 <div className="lg:col-span-5 relative group/input">
                     <label className={`text-[10px] font-mono font-bold ${theme.text} uppercase tracking-widest ml-1 mb-1 block`}>Búsqueda: ID, Teléfono, Nombre</label>
-                    <div className={`absolute -inset-0.5 ${theme.bg} rounded-lg blur opacity-0 group-hover/input:opacity-20 group-focus-within/input:opacity-50 transition-opacity duration-500`}></div>
-                    <div className="relative flex items-center bg-black/60 border border-white/10 rounded-lg overflow-hidden">
+                    {/* Input specific glow */}
+                    <div className={`absolute -inset-0.5 ${theme.bg} rounded-lg blur opacity-0 group-hover/input:opacity-30 group-focus-within/input:opacity-60 transition-opacity duration-500`}></div>
+                    <div className="relative flex items-center bg-[#0a0a0f] border border-white/10 rounded-lg overflow-hidden">
                         <div className="pl-4 text-slate-500"><i className="fas fa-search"></i></div>
                         <input 
                             type="text" 
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             placeholder="Ej: 102340567 o +506..."
-                            className={`w-full bg-transparent border-none text-white font-mono text-sm px-4 py-3 focus:outline-none placeholder-slate-600 focus:text-${theme.name}-400`}
+                            className={`w-full bg-transparent border-none text-white font-mono text-sm px-4 py-3 focus:outline-none placeholder-slate-600 focus:text-${theme.name === 'blue' ? 'cyber-blue' : 'cyber-purple'}`}
                         />
                     </div>
                 </div>
@@ -115,9 +116,7 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
             </div>
         </div>
 
-        <div className="relative overflow-x-auto min-h-[400px] max-h-[600px] custom-scrollbar bg-black/20">
-             <div className={`fixed inset-0 pointer-events-none opacity-[0.02] bg-[linear-gradient(transparent_50%,${theme.hex}_50%)] bg-[length:100%_4px]`}></div>
-
+        <div className="relative overflow-x-auto min-h-[400px] max-h-[600px] custom-scrollbar bg-[#080c14]">
              <table className="w-full text-left border-collapse relative z-10">
                 <thead className="sticky top-0 bg-[#02040a] z-20 shadow-xl">
                     <tr className={`text-[9px] font-mono ${theme.text} uppercase border-b border-white/10 tracking-widest`}>
@@ -143,7 +142,7 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
                             <tr key={u.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group/row">
                                 <td className="p-4 pl-6">
                                     <div className="flex items-center gap-4">
-                                        <div className={`relative w-10 h-10 rounded-full bg-black flex items-center justify-center border border-white/10 group-hover/row:border-${theme.name}-500/50 transition-colors`}>
+                                        <div className={`relative w-10 h-10 rounded-full bg-black flex items-center justify-center border border-white/10 group-hover/row:border-${theme.name === 'blue' ? 'cyber-blue' : 'cyber-purple'} transition-colors`}>
                                             <span className="font-display font-bold text-white">{u.name.substring(0,2).toUpperCase()}</span>
                                             <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-black rounded-full flex items-center justify-center">
                                                 <div className={`w-1.5 h-1.5 rounded-full ${u.status === 'Active' ? 'bg-green-500 shadow-[0_0_5px_lime]' : 'bg-red-500 shadow-[0_0_5px_red]'}`}></div>

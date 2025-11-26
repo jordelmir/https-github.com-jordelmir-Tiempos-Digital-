@@ -1,6 +1,6 @@
 
 import { supabase } from '../lib/supabaseClient';
-import { ApiResponse, AppUser, TransactionResponse, DrawResultPayload, GameMode } from '../types';
+import { ApiResponse, AppUser, TransactionResponse, DrawResultPayload, GameMode, DrawResult } from '../types';
 
 // In a real deployment, these would point to your deployed Edge Functions
 const FUNCTION_BASE_URL = '/functions/v1'; 
@@ -25,8 +25,29 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
     // DEMO MODE INTERCEPTION
     // @ts-ignore - access internal property for demo check
     if ((supabase as any).supabaseUrl === 'https://demo.local' || (supabase as any).supabaseUrl.includes('mock')) {
-        console.log(`[DEMO EDGE] Invocando ${functionName}`, body);
-        await new Promise(r => setTimeout(r, 800)); // Simulate Edge latency
+        // console.log(`[DEMO EDGE] Invocando ${functionName}`, body); // Reduced log noise
+        
+        // Faster response for clock sync
+        if (functionName === 'getServerTime') {
+             return { data: { 
+                 server_time: new Date().toISOString(),
+                 // Mock Draw Times: 12:55, 16:30, 19:30
+                 // We return the config, client logic handles the rest
+                 draw_config: {
+                     mediodia: '12:55:00',
+                     tarde: '16:30:00',
+                     noche: '19:30:00'
+                 }
+             } as any };
+        }
+
+        // Live Results Mock - READ FROM PERSISTENT MOCK TABLE
+        if (functionName === 'getLiveResults') {
+            const { data } = await supabase.from('lottery_results').select('*');
+            return { data: { results: data || [], history: [] } as any };
+        }
+
+        await new Promise(r => setTimeout(r, 800)); // Simulate Edge latency for other calls
 
         if (!session) return { error: 'No autorizado (Demo)' };
 
@@ -284,7 +305,15 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
             const { drawTime, winningNumber, isReventado, reventadoNumber, actor_id } = body;
             console.log(`[EDGE] LIQUIDANDO RESULTADOS: ${drawTime} - Número: ${winningNumber}`);
 
-            // 1. Get all Pending Bets for this Draw
+            // 1. UPDATE LIVE RESULTS STORE
+            await supabase.from('lottery_results').update({
+                winningNumber,
+                isReventado,
+                reventadoNumber: isReventado ? reventadoNumber : undefined,
+                status: 'CLOSED'
+            }).eq('drawTime', drawTime);
+
+            // 2. Get all Pending Bets for this Draw
             const { data: allBets } = await supabase.from('bets').select('*');
             const pendingBets = (allBets as any[]).filter(b => 
                 b.status === 'PENDING' && b.draw_id === drawTime
@@ -292,20 +321,16 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
 
             let processedCount = 0;
 
-            // 2. Iterate and Settle
+            // 3. Iterate and Settle
             for (const bet of pendingBets) {
                 const isWin = bet.numbers === winningNumber;
                 
                 if (isWin) {
                     // Calculate Prize
-                    // Logic: 200x if GameMode is Reventados AND isReventado is true. 
-                    // Note: In simple mode, Reventados bet pays 200x if matching winning number.
-                    // Or standard 90x.
                     let multiplier = 90; // Standard
                     if (isReventado && bet.mode === GameMode.REVENTADOS) {
                         multiplier = 200;
                     }
-                    // For the demo, we simplify: If bet was Reventados, we assume they wanted 200x risk.
                     
                     const prizeAmount = bet.amount_bigint * multiplier;
 
@@ -316,7 +341,7 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
                         await supabase.from('app_users').update({ balance_bigint: newBalance }).eq('id', winner.id);
                         
                         // Update Bet Status
-                        bet.status = 'WON'; // Mock update in memory happens via reference, but ideally utilize update
+                        bet.status = 'WON'; 
                         // Mock DB hack to update array item:
                         const betIndex = (allBets as any[]).findIndex(b => b.id === bet.id);
                         if (betIndex >= 0) (allBets as any[])[betIndex].status = 'WON';
@@ -401,11 +426,11 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
 }
 
 export const api = {
+  // ... existing methods ...
   createUser: async (payload: { name: string; email?: string; phone: string; cedula: string; role: string; balance_bigint: number; pin: string; issuer_id?: string }) => {
     return invokeEdgeFunction<{ user: AppUser }>('createUser', payload);
   },
 
-  // New helper for Real-Time UX checks
   checkIdentityAvailability: async (cedula: string) => {
     return invokeEdgeFunction<AppUser | null>('checkIdentity', { cedula });
   },
@@ -444,5 +469,15 @@ export const api = {
 
   deleteUser: async (payload: { target_user_id: string; confirmation: string; actor_id: string }) => {
     return invokeEdgeFunction<any>('deleteUser', payload);
+  },
+
+  // NEW: Server Clock
+  getServerTime: async () => {
+      return invokeEdgeFunction<{ server_time: string; draw_config: any }>('getServerTime', {});
+  },
+
+  // NEW: Live Results
+  getLiveResults: async () => {
+      return invokeEdgeFunction<{ results: DrawResult[]; history: DrawResult[] }>('getLiveResults', {});
   }
 };

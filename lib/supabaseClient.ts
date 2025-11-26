@@ -59,6 +59,14 @@ const generateUsers = (role: string, count: number) => {
 const MOCK_CLIENTS = generateUsers('Cliente', 50);
 const MOCK_VENDORS = generateUsers('Vendedor', 50);
 
+// MOCK RESULTS - INITIALIZE FOR TODAY
+const todayStr = new Date().toISOString().split('T')[0];
+const MOCK_RESULTS = [
+    { id: 'res-1', date: todayStr, drawTime: 'Mediodía (12:55)', winningNumber: '--', isReventado: false, status: 'OPEN', created_at: new Date().toISOString() },
+    { id: 'res-2', date: todayStr, drawTime: 'Tarde (16:30)', winningNumber: '--', isReventado: false, status: 'OPEN', created_at: new Date().toISOString() },
+    { id: 'res-3', date: todayStr, drawTime: 'Noche (19:30)', winningNumber: '--', isReventado: false, status: 'OPEN', created_at: new Date().toISOString() }
+];
+
 const MOCK_LEDGER = Array.from({ length: 15 }).map((_, i) => ({
   id: `tx-${i}`,
   ticket_code: `TX-${Math.random().toString(36).substring(2,6).toUpperCase()}-${Math.random().toString(36).substring(2,6).toUpperCase()}`,
@@ -234,6 +242,11 @@ if (isDemo) {
                  
                  return { data: null, error: { message: 'User Not Found' } };
             }
+            if (table === 'lottery_results' && currentFilterField === 'drawTime') {
+                // Find result for today and this draw time
+                const res = MOCK_RESULTS.find(r => r.drawTime === currentFilterValue);
+                return { data: res || null, error: null };
+            }
             return { data: null, error: { message: 'No encontrado' } };
         },
         then: (callback: (res: any) => void) => {
@@ -242,9 +255,9 @@ if (isDemo) {
                 if (table === 'app_users') {
                     // FIX: Improved Query Resolver for Uniqueness Check
                     if (currentFilterValue === 'Cliente') {
-                        data = MOCK_CLIENTS;
+                        data = [...MOCK_CLIENTS]; // RETURN COPY TO FORCE RE-RENDER
                     } else if (currentFilterValue === 'Vendedor') {
-                        data = MOCK_VENDORS;
+                        data = [...MOCK_VENDORS]; // RETURN COPY TO FORCE RE-RENDER
                     } else if (currentFilterField === 'auth_uid') {
                         data = [MOCK_ADMIN_PROFILE];
                     } else {
@@ -253,22 +266,24 @@ if (isDemo) {
                         data = [...MOCK_CLIENTS, ...MOCK_VENDORS, MOCK_ADMIN_PROFILE];
                     }
                 } else if (table === 'ledger_transactions') {
-                    data = MOCK_LEDGER;
+                    data = [...MOCK_LEDGER];
                     // Sort ledger
                     data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
                 } else if (table === 'audit_trail') {
-                    data = MOCK_AUDIT;
+                    data = [...MOCK_AUDIT];
                 } else if (table === 'bets') {
                     if (currentFilterField === 'user_id') {
                         data = MOCK_BETS.filter(b => b.user_id === currentFilterValue);
                     } else {
-                        data = MOCK_BETS;
+                        data = [...MOCK_BETS];
                     }
                     data.sort((a, b) => {
                         const dateA = new Date(a.created_at).getTime();
                         const dateB = new Date(b.created_at).getTime();
                         return orderAsc ? dateA - dateB : dateB - dateA;
                     });
+                } else if (table === 'lottery_results') {
+                    data = [...MOCK_RESULTS];
                 }
                 callback({ data, error: null });
             }, 300);
@@ -307,24 +322,38 @@ if (isDemo) {
             })
         }),
         update: (payload: any) => ({
-            eq: (field: string, value: string) => ({
-                select: () => ({
-                    single: async () => {
-                        await new Promise(resolve => setTimeout(resolve, 200));
-                        
-                        let target = MOCK_CLIENTS.find(u => u[field] === value);
-                        if (!target) target = MOCK_VENDORS.find(u => u[field] === value);
-                        if (!target && value === MOCK_ADMIN_PROFILE.id) target = MOCK_ADMIN_PROFILE;
-
+            eq: (field: string, value: string) => {
+                const executeUpdate = async () => {
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    
+                    if (table === 'lottery_results') {
+                        const target = MOCK_RESULTS.find(r => r[field] === value);
                         if (target) {
-                            // Apply updates specifically
                             Object.assign(target, payload);
                             return { data: target, error: null };
                         }
-                        return { data: null, error: { message: 'Update Target Not Found' } };
                     }
-                })
-            })
+
+                    let target = MOCK_CLIENTS.find(u => u[field] === value);
+                    if (!target) target = MOCK_VENDORS.find(u => u[field] === value);
+                    if (!target && value === MOCK_ADMIN_PROFILE.id) target = MOCK_ADMIN_PROFILE;
+
+                    if (target) {
+                        // Apply updates specifically
+                        Object.assign(target, payload);
+                        return { data: target, error: null };
+                    }
+                    return { data: null, error: { message: 'Update Target Not Found' } };
+                };
+
+                return {
+                    select: () => ({
+                        single: executeUpdate
+                    }),
+                    // Allow await direct on eq() chain by providing thenable
+                    then: (onfulfilled: any) => executeUpdate().then(onfulfilled)
+                };
+            }
         }),
         delete: () => ({
              eq: (field: string, value: string) => {

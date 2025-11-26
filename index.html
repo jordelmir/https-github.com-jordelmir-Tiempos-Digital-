@@ -20,14 +20,19 @@
                 dark: '#050a14',
                 panel: '#0a1124',
                 border: '#1e3a8a',
-                neon: '#00f0ff',   // CYAN (Mediodía)
-                purple: '#bc13fe', // MORADO (Tarde)
-                orange: '#ff5f00', // NARANJA (Legacy/Alerts)
-                blue: '#2463eb',   // BLUE BLACK CRYSTAL (Noche - Nuevo)
-                emerald: '#10b981', // NEW: EMERALD (Historical/Secure/Recharge)
-                'emerald-dark': '#064e3b', // NEW: DEEP EMERALD
-                danger: '#ff003c', // ROJO NEON
-                success: '#0aff60' // VERDE NEON (Action)
+                neon: '#00f0ff',   // Legacy Cyan
+                purple: '#bc13fe', // Legacy Purple
+                orange: '#ff5f00', // Alerts
+                blue: '#2463eb',   // Standard Blue
+                emerald: '#10b981', // Secure
+                'emerald-dark': '#064e3b',
+                danger: '#ff003c', // Red
+                success: '#0aff60', // Green
+                
+                // NEW PALETTES FOR DRAW TIMES
+                solar: '#ff5f00',  // Mediodía (Neon Orange)
+                vapor: '#7c3aed',  // Tarde (Deep Imperial Purple - Masculine)
+                abyss: '#1e3a8a'   // Noche (Deep Blue)
               }
             },
             fontFamily: {
@@ -43,6 +48,12 @@
               'neon-emerald': '0 0 20px #10b981, 0 0 80px rgba(16, 185, 129, 0.9), inset 0 0 30px rgba(16, 185, 129, 0.5)', 
               'neon-red': '0 0 5px #ff003c, 0 0 30px rgba(255, 0, 60, 0.5), inset 0 0 10px rgba(255, 0, 60, 0.2)',
               'neon-green': '0 0 5px #0aff60, 0 0 20px rgba(10, 255, 96, 0.4), inset 0 0 10px rgba(10, 255, 96, 0.1)',
+              
+              // NEW SHADOWS - SOLAR (ORANGE) & VAPOR (DEEP PURPLE)
+              'neon-solar': '0 0 10px #ff5f00, 0 0 40px rgba(255, 95, 0, 0.6), inset 0 0 20px rgba(255, 95, 0, 0.2)',
+              'neon-vapor': '0 0 10px #7c3aed, 0 0 40px rgba(124, 58, 237, 0.5), inset 0 0 20px rgba(124, 58, 237, 0.2)',
+              'neon-abyss': '0 0 15px #1e3a8a, 0 0 60px rgba(30, 58, 138, 0.6), inset 0 0 30px rgba(30, 58, 138, 0.3)',
+              
               'panel-glow': '0 0 50px rgba(0, 0, 0, 0.9), inset 0 0 30px rgba(255,255,255,0.02)',
             },
             animation: {
@@ -181,6 +192,16 @@
 </script>
   </head>
   <body>
+    <script>
+        // Process Shim
+        window.process = {
+            env: {
+                NODE_ENV: 'development',
+                REACT_APP_SUPABASE_URL: '',
+                REACT_APP_SUPABASE_ANON_KEY: ''
+            }
+        };
+    </script>
     <div class="neural-bg">
       <div class="neural-web"></div>
       <div class="neural-breath"></div>

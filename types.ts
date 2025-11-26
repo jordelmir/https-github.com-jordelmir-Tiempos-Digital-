@@ -156,3 +156,14 @@ export interface DrawResultPayload {
   reventadoNumber?: string; // If applicable
   actor_id: string;
 }
+
+export interface DrawResult {
+    id: string;
+    date: string;
+    drawTime: DrawTime;
+    winningNumber: string;
+    isReventado: boolean;
+    reventadoNumber?: string;
+    status: 'OPEN' | 'CLOSED' | 'VERIFYING';
+    created_at: string;
+}
