@@ -1,6 +1,6 @@
 
 import { supabase } from '../lib/supabaseClient';
-import { ApiResponse, AppUser, TransactionResponse, DrawResultPayload, GameMode, DrawResult } from '../types';
+import { ApiResponse, AppUser, TransactionResponse, DrawResultPayload, GameMode, DrawResult, Bet } from '../types';
 
 // In a real deployment, these would point to your deployed Edge Functions
 const FUNCTION_BASE_URL = '/functions/v1'; 
@@ -395,6 +395,74 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
             return { data: { success: true } as any };
         }
 
+        // NEW: Server Clock
+        if (functionName === 'getServerTime') {
+             return { data: { 
+                 server_time: new Date().toISOString(),
+                 draw_config: {
+                     mediodia: '12:55:00',
+                     tarde: '16:30:00',
+                     noche: '19:30:00'
+                 }
+             } as any };
+        }
+
+        // NEW: Live Results
+        if (functionName === 'getLiveResults') {
+            const { data } = await supabase.from('lottery_results').select('*');
+            return { data: { results: data || [], history: [] } as any };
+        }
+
+        // NEW: GLOBAL BETS FETCHING (With Roles)
+        if (functionName === 'getGlobalBets') {
+            const { role, userId, timeFilter, statusFilter } = body;
+            
+            // 1. Get all Bets
+            const { data: allBets } = await supabase.from('bets').select('*');
+            let filteredBets = allBets as any[];
+
+            // 2. Role-Based Visibility
+            if (role === 'Cliente') {
+                filteredBets = filteredBets.filter(b => b.user_id === userId);
+            } else if (role === 'Vendedor') {
+                // Mock: Get clients issued by this vendor
+                const { data: clients } = await supabase.from('app_users').select('*');
+                const myClientIds = (clients as any[])
+                    .filter(c => c.issuer_id === userId)
+                    .map(c => c.id);
+                // Vendor sees their own bets + their clients' bets
+                filteredBets = filteredBets.filter(b => b.user_id === userId || myClientIds.includes(b.user_id));
+            }
+            // SuperAdmin sees all (no filter needed)
+
+            // 3. Time/Draw Filter
+            if (timeFilter && timeFilter !== 'ALL') {
+                filteredBets = filteredBets.filter(b => b.draw_id && b.draw_id.includes(timeFilter));
+            }
+
+            // 4. Status Filter
+            if (statusFilter && statusFilter !== 'ALL') {
+                filteredBets = filteredBets.filter(b => b.status === statusFilter);
+            }
+
+            // 5. Attach User Metadata (Mock Join)
+            const { data: allUsers } = await supabase.from('app_users').select('*');
+            const enrichedBets = filteredBets.map(bet => {
+                const user = (allUsers as any[]).find(u => u.id === bet.user_id);
+                return {
+                    ...bet,
+                    user_name: user ? user.name : 'Usuario Desconocido',
+                    user_role: user ? user.role : 'Desconocido',
+                    origin: user ? (user.role === 'Vendedor' ? 'Vendedor' : 'Jugador') : 'N/A'
+                };
+            });
+
+            // Sort by Date Desc
+            enrichedBets.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+            return { data: { bets: enrichedBets } as any };
+        }
+
         return { message: 'Función ejecutada exitosamente (Modo Demo)' };
     }
     // END DEMO MODE
@@ -426,7 +494,6 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
 }
 
 export const api = {
-  // ... existing methods ...
   createUser: async (payload: { name: string; email?: string; phone: string; cedula: string; role: string; balance_bigint: number; pin: string; issuer_id?: string }) => {
     return invokeEdgeFunction<{ user: AppUser }>('createUser', payload);
   },
@@ -471,13 +538,15 @@ export const api = {
     return invokeEdgeFunction<any>('deleteUser', payload);
   },
 
-  // NEW: Server Clock
   getServerTime: async () => {
       return invokeEdgeFunction<{ server_time: string; draw_config: any }>('getServerTime', {});
   },
 
-  // NEW: Live Results
   getLiveResults: async () => {
       return invokeEdgeFunction<{ results: DrawResult[]; history: DrawResult[] }>('getLiveResults', {});
+  },
+
+  getGlobalBets: async (payload: { role: string; userId: string; timeFilter?: string; statusFilter?: string }) => {
+      return invokeEdgeFunction<{ bets: Bet[] }>('getGlobalBets', payload);
   }
 };

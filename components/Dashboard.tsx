@@ -10,7 +10,8 @@ import AdminResultControl from './AdminResultControl';
 import UserManagementPanel from './UserManagementPanel';
 import ReventadosEffect from './ReventadosEffect';
 import CountdownTimer from './CountdownTimer';
-import LiveResultsPanel from './LiveResultsPanel'; // IMPORT
+import LiveResultsPanel from './LiveResultsPanel'; 
+import GlobalBetsTable from './GlobalBetsTable'; // IMPORT
 import { useServerClock } from '../hooks/useServerClock';
 import { formatCurrency } from '../constants';
 import { supabase } from '../lib/supabaseClient';
@@ -305,6 +306,7 @@ export default function Dashboard() {
         onClose={() => setAdminResultOpen(false)}
       />
 
+      {/* --- EDIT MULTIPLIER MODAL --- */}
       {editingMultiplier && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-xl animate-in fade-in duration-300">
               {/* ... Multiplier Modal Content ... */}
@@ -383,25 +385,26 @@ export default function Dashboard() {
             </div>
 
             <div className="flex items-center gap-6">
+                 {/* ADMIN CONTROL CENTER BUTTON - PERMANENT DEEP NEON BLUE BORDER */}
                  {user.role === UserRole.SuperAdmin && (
                      <div className="relative group/btn">
-                         {/* EMERALD CORE BACKLIGHT (Living) */}
-                         <div className="absolute -inset-1 bg-cyber-emerald rounded-xl opacity-30 blur-xl animate-pulse transition-all duration-500 group-hover/btn:opacity-60 group-hover/btn:blur-2xl"></div>
+                         {/* Deep Blue Backlight */}
+                         <div className="absolute -inset-1 bg-[#1e3a8a] rounded-xl opacity-30 blur-xl animate-pulse transition-all duration-500 group-hover/btn:opacity-60 group-hover/btn:blur-2xl"></div>
                          
-                         {/* CONTROL CENTER BUTTON - PHOSPHORESCENT BORDER UPDATE */}
+                         {/* CONTROL CENTER BUTTON - DEEP BLUE ABYSS PHOSPHORESCENT */}
                          <button 
                             onClick={() => setAdminResultOpen(true)}
-                            className="relative overflow-hidden bg-[#050a14] border-2 border-cyber-emerald hover:border-emerald-400 text-cyber-emerald px-8 py-3 rounded-xl backdrop-blur-md transition-all shadow-[0_0_20px_#10b981] hover:shadow-[0_0_40px_#10b981] group-hover/btn:scale-105"
+                            className="relative overflow-hidden bg-[#050a14] border-2 border-[#1e3a8a] hover:border-[#3b82f6] text-[#3b82f6] px-8 py-3 rounded-xl backdrop-blur-md transition-all shadow-[0_0_20px_rgba(30,58,138,0.5)] hover:shadow-[0_0_40px_rgba(30,58,138,0.8)] group-hover/btn:scale-105"
                          >
-                            <div className="absolute top-0 left-0 w-full h-full bg-[linear-gradient(transparent_50%,rgba(16,185,129,0.1)_50%)] bg-[length:100%_4px] pointer-events-none"></div>
+                            <div className="absolute top-0 left-0 w-full h-full bg-[linear-gradient(transparent_50%,rgba(30,58,138,0.1)_50%)] bg-[length:100%_4px] pointer-events-none"></div>
                             <div className="flex items-center gap-3">
                                 <div className="relative">
-                                    <i className="fas fa-cube text-xl animate-pulse text-shadow-green"></i>
-                                    <div className="absolute inset-0 border border-cyber-emerald/50 animate-[spin_3s_linear_infinite]"></div>
+                                    <i className="fas fa-cube text-xl animate-pulse text-shadow-blue"></i>
+                                    <div className="absolute inset-0 border border-[#3b82f6]/50 animate-[spin_3s_linear_infinite]"></div>
                                 </div>
                                 <div className="flex flex-col items-start">
                                     <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-white text-shadow-sm">Centro de Control</span>
-                                    <span className="text-[8px] font-mono text-cyber-emerald opacity-90">RESULTADOS & TIEMPO</span>
+                                    <span className="text-[8px] font-mono text-[#3b82f6] opacity-90">RESULTADOS & TIEMPO</span>
                                 </div>
                             </div>
                          </button>
@@ -411,7 +414,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* --- NEW LIVE RESULTS PANEL --- */}
+      {/* --- LIVE RESULTS PANEL --- */}
       <div className="relative z-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
           <LiveResultsPanel />
       </div>
@@ -477,22 +480,23 @@ export default function Dashboard() {
                                 </div>
                             </div>
                             
-                            {/* --- MODE TOGGLE CONTAINER (UPDATED PHOSPHORESCENT) --- */}
+                            {/* --- MODE TOGGLE CONTAINER (PHOSPHORESCENT BORDER) --- */}
                             <div className={`p-1.5 rounded-full flex gap-2 border-2 backdrop-blur-md shadow-lg self-center md:self-auto relative z-20 transition-all duration-500 group/mode
                                 ${isReventados 
                                     ? 'bg-black/90 border-red-500 shadow-[0_0_20px_rgba(220,38,38,0.6)] hover:shadow-[0_0_40px_rgba(220,38,38,0.9)] hover:border-red-400' 
                                     : `bg-black/90 ${theme.border} ${theme.shadow} hover:shadow-[0_0_30px_currentColor]` 
                                 }
                             `}>
-                                {/* TIEMPOS BUTTON - INDEPENDENT GLOW */}
+                                {/* TIEMPOS BUTTON - INDEPENDENT BORDER */}
                                 <button 
                                     onClick={() => setGameMode(GameMode.TIEMPOS)}
                                     disabled={isMarketClosed}
                                     className={`relative px-6 md:px-8 py-2 md:py-3 rounded-full font-bold text-xs uppercase tracking-widest transition-all duration-300 border-2 ${
                                         gameMode === GameMode.TIEMPOS 
                                         ? `bg-slate-900/50 text-white ${theme.border} ${theme.shadow}` 
-                                        : `border-transparent text-slate-500 hover:text-white hover:bg-white/5 hover:${theme.border}/50`
+                                        : `border-${theme.border.split('-')[1]}-${theme.border.split('-')[2]} text-slate-500 hover:text-white hover:bg-white/5`
                                     }`}
+                                    style={gameMode !== GameMode.TIEMPOS ? { borderColor: 'rgba(255,255,255,0.1)' } : {}}
                                 >
                                     Tiempos
                                 </button>
@@ -509,22 +513,32 @@ export default function Dashboard() {
                             </div>
                         </div>
 
+                        {/* DRAW SELECTORS - PERMANENT BORDERS */}
                         <div className="grid grid-cols-3 gap-3 md:gap-6 mb-10 md:mb-16">
                             {Object.values(DrawTime).map((time) => {
                                 const isSelected = selectedDraw === time;
-                                let activeGlow = "";
-                                // STATIC BORDER STYLES FOR PERMANENT GLOW
-                                let staticClass = "";
                                 
+                                // Determine color based on the draw time itself, NOT the currently selected global theme
+                                let borderColor = 'border-blue-900';
+                                let textColor = 'text-blue-400';
+                                let shadowColor = 'shadow-[0_0_10px_rgba(30,58,138,0.3)]';
+                                let activeGlow = '';
+
                                 if (time.includes('Mediodía')) {
-                                    staticClass = "border-cyber-solar text-cyber-solar shadow-[0_0_10px_rgba(255,95,0,0.2)]";
-                                    if(isSelected) activeGlow = "shadow-[0_0_40px_rgba(255,95,0,0.6),inset_0_0_20px_rgba(255,95,0,0.2)] bg-orange-900/20";
+                                    borderColor = 'border-cyber-solar';
+                                    textColor = 'text-cyber-solar';
+                                    shadowColor = 'shadow-[0_0_15px_rgba(255,95,0,0.3)]';
+                                    if(isSelected) activeGlow = "bg-cyber-solar/10 shadow-[0_0_40px_rgba(255,95,0,0.6)]";
                                 } else if (time.includes('Tarde')) {
-                                    staticClass = "border-cyber-vapor text-cyber-vapor shadow-[0_0_10px_rgba(124,58,237,0.2)]";
-                                    if(isSelected) activeGlow = "shadow-[0_0_40px_rgba(124,58,237,0.6),inset_0_0_20px_rgba(124,58,237,0.2)] bg-violet-900/20";
+                                    borderColor = 'border-cyber-vapor';
+                                    textColor = 'text-cyber-vapor';
+                                    shadowColor = 'shadow-[0_0_15px_rgba(124,58,237,0.3)]';
+                                    if(isSelected) activeGlow = "bg-cyber-vapor/10 shadow-[0_0_40px_rgba(124,58,237,0.6)]";
                                 } else {
-                                    staticClass = "border-blue-600 text-blue-400 shadow-[0_0_10px_rgba(30,58,138,0.3)]";
-                                    if(isSelected) activeGlow = "shadow-[0_0_40px_rgba(30,58,138,0.8),inset_0_0_20px_rgba(30,58,138,0.3)] bg-blue-950/50";
+                                    borderColor = 'border-blue-600';
+                                    textColor = 'text-blue-400';
+                                    shadowColor = 'shadow-[0_0_15px_rgba(30,58,138,0.4)]';
+                                    if(isSelected) activeGlow = "bg-blue-900/20 shadow-[0_0_40px_rgba(30,58,138,0.8)]";
                                 }
 
                                 return (
@@ -532,14 +546,14 @@ export default function Dashboard() {
                                         key={time}
                                         onClick={() => setSelectedDraw(time)}
                                         className={`relative h-24 md:h-32 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 md:gap-3 backdrop-blur-md overflow-hidden transition-all duration-500 ease-out group/btn 
-                                            ${isSelected ? activeGlow : 'bg-black/20 hover:bg-white/5'}
-                                            ${staticClass}
+                                            ${borderColor} ${textColor} ${shadowColor}
+                                            ${isSelected ? activeGlow : 'bg-black/40 hover:bg-white/5'}
                                         `}
                                     >
-                                        {isSelected && <div className={`absolute inset-0 ${isReventados ? 'bg-red-500' : theme.glow} opacity-10 animate-pulse theme-transition`}></div>}
+                                        {isSelected && <div className={`absolute inset-0 ${isReventados ? 'bg-red-500' : 'bg-current'} opacity-10 animate-pulse`}></div>}
                                         <i className={`fas ${time.includes('19') ? 'fa-moon' : (time.includes('16') ? 'fa-cloud-sun' : 'fa-sun')} text-2xl md:text-3xl transition-all duration-500 group-hover/btn:scale-110`}></i>
                                         <span className={`text-[10px] md:text-xs font-black uppercase tracking-widest transition-colors duration-500 ${isSelected ? 'text-white text-glow' : ''}`}>{time.split(' ')[0]}</span>
-                                        <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${isSelected ? (isReventados ? 'bg-red-500 shadow-[0_0_10px_red]' : `${theme.glow} shadow-[0_0_10px_white]`) : 'bg-slate-800'}`}></div>
+                                        <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${isSelected ? (isReventados ? 'bg-red-500 shadow-[0_0_10px_red]' : `bg-current shadow-[0_0_10px_currentColor]`) : 'bg-slate-800'}`}></div>
                                     </button>
                                 )
                             })}
@@ -681,6 +695,12 @@ export default function Dashboard() {
                 </div>
             )}
             
+            {/* --- GLOBAL BETS TABLE (FOR ALL ROLES) --- */}
+            <div className="space-y-12 relative z-0">
+                <div className="h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+                <GlobalBetsTable />
+            </div>
+
             {(user.role === UserRole.SuperAdmin || user.role === UserRole.Vendedor) && (
                 <div className="space-y-12 relative z-0">
                      <div className="h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
