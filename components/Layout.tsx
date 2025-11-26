@@ -1,3 +1,4 @@
+
 import React, { ReactNode, useState } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { UserRole } from '../types';
@@ -140,68 +141,136 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           {/* 3. USER COMMAND NODE (Unified Capsule) */}
           <div className="flex items-center justify-end shrink-0 gap-4">
              
-             {/* Desktop Integrated Capsule */}
-             <div className="hidden md:flex items-center bg-[#050a14]/60 backdrop-blur-md border border-white/10 rounded-full p-1 pl-6 gap-6 shadow-inner group transition-all duration-300 hover:border-cyber-neon/30 hover:shadow-neon-cyan">
+             {/* Desktop Integrated Capsule - DEEP NIGHT BLUE PHOSPHORESCENT (ABYSS) - LIVING UPGRADE */}
+             <div className="hidden md:block relative group">
                 
-                {/* User Details */}
-                <div className="flex flex-col items-end">
-                   <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyber-success animate-pulse shadow-[0_0_5px_lime]"></span>
-                      <span className="text-[9px] text-cyber-blue font-mono uppercase tracking-widest font-bold">{user.role}</span>
-                   </div>
-                   <span className="font-display font-bold text-white text-sm tracking-wide text-glow-sm">{user.name.split(' ')[0]}</span>
-                </div>
+                {/* LIVING BACKLIGHT (The "Soul") */}
+                <div className="absolute -inset-1 bg-[#1e3a8a] rounded-full opacity-20 blur-xl animate-[pulse_3s_ease-in-out_infinite] transition-all duration-500 group-hover:opacity-50 group-hover:blur-2xl"></div>
                 
-                {/* Balance & Actions Cluster */}
-                <div className="flex items-center gap-1 bg-black/40 rounded-full p-1 pr-1 border border-white/5 group-hover:border-cyber-neon/20 transition-colors">
-                   
-                   {/* Balance Display */}
-                   <div className="px-4 py-1.5 rounded-full bg-cyber-panel/50 border border-cyber-neon/20 text-cyber-neon font-mono font-bold text-sm shadow-[0_0_15px_rgba(0,240,255,0.15)]">
-                      {formatCurrency(user.balance_bigint)}
-                   </div>
+                {/* SOLID CONTAINER */}
+                <div className="relative flex items-center bg-[#050a14]/95 backdrop-blur-xl border-2 border-[#1e3a8a] shadow-[0_0_30px_rgba(30,58,138,0.5)] rounded-full p-1 pl-6 gap-6 transition-all duration-500 group-hover:border-[#3b82f6] group-hover:shadow-[0_0_50px_rgba(30,58,138,0.8)]">
+                    
+                    {/* User Details */}
+                    <div className="flex flex-col items-end">
+                       {/* PHOSPHORESCENT ROLE BADGE (LIVING BORDER) */}
+                       <div className={`px-3 py-1 rounded-lg border-2 text-[9px] font-mono uppercase tracking-widest font-bold mb-1 shadow-lg transition-all duration-500 ${
+                           user.role === UserRole.SuperAdmin ? 'border-cyber-emerald text-cyber-emerald shadow-[0_0_15px_rgba(16,185,129,0.4)]' :
+                           user.role === UserRole.Vendedor ? 'border-cyber-purple text-cyber-purple shadow-[0_0_15px_rgba(188,19,254,0.4)]' :
+                           'border-cyber-blue text-cyber-blue shadow-[0_0_15px_rgba(36,99,235,0.4)]'
+                       }`}>
+                          {user.role}
+                       </div>
+                       <span className="font-display font-bold text-white text-sm tracking-wide text-glow-sm">{user.name.split(' ')[0]}</span>
+                    </div>
+                    
+                    {/* Balance & Actions Cluster */}
+                    <div className="flex items-center gap-3 bg-black/40 rounded-full p-1 pr-1 border border-white/5 group-hover:border-white/10 transition-colors">
+                       
+                       {/* Balance Display - PHOSPHORESCENT CYAN */}
+                       <div className="px-4 py-1.5 rounded-full bg-[#0a1124] border-2 border-cyber-neon text-cyber-neon font-mono font-bold text-sm shadow-[0_0_20px_rgba(0,240,255,0.3)] animate-[pulse_4s_ease-in-out_infinite]">
+                          {formatCurrency(user.balance_bigint)}
+                       </div>
 
-                   {/* Divider */}
-                   <div className="w-px h-6 bg-white/10 mx-1"></div>
+                       {/* Divider */}
+                       <div className="w-px h-6 bg-white/10 mx-1"></div>
 
-                   {/* Logout Button (Integrated) */}
-                   <button 
-                      onClick={requestSignOut}
-                      className="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-white hover:bg-cyber-danger hover:shadow-neon-red transition-all duration-300"
-                      title="Desconectar del Núcleo"
-                   >
-                      <i className="fas fa-power-off text-xs"></i>
-                   </button>
+                       {/* Logout Button (LIVING PHOSPHORESCENT DANGER) */}
+                       <button 
+                          onClick={requestSignOut}
+                          className="w-9 h-9 flex items-center justify-center rounded-full border-2 border-cyber-danger text-cyber-danger shadow-[0_0_10px_rgba(255,0,60,0.3)] bg-cyber-danger/5 hover:bg-cyber-danger hover:text-white hover:shadow-neon-red transition-all duration-300 group/logout relative overflow-hidden"
+                          title="Desconectar del Núcleo"
+                       >
+                          <div className="absolute inset-0 bg-cyber-danger opacity-0 group-hover/logout:opacity-100 transition-opacity duration-300"></div>
+                          <i className="fas fa-power-off text-xs relative z-10 group-hover/logout:animate-pulse"></i>
+                       </button>
+                    </div>
                 </div>
              </div>
 
-             {/* Mobile Toggle */}
+             {/* Mobile Toggle - PHOSPHORESCENT UPGRADE */}
              <button 
                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-               className="lg:hidden w-10 h-10 flex items-center justify-center text-white border border-white/10 rounded bg-white/5"
+               className={`lg:hidden w-12 h-12 flex items-center justify-center rounded-xl border-2 transition-all duration-300 ${
+                   isMobileMenuOpen 
+                   ? 'bg-cyber-neon text-black border-cyber-neon shadow-neon-cyan rotate-90' 
+                   : 'bg-black/50 text-cyber-neon border-cyber-neon/50 shadow-[0_0_15px_rgba(0,240,255,0.2)] hover:border-cyber-neon hover:shadow-neon-cyan'
+               }`}
              >
-                <i className={`fas ${isMobileMenuOpen ? 'fa-times' : 'fa-bars'}`}></i>
+                <i className={`fas ${isMobileMenuOpen ? 'fa-times' : 'fa-bars'} text-xl`}></i>
              </button>
           </div>
         </div>
 
-        {/* Mobile Menu Dropdown */}
+        {/* Mobile Menu Dropdown - HOLOGRAPHIC MODULE UPGRADE */}
         {isMobileMenuOpen && (
-           <div className="lg:hidden border-t border-cyber-border bg-[#050a14]/95 backdrop-blur-xl p-4 space-y-2 animate-in slide-in-from-top-2 absolute w-full z-50 shadow-2xl">
-              <MobileNavItem label="Panel Principal" icon="fa-chart-pie" onClick={() => { navigate(ROUTES.DASHBOARD); setIsMobileMenuOpen(false); }} active={isActive(ROUTES.DASHBOARD)} />
-              {user.role === UserRole.SuperAdmin && <MobileNavItem label="Auditoría" icon="fa-dna" onClick={() => { navigate(ROUTES.AUDIT); setIsMobileMenuOpen(false); }} active={isActive(ROUTES.AUDIT)} />}
-              <MobileNavItem label="Libro Mayor" icon="fa-server" onClick={() => { navigate(ROUTES.LEDGER); setIsMobileMenuOpen(false); }} active={isActive(ROUTES.LEDGER)} />
+           <div className="lg:hidden absolute top-[calc(100%+1px)] left-0 w-full z-50 animate-in slide-in-from-top-2 duration-300">
               
-              <div className="h-px bg-white/10 my-4"></div>
-              
-              {/* Mobile User Info */}
-              <div className="px-4 py-2 flex justify-between items-center bg-black/40 rounded-lg border border-cyber-neon/20 mb-2">
-                 <span className="text-xs text-cyber-blue font-bold">{user.name}</span>
-                 <span className="text-cyber-neon font-mono font-bold text-glow-sm">{formatCurrency(user.balance_bigint)}</span>
-              </div>
+              {/* Backdrop Blur & Border */}
+              <div className="bg-[#050a14]/95 backdrop-blur-xl border-b-2 border-cyber-neon shadow-[0_10px_40px_rgba(0,0,0,0.8)] p-6 relative overflow-hidden">
+                  
+                  {/* Top Glow Line */}
+                  <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-cyber-neon to-transparent opacity-50"></div>
 
-              <button onClick={requestSignOut} className="w-full text-left px-4 py-3 text-cyber-danger font-display font-bold uppercase tracking-widest flex items-center gap-3 hover:bg-white/5 rounded-lg transition-colors text-shadow-red">
-                 <i className="fas fa-power-off"></i> Cerrar Sesión
-              </button>
+                  <div className="space-y-3 relative z-10">
+                      <MobileNavItem 
+                        label="Panel Principal" 
+                        icon="fa-chart-pie" 
+                        color="neon"
+                        onClick={() => { navigate(ROUTES.DASHBOARD); setIsMobileMenuOpen(false); }} 
+                        active={isActive(ROUTES.DASHBOARD)} 
+                      />
+                      {user.role === UserRole.SuperAdmin && (
+                        <MobileNavItem 
+                            label="Auditoría Forense" 
+                            icon="fa-dna" 
+                            color="purple"
+                            onClick={() => { navigate(ROUTES.AUDIT); setIsMobileMenuOpen(false); }} 
+                            active={isActive(ROUTES.AUDIT)} 
+                        />
+                      )}
+                      <MobileNavItem 
+                        label="Libro Mayor" 
+                        icon="fa-server" 
+                        color="success"
+                        onClick={() => { navigate(ROUTES.LEDGER); setIsMobileMenuOpen(false); }} 
+                        active={isActive(ROUTES.LEDGER)} 
+                      />
+                  </div>
+                  
+                  <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent my-6"></div>
+                  
+                  {/* Mobile User Info - PHOSPHORESCENT CAPSULE */}
+                  <div className="relative group/mobile-user mb-4">
+                     <div className="absolute -inset-1 bg-[#1e3a8a] rounded-xl opacity-20 blur-lg animate-pulse"></div>
+                     <div className="relative px-5 py-4 flex justify-between items-center bg-[#0a1124] rounded-xl border-2 border-[#1e3a8a] shadow-[0_0_20px_rgba(30,58,138,0.3)]">
+                        <div className="flex flex-col">
+                            <span className={`text-[9px] font-bold uppercase tracking-widest mb-1 px-2 py-0.5 rounded border w-fit ${
+                                user.role === UserRole.SuperAdmin ? 'text-cyber-emerald border-cyber-emerald' : 
+                                user.role === UserRole.Vendedor ? 'text-cyber-purple border-cyber-purple' : 
+                                'text-cyber-blue border-cyber-blue'
+                            }`}>
+                                {user.role}
+                            </span>
+                            <span className="text-sm text-white font-display font-bold tracking-wider">{user.name}</span>
+                        </div>
+                        <div className="text-right">
+                            <span className="block text-[8px] text-slate-500 uppercase tracking-widest">Saldo</span>
+                            <span className="text-cyber-neon font-mono font-bold text-xl text-shadow-cyan">{formatCurrency(user.balance_bigint)}</span>
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* Mobile Logout - DANGER ZONE */}
+                  <button 
+                    onClick={requestSignOut} 
+                    className="w-full relative group/logout overflow-hidden rounded-xl border-2 border-cyber-danger/50 p-4 transition-all duration-300 hover:border-cyber-danger hover:shadow-neon-red"
+                  >
+                     <div className="absolute inset-0 bg-cyber-danger/10 group-hover/logout:bg-cyber-danger group-hover/logout:opacity-100 transition-all duration-300 opacity-0"></div>
+                     <div className="relative z-10 flex items-center justify-center gap-3 text-cyber-danger group-hover/logout:text-white font-display font-black uppercase tracking-widest">
+                        <i className="fas fa-power-off"></i> Desconectar
+                     </div>
+                  </button>
+              </div>
            </div>
         )}
       </header>
@@ -262,9 +331,24 @@ const NavItem = ({ icon, label, active, onClick, color }: any) => {
   );
 };
 
-const MobileNavItem = ({ label, icon, onClick, active }: any) => (
-   <button onClick={onClick} className={`w-full flex items-center gap-4 px-4 py-4 rounded-lg transition-colors ${active ? 'bg-cyber-neon/10 text-cyber-neon border border-cyber-neon/20' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>
-      <i className={`fas ${icon} w-6 text-center`}></i>
-      <span className="font-display font-bold uppercase tracking-wider text-sm">{label}</span>
-   </button>
-);
+const MobileNavItem = ({ label, icon, onClick, active, color }: any) => {
+    const themeColors: any = {
+        'neon': 'border-cyber-neon text-cyber-neon shadow-neon-cyan',
+        'purple': 'border-cyber-purple text-cyber-purple shadow-neon-purple',
+        'success': 'border-cyber-success text-cyber-success shadow-neon-green'
+    };
+
+    const activeClass = active 
+        ? `bg-black border-2 ${themeColors[color] || 'border-white text-white'}`
+        : 'border-2 border-white/5 text-slate-400 hover:border-white/20 hover:text-white hover:bg-white/5';
+
+    return (
+       <button onClick={onClick} className={`w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all duration-300 group ${activeClass}`}>
+          <div className={`w-8 h-8 rounded flex items-center justify-center ${active ? 'bg-white/10' : 'bg-black/40'}`}>
+            <i className={`fas ${icon} text-lg group-hover:scale-110 transition-transform`}></i>
+          </div>
+          <span className="font-display font-bold uppercase tracking-wider text-sm">{label}</span>
+          {active && <div className={`ml-auto w-2 h-2 rounded-full ${color === 'neon' ? 'bg-cyber-neon' : color === 'purple' ? 'bg-cyber-purple' : 'bg-cyber-success'} animate-pulse shadow-[0_0_5px_currentColor]`}></div>}
+       </button>
+    );
+};

@@ -182,15 +182,15 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
         ></div>
 
         <div 
-            className="relative h-full bg-[#050a14]/90 border rounded-2xl p-0 shadow-2xl overflow-hidden backdrop-blur-xl transition-all duration-700 flex flex-col z-10"
-            style={{ borderColor: '#10b98160' }} // Emerald 40%
+            className="relative h-full bg-[#050a14]/90 border-2 rounded-2xl p-0 shadow-2xl overflow-hidden backdrop-blur-xl transition-all duration-700 flex flex-col z-10"
+            style={{ borderColor: '#10b981' }} // Emerald Border
         >
             
             {/* Header */}
             <div className="p-6 border-b border-white/5 flex justify-between items-center bg-black/20">
                 <div className="flex items-center gap-4">
                     <div 
-                        className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center transition-all duration-700 border"
+                        className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center transition-all duration-700 border-2"
                         style={{ borderColor: activeTheme.color, color: activeTheme.color, boxShadow: `0 0 15px ${activeTheme.shadow}` }}
                     >
                         <i className="fas fa-id-card text-lg"></i>
@@ -207,9 +207,10 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
                     {[1, 2, 3].map(i => (
                         <div 
                             key={i} 
-                            className="w-2 h-2 rounded-full transition-all duration-500"
+                            className="w-2 h-2 rounded-full transition-all duration-500 border"
                             style={{ 
                                 backgroundColor: step >= i ? activeTheme.color : '#1e293b',
+                                borderColor: step >= i ? activeTheme.color : '#334155',
                                 boxShadow: step >= i ? `0 0 5px ${activeTheme.shadow}` : 'none'
                             }}
                         ></div>
@@ -221,21 +222,38 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
                 
                 <div className="flex-1 p-6 relative">
                     
-                    {/* ROLE TOGGLE - NO FLICKER */}
+                    {/* ROLE TOGGLE CONTAINER - PHOSPHORESCENT BORDER & GLOW */}
                     <div className="flex justify-center mb-6">
-                        <div className="bg-black/40 p-1 rounded-lg border border-white/10 flex gap-1">
+                        <div 
+                            className="bg-black/60 p-1.5 rounded-xl border-2 flex gap-4 shadow-lg transition-all duration-500"
+                            style={{
+                                borderColor: activeTheme.color, // Container matches active theme
+                                boxShadow: `0 0 25px ${activeTheme.shadow.replace('0.5', '0.2')}`
+                            }}
+                        >
+                            {/* PLAYER TOGGLE - PERMANENT CYAN BORDER */}
                             <button
                                 type="button"
                                 onClick={() => setRole(UserRole.Cliente)}
-                                className={`px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${role === UserRole.Cliente ? 'bg-cyber-neon text-black shadow-neon-cyan' : 'text-slate-500 hover:text-white'}`}
+                                className={`px-6 py-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 border-2 border-cyber-neon ${
+                                    role === UserRole.Cliente 
+                                    ? 'bg-cyber-neon text-black shadow-[0_0_20px_#00f0ff]' 
+                                    : 'bg-transparent text-slate-400 shadow-[0_0_10px_rgba(0,240,255,0.2)] hover:text-cyber-neon hover:shadow-[0_0_15px_#00f0ff] hover:bg-cyber-neon/5'
+                                }`}
                             >
                                 Jugador
                             </button>
+                            
+                            {/* VENDOR TOGGLE - PERMANENT PURPLE BORDER */}
                             <button
                                 type="button"
                                 disabled={isVendedor}
                                 onClick={() => setRole(UserRole.Vendedor)}
-                                className={`px-4 py-2 rounded text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${role === UserRole.Vendedor ? 'bg-cyber-purple text-black shadow-neon-purple' : 'text-slate-500 hover:text-white'} ${isVendedor ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`px-6 py-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 border-2 border-cyber-purple ${
+                                    role === UserRole.Vendedor 
+                                    ? 'bg-cyber-purple text-black shadow-[0_0_20px_#bc13fe]' 
+                                    : 'bg-transparent text-slate-400 shadow-[0_0_10px_rgba(188,19,254,0.2)] hover:text-cyber-purple hover:shadow-[0_0_15px_#bc13fe] hover:bg-cyber-purple/5'
+                                } ${isVendedor ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                                 Vendedor
                             </button>
@@ -253,28 +271,21 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
                                     Cédula de Identidad / ID
                                 </label>
                                 
-                                {/* Input Focus Glow */}
-                                <div 
-                                    className="absolute -inset-0.5 rounded-lg blur-md transition-all duration-500 opacity-0 group-focus-within/field:opacity-50"
-                                    style={{ backgroundColor: collisionUser ? '#ef4444' : activeTheme.color }}
-                                ></div>
-                                
                                 <div className="relative">
                                     <input 
                                         type="text"
                                         required
                                         value={cedula}
                                         onChange={e => setCedula(e.target.value)}
-                                        className={`relative w-full bg-black/60 border rounded-lg px-4 py-3 text-white font-mono placeholder-slate-700 focus:outline-none transition-all z-10 ${
+                                        className={`relative w-full bg-black/60 border-2 rounded-lg px-4 py-3 text-white font-mono placeholder-slate-700 focus:outline-none transition-all duration-300 z-10 ${
                                             collisionUser 
-                                            ? 'border-red-500 text-red-500 focus:border-red-500' 
-                                            : checkingId 
-                                                ? `border-white/20` 
-                                                : cedula.length > 3 
-                                                    ? `border-green-500 text-green-400 focus:border-green-500` 
-                                                    : `border-slate-700`
+                                            ? 'border-red-500 text-red-500 focus:shadow-[0_0_20px_red]' 
+                                            : ''
                                         }`}
-                                        style={(!collisionUser && !checkingId && cedula.length <= 3) ? { borderColor: 'rgb(51 65 85)' } : {}}
+                                        style={!collisionUser ? { 
+                                            borderColor: activeTheme.color, 
+                                            boxShadow: `0 0 10px ${activeTheme.shadow.replace('0.5', '0.1')}` 
+                                        } : {}}
                                         placeholder="NO. IDENTIFICACIÓN ÚNICO"
                                         autoFocus
                                     />
@@ -288,7 +299,7 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
 
                             {/* COLLISION ALERT CARD */}
                             {collisionUser && (
-                                <div className="animate-in slide-in-from-top-2 fade-in duration-300 bg-red-950/20 border border-red-500/50 rounded-lg p-3 relative overflow-hidden">
+                                <div className="animate-in slide-in-from-top-2 fade-in duration-300 bg-red-950/20 border-2 border-red-500 rounded-lg p-3 relative overflow-hidden shadow-[0_0_20px_rgba(255,0,0,0.2)]">
                                     <div className="absolute top-0 left-0 w-1 h-full bg-red-500 animate-pulse"></div>
                                     <div className="flex gap-3 items-start">
                                         <div className="text-red-500 text-xl mt-1"><i className="fas fa-ban"></i></div>
@@ -319,17 +330,17 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
                                 >
                                     Nombre Completo
                                 </label>
-                                <div 
-                                    className="absolute -inset-0.5 rounded-lg opacity-0 group-focus-within/field:opacity-50 blur-md transition-all duration-500"
-                                    style={{ backgroundColor: activeTheme.color }}
-                                ></div>
                                 <input 
                                     type="text"
                                     required
                                     value={name}
                                     onChange={e => setName(e.target.value)}
-                                    className="relative w-full bg-black/60 border border-slate-700 rounded-lg px-4 py-3 text-white font-mono placeholder-slate-700 focus:outline-none transition-all z-10"
-                                    style={{ caretColor: activeTheme.color }}
+                                    className="relative w-full bg-black/60 border-2 rounded-lg px-4 py-3 text-white font-mono placeholder-slate-700 focus:outline-none transition-all z-10"
+                                    style={{ 
+                                        borderColor: activeTheme.color,
+                                        caretColor: activeTheme.color,
+                                        boxShadow: `0 0 10px ${activeTheme.shadow.replace('0.5', '0.1')}`
+                                    }}
                                     placeholder="NOMBRE REGISTRADO"
                                 />
                             </div>
@@ -346,17 +357,17 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
                                 >
                                     Teléfono Móvil
                                 </label>
-                                <div 
-                                    className="absolute -inset-0.5 rounded-lg opacity-0 group-focus-within/field:opacity-50 blur-md transition-all duration-500"
-                                    style={{ backgroundColor: activeTheme.color }}
-                                ></div>
                                 <input 
                                     type="tel"
                                     required
                                     value={phone}
                                     onChange={e => setPhone(e.target.value)}
-                                    className="relative w-full bg-black/60 border border-slate-700 rounded-lg px-4 py-3 text-white font-mono placeholder-slate-700 focus:outline-none transition-all z-10"
-                                    style={{ caretColor: activeTheme.color }}
+                                    className="relative w-full bg-black/60 border-2 rounded-lg px-4 py-3 text-white font-mono placeholder-slate-700 focus:outline-none transition-all z-10"
+                                    style={{ 
+                                        borderColor: activeTheme.color,
+                                        caretColor: activeTheme.color,
+                                        boxShadow: `0 0 10px ${activeTheme.shadow.replace('0.5', '0.1')}`
+                                    }}
                                     placeholder="+506 0000-0000"
                                     autoFocus
                                 />
@@ -369,17 +380,17 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
                                 >
                                     Correo Electrónico {role === UserRole.Cliente && <span className="text-slate-500 text-[8px]">(OPCIONAL)</span>}
                                 </label>
-                                <div 
-                                    className="absolute -inset-0.5 rounded-lg opacity-0 group-focus-within/field:opacity-50 blur-md transition-all duration-500"
-                                    style={{ backgroundColor: activeTheme.color }}
-                                ></div>
                                 <input 
                                     type="email"
                                     required={role === UserRole.Vendedor}
                                     value={email}
                                     onChange={e => setEmail(e.target.value)}
-                                    className="relative w-full bg-black/60 border border-slate-700 rounded-lg px-4 py-3 text-white font-mono placeholder-slate-700 focus:outline-none transition-all z-10"
-                                    style={{ caretColor: activeTheme.color }}
+                                    className="relative w-full bg-black/60 border-2 rounded-lg px-4 py-3 text-white font-mono placeholder-slate-700 focus:outline-none transition-all z-10"
+                                    style={{ 
+                                        borderColor: activeTheme.color,
+                                        caretColor: activeTheme.color,
+                                        boxShadow: `0 0 10px ${activeTheme.shadow.replace('0.5', '0.1')}`
+                                    }}
                                     placeholder={role === UserRole.Vendedor ? "REQUERIDO@RED.COM" : "OPCIONAL@RED.COM"}
                                 />
                             </div>
@@ -392,7 +403,6 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
                             {/* Balance */}
                             <div className="relative group/field">
                                 <label className="absolute -top-2.5 left-3 px-1 bg-[#050a14] text-[9px] font-bold text-cyber-success uppercase tracking-widest z-20">Crédito Inicial</label>
-                                <div className="absolute -inset-0.5 bg-cyber-success rounded-lg opacity-0 group-focus-within/field:opacity-50 blur-md transition-all duration-500"></div>
                                 <div className="relative flex items-center">
                                     <input 
                                         type="number"
@@ -400,7 +410,8 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
                                         min="0"
                                         value={balance}
                                         onChange={e => setBalance(parseFloat(e.target.value))}
-                                        className="w-full bg-black/60 border border-slate-700 rounded-lg px-4 py-3 pl-4 pr-12 text-white font-mono placeholder-slate-700 focus:outline-none focus:border-cyber-success focus:text-cyber-success transition-all z-10"
+                                        className="w-full bg-black/60 border-2 border-slate-700 rounded-lg px-4 py-3 pl-4 pr-12 text-white font-mono placeholder-slate-700 focus:outline-none focus:border-cyber-success focus:shadow-[0_0_15px_rgba(10,255,96,0.3)] transition-all z-10"
+                                        style={{ borderColor: activeTheme.color }} // Using theme color as requested
                                         placeholder="0.00"
                                         autoFocus
                                     />
@@ -409,7 +420,7 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
                             </div>
 
                             {/* PIN Generation */}
-                            <div className="bg-white/5 p-4 rounded-xl border border-white/5 relative overflow-hidden">
+                            <div className="bg-white/5 p-4 rounded-xl border-2 border-white/10 relative overflow-hidden shadow-inner">
                                 <div className="flex justify-between items-center mb-3">
                                     <label 
                                         className="text-[9px] font-bold uppercase tracking-widest transition-colors duration-500"
@@ -427,19 +438,15 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
                                 </div>
                                 
                                 <div className="relative group/input">
-                                    <div 
-                                        className="absolute -inset-0.5 rounded-lg opacity-0 group-focus-within/input:opacity-50 blur-md transition-all duration-500"
-                                        style={{ backgroundColor: activeTheme.color }}
-                                    ></div>
                                     <input 
                                         type="text"
                                         maxLength={6}
                                         value={pin}
                                         onChange={e => setPin(e.target.value.replace(/[^0-9]/g, ''))}
-                                        className="relative w-full bg-black border-2 border-slate-800 rounded-lg py-3 text-center text-3xl font-mono tracking-[0.5em] text-white outline-none z-10 transition-colors duration-500 focus:border-transparent"
+                                        className="relative w-full bg-black border-2 border-slate-800 rounded-lg py-3 text-center text-3xl font-mono tracking-[0.5em] text-white outline-none z-10 transition-all duration-500"
                                         style={{ 
-                                            // We apply dynamic border/text via CSS style for smooth transition
-                                            // When focused, we want the border to match theme
+                                            borderColor: activeTheme.color,
+                                            boxShadow: `0 0 15px ${activeTheme.shadow.replace('0.5', '0.1')}`
                                         }}
                                         placeholder="------"
                                     />
@@ -453,13 +460,13 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
 
                 </div>
 
-                {/* Navigation & Actions */}
+                {/* Navigation & Actions - PHOSPHORESCENT BUTTONS */}
                 <div className="p-6 border-t border-white/5 bg-black/20 flex justify-between gap-4">
                     {step > 1 ? (
                         <button
                             type="button"
                             onClick={() => setStep(prev => prev - 1 as any)}
-                            className="px-6 py-3 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 font-bold uppercase text-xs tracking-wider transition-colors"
+                            className="px-6 py-3 rounded-xl border-2 border-slate-700 text-slate-400 hover:text-white hover:border-white hover:shadow-[0_0_15px_white] font-bold uppercase text-xs tracking-wider transition-all"
                         >
                             Atrás
                         </button>
@@ -475,14 +482,18 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
                                 (step === 2 && (!phone || (role === UserRole.Vendedor && !email)))
                             }
                             onClick={() => setStep(prev => prev + 1 as any)}
-                            className={`px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-wider transition-all duration-300 ${
+                            className={`px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-wider transition-all duration-300 border-2 ${
                                 ((step === 1 && name && cedula && !collisionUser) || (step === 2 && phone))
                                 ? 'text-black hover:scale-105' 
-                                : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                : 'bg-slate-800 text-slate-500 border-slate-800 cursor-not-allowed'
                             }`}
                             style={
                                 ((step === 1 && name && cedula && !collisionUser) || (step === 2 && phone))
-                                ? { backgroundColor: activeTheme.color, boxShadow: `0 0 20px ${activeTheme.shadow}` }
+                                ? { 
+                                    backgroundColor: activeTheme.color, 
+                                    borderColor: activeTheme.color,
+                                    boxShadow: `0 0 20px ${activeTheme.shadow}` 
+                                  }
                                 : {}
                             }
                         >
@@ -492,14 +503,18 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
                         <button 
                             type="submit"
                             disabled={loading || balance === '' || !pin}
-                            className={`px-8 py-3 rounded-xl font-black uppercase text-xs tracking-[0.2em] transition-all duration-300 flex items-center gap-2 ${
+                            className={`px-8 py-3 rounded-xl font-black uppercase text-xs tracking-[0.2em] transition-all duration-300 flex items-center gap-2 border-2 ${
                                 !loading && balance !== '' && pin
-                                ? 'text-black hover:bg-white hover:scale-105'
-                                : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                ? 'text-black hover:bg-white hover:scale-105 hover:border-white'
+                                : 'bg-slate-800 text-slate-500 border-slate-800 cursor-not-allowed'
                             }`}
                             style={
                                 !loading && balance !== '' && pin
-                                ? { backgroundColor: activeTheme.color, boxShadow: `0 0 30px ${activeTheme.shadow}` }
+                                ? { 
+                                    backgroundColor: activeTheme.color, 
+                                    borderColor: activeTheme.color,
+                                    boxShadow: `0 0 30px ${activeTheme.shadow}` 
+                                  }
                                 : {}
                             }
                         >

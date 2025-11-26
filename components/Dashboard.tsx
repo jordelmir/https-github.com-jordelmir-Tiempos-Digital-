@@ -270,12 +270,9 @@ export default function Dashboard() {
   }, [isMarketClosed, isReventados, selectedDraw]);
   
   // SOLID TINT CORE Logic:
-  // Returns actual hex strings for use in style={{ backgroundColor }} to ensure immediate update without Tailwind purging issues.
   const consoleBgHex = useMemo(() => {
         if (isMarketClosed) return '#0f0202'; // Dead Zone (Dark Red)
-        
         if (isReventados) return '#0f0202'; // Hazard Zone (Solid Dark Red - No Transparency)
-        
         switch (selectedDraw) {
             case DrawTime.MEDIODIA: return '#0c0400'; // Solar Tint (Solid Dark Orange/Black)
             case DrawTime.TARDE: return '#05020c'; // Vapor Tint (Solid Dark Violet/Black - Deep Imperial)
@@ -310,6 +307,7 @@ export default function Dashboard() {
 
       {editingMultiplier && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-xl animate-in fade-in duration-300">
+              {/* ... Multiplier Modal Content ... */}
               <div className="relative w-96 perspective-1000">
                   <div className={`absolute -inset-4 bg-cyber-emerald-dark rounded-full blur-3xl opacity-40 animate-breathe transition-all duration-1000 ${savingMultiplier ? 'scale-150 opacity-80 bg-emerald-400' : ''}`}></div>
                   <div className="absolute -inset-1 bg-cyber-emerald rounded-2xl blur-md opacity-60 animate-pulse"></div>
@@ -390,18 +388,19 @@ export default function Dashboard() {
                          {/* EMERALD CORE BACKLIGHT (Living) */}
                          <div className="absolute -inset-1 bg-cyber-emerald rounded-xl opacity-30 blur-xl animate-pulse transition-all duration-500 group-hover/btn:opacity-60 group-hover/btn:blur-2xl"></div>
                          
+                         {/* CONTROL CENTER BUTTON - PHOSPHORESCENT BORDER UPDATE */}
                          <button 
                             onClick={() => setAdminResultOpen(true)}
-                            className="relative overflow-hidden bg-[#050a14] border border-cyber-emerald/50 hover:border-cyber-emerald text-cyber-emerald px-8 py-3 rounded-xl backdrop-blur-md transition-all group-hover/btn:shadow-[0_0_40px_rgba(16,185,129,0.4)] shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+                            className="relative overflow-hidden bg-[#050a14] border-2 border-cyber-emerald hover:border-emerald-400 text-cyber-emerald px-8 py-3 rounded-xl backdrop-blur-md transition-all shadow-[0_0_20px_#10b981] hover:shadow-[0_0_40px_#10b981] group-hover/btn:scale-105"
                          >
                             <div className="absolute top-0 left-0 w-full h-full bg-[linear-gradient(transparent_50%,rgba(16,185,129,0.1)_50%)] bg-[length:100%_4px] pointer-events-none"></div>
                             <div className="flex items-center gap-3">
                                 <div className="relative">
-                                    <i className="fas fa-cube text-xl animate-pulse"></i>
+                                    <i className="fas fa-cube text-xl animate-pulse text-shadow-green"></i>
                                     <div className="absolute inset-0 border border-cyber-emerald/50 animate-[spin_3s_linear_infinite]"></div>
                                 </div>
                                 <div className="flex flex-col items-start">
-                                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-white">Centro de Control</span>
+                                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-white text-shadow-sm">Centro de Control</span>
                                     <span className="text-[8px] font-mono text-cyber-emerald opacity-90">RESULTADOS & TIEMPO</span>
                                 </div>
                             </div>
@@ -489,10 +488,10 @@ export default function Dashboard() {
                                 <button 
                                     onClick={() => setGameMode(GameMode.TIEMPOS)}
                                     disabled={isMarketClosed}
-                                    className={`px-6 md:px-8 py-2 md:py-3 rounded-full font-bold text-xs uppercase tracking-widest transition-all duration-300 border-2 ${
+                                    className={`relative px-6 md:px-8 py-2 md:py-3 rounded-full font-bold text-xs uppercase tracking-widest transition-all duration-300 border-2 ${
                                         gameMode === GameMode.TIEMPOS 
                                         ? `bg-slate-900/50 text-white ${theme.border} ${theme.shadow}` 
-                                        : 'border-transparent text-slate-500 hover:text-white hover:bg-white/5'
+                                        : `border-transparent text-slate-500 hover:text-white hover:bg-white/5 hover:${theme.border}/50`
                                     }`}
                                 >
                                     Tiempos
@@ -514,45 +513,33 @@ export default function Dashboard() {
                             {Object.values(DrawTime).map((time) => {
                                 const isSelected = selectedDraw === time;
                                 let activeGlow = "";
-                                let activeBorder = "border-white/5 bg-white/5";
-                                let iconColor = "text-slate-600";
-                                let textColor = "text-slate-500";
-                                let markerColor = "bg-slate-800";
-
-                                if (isSelected) {
-                                    textColor = "text-white text-glow";
-                                    markerColor = `${isReventados ? 'bg-red-500 shadow-[0_0_10px_red]' : `${theme.glow} shadow-[0_0_10px_white]`}`;
-                                    
-                                    if (isReventados) {
-                                        activeGlow = "shadow-[0_0_40px_rgba(220,38,38,0.4),inset_0_0_20px_rgba(220,38,38,0.1)] bg-red-900/40 border-red-500/80";
-                                        iconColor = "text-red-500 drop-shadow-[0_0_10px_red]";
-                                    } else {
-                                        if (time.includes('Mediodía')) {
-                                            // NEON ORANGE / SOLAR
-                                            activeGlow = "shadow-[0_0_40px_rgba(255,95,0,0.4),inset_0_0_20px_rgba(255,95,0,0.1)] bg-orange-900/20 border-cyber-solar";
-                                            iconColor = "text-cyber-solar drop-shadow-[0_0_10px_#ff5f00]";
-                                        } else if (time.includes('Tarde')) {
-                                            // VAPOR VIOLET (UPDATED)
-                                            activeGlow = "shadow-[0_0_40px_rgba(124,58,237,0.4),inset_0_0_20px_rgba(124,58,237,0.1)] bg-violet-900/20 border-cyber-vapor";
-                                            iconColor = "text-cyber-vapor drop-shadow-[0_0_10px_#7c3aed]";
-                                        } else {
-                                            // ABYSS BLUE
-                                            activeGlow = "shadow-[0_0_40px_rgba(30,58,138,0.6),inset_0_0_20px_rgba(30,58,138,0.2)] bg-blue-950/50 border-blue-600";
-                                            iconColor = "text-blue-400 drop-shadow-[0_0_15px_rgba(36,99,235,0.8)]";
-                                        }
-                                    }
+                                // STATIC BORDER STYLES FOR PERMANENT GLOW
+                                let staticClass = "";
+                                
+                                if (time.includes('Mediodía')) {
+                                    staticClass = "border-cyber-solar text-cyber-solar shadow-[0_0_10px_rgba(255,95,0,0.2)]";
+                                    if(isSelected) activeGlow = "shadow-[0_0_40px_rgba(255,95,0,0.6),inset_0_0_20px_rgba(255,95,0,0.2)] bg-orange-900/20";
+                                } else if (time.includes('Tarde')) {
+                                    staticClass = "border-cyber-vapor text-cyber-vapor shadow-[0_0_10px_rgba(124,58,237,0.2)]";
+                                    if(isSelected) activeGlow = "shadow-[0_0_40px_rgba(124,58,237,0.6),inset_0_0_20px_rgba(124,58,237,0.2)] bg-violet-900/20";
+                                } else {
+                                    staticClass = "border-blue-600 text-blue-400 shadow-[0_0_10px_rgba(30,58,138,0.3)]";
+                                    if(isSelected) activeGlow = "shadow-[0_0_40px_rgba(30,58,138,0.8),inset_0_0_20px_rgba(30,58,138,0.3)] bg-blue-950/50";
                                 }
 
                                 return (
                                     <button
                                         key={time}
                                         onClick={() => setSelectedDraw(time)}
-                                        className={`relative h-24 md:h-32 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 md:gap-3 backdrop-blur-md overflow-hidden transition-all duration-500 ease-out group/btn ${isSelected ? activeGlow : activeBorder}`}
+                                        className={`relative h-24 md:h-32 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 md:gap-3 backdrop-blur-md overflow-hidden transition-all duration-500 ease-out group/btn 
+                                            ${isSelected ? activeGlow : 'bg-black/20 hover:bg-white/5'}
+                                            ${staticClass}
+                                        `}
                                     >
                                         {isSelected && <div className={`absolute inset-0 ${isReventados ? 'bg-red-500' : theme.glow} opacity-10 animate-pulse theme-transition`}></div>}
-                                        <i className={`fas ${time.includes('19') ? 'fa-moon' : (time.includes('16') ? 'fa-cloud-sun' : 'fa-sun')} text-2xl md:text-3xl transition-all duration-500 group-hover/btn:scale-110 ${iconColor}`}></i>
-                                        <span className={`text-[10px] md:text-xs font-black uppercase tracking-widest transition-colors duration-500 ${textColor}`}>{time.split(' ')[0]}</span>
-                                        <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${markerColor}`}></div>
+                                        <i className={`fas ${time.includes('19') ? 'fa-moon' : (time.includes('16') ? 'fa-cloud-sun' : 'fa-sun')} text-2xl md:text-3xl transition-all duration-500 group-hover/btn:scale-110`}></i>
+                                        <span className={`text-[10px] md:text-xs font-black uppercase tracking-widest transition-colors duration-500 ${isSelected ? 'text-white text-glow' : ''}`}>{time.split(' ')[0]}</span>
+                                        <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${isSelected ? (isReventados ? 'bg-red-500 shadow-[0_0_10px_red]' : `${theme.glow} shadow-[0_0_10px_white]`) : 'bg-slate-800'}`}></div>
                                     </button>
                                 )
                             })}
@@ -560,9 +547,15 @@ export default function Dashboard() {
                         
                         <div className="flex flex-col md:flex-row gap-8 items-stretch relative z-20">
                             
+                            {/* INPUTS: PERMANENT PHOSPHORESCENT BORDER */}
                             <div className="flex-1 relative group/field">
                                 <div className={`absolute -inset-1 ${isReventados ? 'bg-red-500' : theme.glow} rounded-2xl opacity-0 group-focus-within/field:opacity-60 blur-md theme-transition duration-700`}></div>
-                                <div className={`relative bg-black/90 rounded-2xl border-2 p-1 h-full shadow-inner overflow-hidden transition-all duration-300 ${isReventados ? 'border-red-900 group-focus-within/field:border-red-500 group-focus-within/field:shadow-[0_0_20px_red]' : `border-slate-800 group-focus-within/field:${theme.border} group-focus-within/field:shadow-${theme.shadow.split(' ')[0]}`}`}>
+                                <div className={`relative bg-black/90 rounded-2xl border-2 p-1 h-full overflow-hidden transition-all duration-300 
+                                    ${isReventados 
+                                        ? 'border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.4)] group-focus-within/field:shadow-[0_0_30px_red]' 
+                                        : `${theme.border} ${theme.shadow.replace('40px', '15px')} group-focus-within/field:shadow-${theme.shadow.split(' ')[0]}`
+                                    }`}
+                                >
                                     <div className="h-full rounded-xl bg-gradient-to-b from-slate-900/50 to-black/80 flex flex-col items-center justify-center p-4 relative">
                                         <label className={`text-[10px] font-mono font-bold ${isReventados ? 'text-red-400' : 'text-cyber-blue'} uppercase tracking-wider mb-2`}>Número Objetivo</label>
                                         <input 
@@ -584,7 +577,12 @@ export default function Dashboard() {
 
                             <div className="flex-1 relative group/field">
                                 <div className={`absolute -inset-1 ${isReventados ? 'bg-red-500' : theme.glow} rounded-2xl opacity-0 group-focus-within/field:opacity-60 blur-md theme-transition duration-700`}></div>
-                                <div className={`relative bg-black/90 rounded-2xl border-2 p-1 h-full shadow-inner overflow-hidden transition-all duration-300 ${isReventados ? 'border-red-900 group-focus-within/field:border-red-500 group-focus-within/field:shadow-[0_0_20px_red]' : `border-slate-800 group-focus-within/field:${theme.border} group-focus-within/field:shadow-${theme.shadow.split(' ')[0]}`}`}>
+                                <div className={`relative bg-black/90 rounded-2xl border-2 p-1 h-full overflow-hidden transition-all duration-300 
+                                    ${isReventados 
+                                        ? 'border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.4)] group-focus-within/field:shadow-[0_0_30px_red]' 
+                                        : `${theme.border} ${theme.shadow.replace('40px', '15px')} group-focus-within/field:shadow-${theme.shadow.split(' ')[0]}`
+                                    }`}
+                                >
                                     <div className="h-full rounded-xl bg-gradient-to-b from-slate-900/50 to-black/80 flex flex-col items-center justify-center p-4 relative">
                                         <label className={`text-[10px] font-mono font-bold ${isReventados ? 'text-red-400' : 'text-cyber-blue'} uppercase tracking-wider mb-2`}>Valor de Inversión (CRC)</label>
                                         <input 

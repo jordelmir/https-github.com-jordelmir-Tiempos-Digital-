@@ -41,13 +41,15 @@ export default function LiveResultsPanel() {
                         </div>
                     </div>
                     
-                    {/* Role Badge - Integrated Aesthetic */}
-                    <div className={`px-4 py-1.5 rounded-lg border text-[9px] font-bold uppercase tracking-[0.2em] backdrop-blur-md ${
-                        user?.role === UserRole.Cliente ? 'border-blue-500/30 text-blue-400 bg-blue-900/10' :
-                        user?.role === UserRole.Vendedor ? 'border-purple-500/30 text-purple-400 bg-purple-900/10' :
-                        'border-emerald-500/30 text-emerald-400 bg-emerald-900/10'
+                    {/* Role Badge - PHOSPHORESCENT BORDER UPDATE */}
+                    <div className={`px-6 py-2 rounded-lg border-2 text-[10px] font-bold uppercase tracking-[0.2em] backdrop-blur-md transition-all duration-500 ${
+                        user?.role === UserRole.Cliente 
+                        ? 'border-cyber-blue text-cyber-blue bg-blue-900/10 shadow-[0_0_15px_#2463eb]' 
+                        : user?.role === UserRole.Vendedor 
+                        ? 'border-cyber-purple text-cyber-purple bg-purple-900/10 shadow-[0_0_15px_#bc13fe]' 
+                        : 'border-cyber-emerald text-cyber-emerald bg-emerald-900/10 shadow-[0_0_15px_#10b981]'
                     }`}>
-                        <i className="fas fa-eye mr-2 opacity-50"></i>
+                        <i className="fas fa-eye mr-2 opacity-70"></i>
                         VISTA: {user?.role}
                     </div>
                 </div>
