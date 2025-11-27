@@ -79,6 +79,8 @@ export default function AuditView() {
           case AuditEventType.TX_WITHDRAWAL: return 'fa-arrow-up';
           case AuditEventType.ADMIN_PURGE: return 'fa-radiation';
           case AuditEventType.GAME_BET: return 'fa-ticket-alt';
+          case AuditEventType.AI_OPERATION: return 'fa-brain'; // New AI Icon
+          case AuditEventType.SYSTEM_INTEGRITY: return 'fa-shield-alt';
           default: return 'fa-info-circle';
       }
   };

@@ -316,6 +316,16 @@ if (isDemo) {
                         if (newItem.role === 'Vendedor') MOCK_VENDORS.unshift(newItem);
                         return { data: newItem, error: null };
                     }
+
+                    // SUPPORT AUDIT LOG INSERTS
+                    if (table === 'audit_trail') {
+                        newItem.id = Date.now(); // Simple numeric ID
+                        newItem.event_id = `evt-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+                        newItem.timestamp = new Date().toISOString();
+                        newItem.hash = `sha256-mock-${Date.now()}`;
+                        MOCK_AUDIT.unshift(newItem);
+                        return { data: newItem, error: null };
+                    }
                     
                     return { data: null, error: { message: 'Insert not mocked for this table' } };
                 }
