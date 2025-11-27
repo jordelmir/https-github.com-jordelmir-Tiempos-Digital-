@@ -19,9 +19,16 @@ export default function AdminResultControl({ isOpen, onClose }: AdminResultContr
   const [isReventado, setIsReventado] = useState(false);
   const [reventadoNumber, setReventadoNumber] = useState('');
   
+  // Animation States
+  const [inputAnim, setInputAnim] = useState(false);
+  const [revInputAnim, setRevInputAnim] = useState(false);
+  
+  // Execution Logic
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [processedCount, setProcessedCount] = useState(0);
+  const [charging, setCharging] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   // Computed: Is this historical?
   const isHistorical = date !== new Date().toISOString().split('T')[0];
@@ -37,7 +44,7 @@ export default function AdminResultControl({ isOpen, onClose }: AdminResultContr
           shadow: 'shadow-neon-red',
           glow: 'bg-red-600',
           iconColor: 'text-red-500',
-          inputColor: 'text-red-500 drop-shadow-[0_0_10px_rgba(220,38,38,0.8)]'
+          inputColor: 'text-red-500 drop-shadow-[0_0_15px_rgba(255,0,0,1)]'
       };
       
       // 2. PRIORITY: HISTORICAL (Emerald Mode)
@@ -49,7 +56,7 @@ export default function AdminResultControl({ isOpen, onClose }: AdminResultContr
           shadow: 'shadow-neon-emerald',
           glow: 'bg-cyber-emerald',
           iconColor: 'text-cyber-emerald',
-          inputColor: 'text-cyber-emerald drop-shadow-[0_0_10px_rgba(16,185,129,0.8)]'
+          inputColor: 'text-cyber-emerald drop-shadow-[0_0_15px_rgba(16,185,129,0.8)]'
       };
 
       // 3. PRIORITY: LIVE SCHEDULES
@@ -62,7 +69,7 @@ export default function AdminResultControl({ isOpen, onClose }: AdminResultContr
               shadow: 'shadow-neon-solar',
               glow: 'bg-cyber-solar',
               iconColor: 'text-cyber-solar',
-              inputColor: 'text-cyber-solar drop-shadow-[0_0_10px_rgba(255,95,0,0.8)]'
+              inputColor: 'text-cyber-solar drop-shadow-[0_0_15px_rgba(255,95,0,0.8)]'
           };
           case DrawTime.TARDE: return {
               name: 'vapor',
@@ -72,7 +79,7 @@ export default function AdminResultControl({ isOpen, onClose }: AdminResultContr
               shadow: 'shadow-neon-vapor',
               glow: 'bg-cyber-vapor',
               iconColor: 'text-cyber-vapor',
-              inputColor: 'text-cyber-vapor drop-shadow-[0_0_10px_rgba(124,58,237,0.8)]'
+              inputColor: 'text-cyber-vapor drop-shadow-[0_0_15px_rgba(124,58,237,0.8)]'
           };
           case DrawTime.NOCHE: 
           default: return {
@@ -83,7 +90,7 @@ export default function AdminResultControl({ isOpen, onClose }: AdminResultContr
               shadow: 'shadow-neon-abyss',
               glow: 'bg-cyber-blue',
               iconColor: 'text-cyber-blue',
-              inputColor: 'text-cyber-blue drop-shadow-[0_0_10px_rgba(36,99,235,0.8)]'
+              inputColor: 'text-cyber-blue drop-shadow-[0_0_15px_rgba(36,99,235,0.8)]'
           };
       }
   }, [isReventado, isHistorical, selectedDraw]);
@@ -98,10 +105,60 @@ export default function AdminResultControl({ isOpen, onClose }: AdminResultContr
       }
   }, [isReventado]);
 
-  if (!isOpen || !user) return null;
+  // --- HOLD-TO-INJECT LOGIC ---
+  const resetInternalState = () => {
+      setCharging(false);
+      setProgress(0);
+      setLoading(false);
+      setSuccess(false);
+      setProcessedCount(0);
+  };
+
+  useEffect(() => {
+      resetInternalState();
+  }, [isOpen]);
+
+  const handleInteractionStart = () => {
+      if (!winningNumber || loading || success) return;
+      if (isReventado && !reventadoNumber) return;
+      setCharging(true);
+  };
+
+  const handleInteractionEnd = () => {
+      if (progress < 100 && !success) {
+          setCharging(false);
+          setProgress(0);
+      }
+  };
+
+  useEffect(() => {
+      let interval: any;
+      if (charging && !loading && !success) {
+          interval = setInterval(() => {
+              setProgress(prev => {
+                  if (prev >= 100) {
+                      clearInterval(interval);
+                      return 100;
+                  }
+                  return prev + 4; // Speed of charge
+              });
+          }, 30);
+      } else {
+          clearInterval(interval);
+          if (!success && !loading) setProgress(0);
+      }
+      return () => clearInterval(interval);
+  }, [charging, loading, success]);
+
+  // Trigger Submit when progress hits 100
+  useEffect(() => {
+      if (progress === 100 && !loading && !success) {
+          handleSubmit();
+      }
+  }, [progress]);
+
 
   const handleSubmit = async () => {
-    if (!winningNumber) return;
     setLoading(true);
 
     try {
@@ -111,26 +168,49 @@ export default function AdminResultControl({ isOpen, onClose }: AdminResultContr
             winningNumber,
             isReventado,
             reventadoNumber: isReventado ? reventadoNumber : undefined,
-            actor_id: user.id
+            actor_id: user!.id
         });
 
         if (res.error) {
             alert(res.error);
+            setLoading(false); // Unblock on error
+            setCharging(false);
+            setProgress(0);
         } else {
             setProcessedCount(res.data?.processed || 0);
             setSuccess(true);
+            // KEEP LOADING TRUE VISUALLY UNTIL RESET
+            
             setTimeout(() => {
-                setSuccess(false);
+                resetInternalState();
                 setWinningNumber('');
-                setProcessedCount(0);
-                onClose();
-            }, 2500);
+                setReventadoNumber('');
+                onClose(); // Or keep open? Usually close on success
+            }, 3000);
         }
     } catch (e) {
         alert("Error de conexión al Núcleo.");
-    } finally {
         setLoading(false);
+        setCharging(false);
+        setProgress(0);
     }
+  };
+
+  // --- INPUT HANDLERS WITH FX ---
+  const handleWinningChange = (val: string) => {
+      const clean = val.replace(/[^0-9]/g, '');
+      setWinningNumber(clean);
+      // Trigger Animation
+      setInputAnim(true);
+      setTimeout(() => setInputAnim(false), 200);
+  };
+
+  const handleReventadoChange = (val: string) => {
+      const clean = val.replace(/[^0-9]/g, '');
+      setReventadoNumber(clean);
+      // Trigger Animation
+      setRevInputAnim(true);
+      setTimeout(() => setRevInputAnim(false), 200);
   };
 
   const getDrawIcon = (draw: DrawTime) => {
@@ -138,6 +218,8 @@ export default function AdminResultControl({ isOpen, onClose }: AdminResultContr
       if (draw.includes('Tarde')) return 'fa-cloud-sun';
       return 'fa-moon';
   };
+
+  if (!isOpen || !user) return null;
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/90 backdrop-blur-xl animate-in fade-in zoom-in duration-300">
@@ -224,28 +306,40 @@ export default function AdminResultControl({ isOpen, onClose }: AdminResultContr
 
                     {/* 2. Main Number Reactor */}
                     <div className="flex gap-6 items-stretch mb-8">
-                        <div className="flex-1 relative">
-                            <div className={`absolute -inset-1 ${theme.glow} rounded-2xl opacity-10 blur-xl transition-colors duration-500`}></div>
-                            <div className={`bg-black/40 border ${theme.border} rounded-2xl p-6 flex flex-col items-center relative z-10 h-full justify-center transition-colors duration-500 shadow-inner`}>
+                        
+                        {/* WINNING NUMBER INPUT - QUANTUM ANIMATION */}
+                        <div className="flex-1 relative group/reactor">
+                            {/* Outer Glow Ring */}
+                            <div className={`absolute -inset-1 ${theme.glow} rounded-2xl opacity-10 blur-xl transition-colors duration-500 group-focus-within/reactor:opacity-40 group-focus-within/reactor:scale-105`}></div>
+                            
+                            <div className={`bg-black/40 border-2 ${theme.border} rounded-2xl p-6 flex flex-col items-center relative z-10 h-full justify-center transition-all duration-300 shadow-inner group-focus-within/reactor:bg-black/60`}>
                                 <label className="text-[10px] font-mono font-bold text-white uppercase tracking-[0.3em] mb-2 opacity-50">Número Ganador</label>
-                                <input 
-                                    type="text" 
-                                    maxLength={2}
-                                    value={winningNumber}
-                                    onChange={e => setWinningNumber(e.target.value.replace(/[^0-9]/g, ''))}
-                                    className={`bg-transparent text-7xl font-mono font-bold text-center focus:outline-none w-full placeholder-white/10 transition-colors duration-500 ${theme.inputColor}`}
-                                    placeholder="00"
-                                    autoFocus
-                                />
+                                
+                                <div className="relative">
+                                    {/* Quantum Particles Effect on Input */}
+                                    {inputAnim && (
+                                        <div className={`absolute inset-0 ${theme.glow} blur-md opacity-50 animate-ping`}></div>
+                                    )}
+                                    
+                                    <input 
+                                        type="text" 
+                                        maxLength={2}
+                                        value={winningNumber}
+                                        onChange={e => handleWinningChange(e.target.value)}
+                                        className={`bg-transparent text-8xl font-mono font-black text-center focus:outline-none w-full placeholder-white/5 transition-all duration-100 ${theme.inputColor} ${inputAnim ? 'scale-110' : 'scale-100'}`}
+                                        placeholder="--"
+                                        autoFocus
+                                    />
+                                </div>
                             </div>
                         </div>
 
                         {/* Reventados Toggle Column - HAZARD UPGRADE */}
-                        <div className={`w-32 flex flex-col justify-center rounded-2xl p-4 gap-4 transition-all duration-500 relative overflow-hidden border ${isReventado ? 'bg-red-950/30 border-red-500 shadow-[0_0_20px_rgba(220,38,38,0.3)]' : 'bg-slate-900/20 border-white/10'} ${shake ? 'animate-[shake_0.5s_ease-in-out]' : ''}`}>
+                        <div className={`w-32 flex flex-col justify-center rounded-2xl p-4 gap-4 transition-all duration-500 relative overflow-hidden border-2 ${isReventado ? 'bg-red-950/30 border-red-500 shadow-[0_0_30px_rgba(255,0,0,0.4)]' : 'bg-slate-900/20 border-white/10'} ${shake ? 'animate-[shake_0.5s_ease-in-out]' : ''}`}>
                             
                             {/* Hazard Stripes Background */}
                             {isReventado && (
-                                <div className="absolute inset-0 opacity-20" style={{backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 10px, #ff0000 10px, #ff0000 20px)'}}></div>
+                                <div className="absolute inset-0 opacity-20 animate-[scroll_2s_linear_infinite]" style={{backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 10px, #ff0000 10px, #ff0000 20px)', backgroundSize: '200% 200%'}}></div>
                             )}
 
                             <div className="text-center relative z-10">
@@ -262,38 +356,103 @@ export default function AdminResultControl({ isOpen, onClose }: AdminResultContr
                                 </button>
                             </div>
                             
+                            {/* RED BALL INPUT - PLASMA INSTABILITY */}
                             <div className={`transition-all duration-500 relative z-10 ${isReventado ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
                                 <label className="text-[7px] font-mono text-red-400 uppercase tracking-widest text-center block mb-1">Bola Roja</label>
-                                <input 
-                                    type="text"
-                                    maxLength={2}
-                                    value={reventadoNumber}
-                                    onChange={e => setReventadoNumber(e.target.value.replace(/[^0-9]/g, ''))}
-                                    className="w-full bg-black border-2 border-red-500 rounded-lg py-3 text-center text-2xl text-red-500 font-mono font-bold focus:outline-none shadow-neon-red placeholder-red-900/50"
-                                    placeholder="--"
-                                />
+                                <div className="relative">
+                                    {revInputAnim && (
+                                        <div className="absolute inset-0 bg-white opacity-50 blur-md animate-ping"></div>
+                                    )}
+                                    <input 
+                                        type="text"
+                                        maxLength={2}
+                                        value={reventadoNumber}
+                                        onChange={e => handleReventadoChange(e.target.value)}
+                                        className={`w-full bg-black border-2 border-red-500 rounded-lg py-3 text-center text-2xl text-red-500 font-mono font-bold focus:outline-none shadow-neon-red placeholder-red-900/50 transition-transform duration-100 ${revInputAnim ? 'translate-x-1 scale-110' : ''}`}
+                                        placeholder="--"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Submit */}
+                    {/* SUPER ACTIVATION BUTTON - HOLD TO INJECT */}
                     <button 
-                        onClick={handleSubmit}
-                        disabled={loading || !winningNumber}
-                        className={`w-full py-5 rounded-xl font-display font-black uppercase tracking-[0.2em] transition-all relative overflow-hidden group mt-auto ${success ? 'bg-green-500 text-black' : isReventado ? 'bg-red-600 text-white hover:bg-white hover:text-red-600 shadow-neon-red' : `${theme.color.replace('text-', 'bg-')} text-black hover:bg-white shadow-${theme.shadow}`}`}
+                        onMouseDown={handleInteractionStart}
+                        onMouseUp={handleInteractionEnd}
+                        onMouseLeave={handleInteractionEnd}
+                        onTouchStart={handleInteractionStart}
+                        onTouchEnd={handleInteractionEnd}
+                        disabled={loading || !winningNumber || (isReventado && !reventadoNumber) || success}
+                        className={`
+                            w-full py-6 rounded-xl font-display font-black uppercase tracking-[0.2em] transition-all relative overflow-hidden group mt-auto select-none border-2
+                            ${success 
+                                ? 'bg-black border-green-500 text-green-500 shadow-[0_0_50px_lime]' 
+                                : isReventado 
+                                    ? 'bg-red-900/20 border-red-600 text-red-500 hover:shadow-neon-red hover:text-white' 
+                                    : `${theme.color.replace('text-', 'border-')} text-white hover:shadow-${theme.shadow}`
+                            }
+                            ${charging ? (isReventado ? 'animate-[shake_0.2s_ease-in-out_infinite]' : 'animate-pulse') : ''}
+                            disabled:opacity-50 disabled:cursor-not-allowed
+                        `}
                     >
-                        {loading ? (
-                            <div className="flex items-center justify-center gap-3">
-                                <i className="fas fa-circle-notch fa-spin"></i>
-                                <span>LIQUIDANDO APUESTAS...</span>
+                        {/* PROGRESS FILL (CHARGING) */}
+                        <div 
+                            className={`absolute top-0 left-0 h-full transition-all ease-linear duration-75 ${isReventado ? 'bg-red-600' : theme.color.replace('text-', 'bg-')}`}
+                            style={{ width: `${progress}%`, opacity: charging ? 0.8 : 0 }}
+                        ></div>
+
+                        {/* SCANLINES & GLITCH (REVENTADOS ONLY) */}
+                        {isReventado && !success && (
+                            <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0)_50%,rgba(0,0,0,0.5)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%] opacity-20 pointer-events-none"></div>
+                        )}
+
+                        {/* CONTENT LAYER */}
+                        <div className="relative z-10 flex items-center justify-center gap-3 mix-blend-normal">
+                            
+                            {/* LOADING STATE */}
+                            {loading ? (
+                                <>
+                                    <i className="fas fa-circle-notch fa-spin"></i>
+                                    <span>INICIANDO SECUENCIA...</span>
+                                </>
+                            ) : success ? (
+                                /* QUANTUM LOCK SUCCESS STATE */
+                                <div className="flex items-center gap-4 animate-in zoom-in duration-300">
+                                    <div className="relative">
+                                        <i className="fas fa-lock text-2xl"></i>
+                                        <div className="absolute -inset-2 border-2 border-green-500 rounded-full animate-ping"></div>
+                                    </div>
+                                    <div className="flex flex-col items-start leading-none">
+                                        <span className="text-lg">RESULTADO FIJADO</span>
+                                        <span className="text-[10px] opacity-70 font-mono tracking-widest">{processedCount} PAGOS EJECUTADOS</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                /* IDLE / CHARGING STATE */
+                                <>
+                                    {charging ? (
+                                        <span className={`${isReventado ? 'text-white font-black text-xl drop-shadow-[0_0_10px_black]' : 'text-black font-bold'}`}>
+                                            {progress < 100 ? (isReventado ? 'ARMANDO DETONADOR...' : 'CARGANDO ENLACE...') : 'EJECUTANDO...'}
+                                        </span>
+                                    ) : (
+                                        <>
+                                            {isReventado ? <i className="fas fa-radiation fa-spin-slow text-xl"></i> : <i className="fas fa-fingerprint text-xl"></i>}
+                                            <span>
+                                                {isReventado ? 'MANTENER PARA DETONAR' : 'MANTENER PARA PUBLICAR'}
+                                            </span>
+                                        </>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                        
+                        {/* Electric Arcs (Reventados Hover) */}
+                        {isReventado && !charging && !success && (
+                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none">
+                                <div className="absolute top-0 left-1/4 w-1 h-full bg-white blur-sm animate-pulse"></div>
+                                <div className="absolute top-0 right-1/4 w-1 h-full bg-white blur-sm animate-pulse delay-75"></div>
                             </div>
-                        ) : success ? (
-                            <div className="flex items-center justify-center gap-3 animate-in zoom-in">
-                                <i className="fas fa-check-circle"></i>
-                                <span>RESULTADO PUBLICADO ({processedCount} Pagos)</span>
-                            </div>
-                        ) : (
-                            <span>EJECUTAR RESULTADO</span>
                         )}
                     </button>
 
@@ -312,6 +471,10 @@ export default function AdminResultControl({ isOpen, onClose }: AdminResultContr
                     80% { transform: translate(-1px, -1px) rotate(1deg); }
                     90% { transform: translate(1px, 2px) rotate(0deg); }
                     100% { transform: translate(1px, -2px) rotate(-1deg); }
+                }
+                @keyframes scroll {
+                    0% { background-position: 0 0; }
+                    100% { background-position: 50px 50px; }
                 }
             `}</style>
         </div>
