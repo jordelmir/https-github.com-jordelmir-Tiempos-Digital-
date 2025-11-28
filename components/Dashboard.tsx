@@ -85,6 +85,7 @@ export default function Dashboard() {
   // QUEUE & EXECUTION STATE
   const [pendingBets, setPendingBets] = useState<PendingBet[]>([]);
   const [executingBatch, setExecutingBatch] = useState(false);
+  const [batchSuccess, setBatchSuccess] = useState(false);
 
   // --- CLOCK & LOCK LOGIC ---
   const { status: marketStatus, nextDraw } = useServerClock();
@@ -248,21 +249,24 @@ export default function Dashboard() {
                    // Check for Risk Limit Reached Error
                    if (res.error.includes("LIMIT_REACHED")) {
                        alert(`ERROR: ${res.error}`);
-                       // Optionally mark this specific bet as failed in the UI
                    }
                }
           }
 
           if (successCount > 0) {
-              const newBalance = user.balance_bigint - (successCount === pendingBets.length ? totalCost : 0); // Simple deduction logic fix needed for partial success
-              // For now, just refetch user to get accurate balance from backend
+              const newBalance = user.balance_bigint - (successCount === pendingBets.length ? totalCost : 0); // Approx
               fetchUser(true);
               
               if (successCount === pendingBets.length) {
-                  setPendingBets([]);
+                  // SUCCESS SEQUENCE
+                  setBatchSuccess(true);
+                  // Allow animation to play before clearing
+                  setTimeout(() => {
+                      setPendingBets([]);
+                      setBatchSuccess(false);
+                  }, 2000);
               } else {
                   alert("Algunas apuestas no se procesaron debido a límites de riesgo.");
-                  // Filter out processed bets? In a real app yes. Here we clear all to be safe or handle partials.
                   setPendingBets([]);
               }
           } else {
@@ -283,25 +287,24 @@ export default function Dashboard() {
   // BORDER & GLOW LOGIC
   const consoleBorder = useMemo(() => {
       if (isMarketClosed) return 'border-red-900 opacity-50';
-      if (isReventados) return 'border-red-600 shadow-[0_0_40px_rgba(220,38,38,0.6),inset_0_0_20px_rgba(220,38,38,0.2)]'; // Intense Red Neon for Reventados
+      if (isReventados) return 'border-red-600 shadow-[0_0_40px_rgba(220,38,38,0.6),inset_0_0_20px_rgba(220,38,38,0.2)]'; 
       
-      // Standard themes
       switch (selectedDraw) {
           case DrawTime.MEDIODIA: return 'border-cyber-solar shadow-[0_0_40px_rgba(255,95,0,0.4)]';
           case DrawTime.TARDE: return 'border-cyber-vapor shadow-[0_0_40px_rgba(124,58,237,0.4)]'; 
-          case DrawTime.NOCHE: return 'border-blue-900 shadow-[0_0_40px_rgba(30,58,138,0.6)]'; // Deep Abyss
+          case DrawTime.NOCHE: return 'border-blue-900 shadow-[0_0_40px_rgba(30,58,138,0.6)]'; 
           default: return 'border-blue-900 shadow-[0_0_40px_rgba(30,58,138,0.6)]';
       }
   }, [isMarketClosed, isReventados, selectedDraw]);
   
   // SOLID TINT CORE Logic:
   const consoleBgHex = useMemo(() => {
-        if (isMarketClosed) return '#0f0202'; // Dead Zone (Dark Red)
-        if (isReventados) return '#0f0202'; // Hazard Zone (Solid Dark Red - No Transparency)
+        if (isMarketClosed) return '#0f0202'; // Dead Zone
+        if (isReventados) return '#0f0202'; // Hazard Zone
         switch (selectedDraw) {
-            case DrawTime.MEDIODIA: return '#0c0400'; // Solar Tint (Solid Dark Orange/Black)
-            case DrawTime.TARDE: return '#05020c'; // Vapor Tint (Solid Dark Violet/Black - Deep Imperial)
-            case DrawTime.NOCHE: return '#02040a'; // Abyss (Standard Dark Blue/Black)
+            case DrawTime.MEDIODIA: return '#0c0400'; 
+            case DrawTime.TARDE: return '#05020c'; 
+            case DrawTime.NOCHE: return '#02040a'; 
             default: return '#02040a';
         }
   }, [isMarketClosed, isReventados, selectedDraw]);
@@ -330,18 +333,14 @@ export default function Dashboard() {
         onClose={() => setAdminResultOpen(false)}
       />
 
-      {/* --- EDIT MULTIPLIER MODAL (DUAL CORE REACTOR) --- */}
+      {/* --- EDIT MULTIPLIER MODAL --- */}
       {editingMultiplier && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-xl animate-in fade-in duration-300">
               <div className="relative w-[500px] perspective-1000">
-                  
-                  {/* Global Reactor Glow */}
                   <div className={`absolute -inset-4 rounded-full blur-3xl opacity-30 animate-breathe transition-all duration-1000 bg-gradient-to-r from-cyber-emerald to-red-600 ${savingMultiplier ? 'scale-150 opacity-80' : ''}`}></div>
                   <div className="absolute -inset-1 bg-gradient-to-r from-cyber-emerald to-red-600 rounded-3xl blur-md opacity-40 animate-pulse"></div>
 
                   <div className="bg-[#02040a] border-2 border-white/10 p-0 rounded-3xl relative z-10 w-full overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.8)]">
-                    
-                    {/* Header */}
                     <div className="bg-black/50 border-b border-white/10 p-6 flex justify-between items-center relative overflow-hidden">
                         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyber-emerald to-red-600 opacity-80"></div>
                         <div className="flex items-center gap-4">
@@ -356,7 +355,6 @@ export default function Dashboard() {
                     </div>
 
                     <div className="p-8 relative">
-                        {/* Carbon Fiber BG */}
                         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 mix-blend-overlay pointer-events-none"></div>
                         
                         {savingMultiplier && (
@@ -373,76 +371,57 @@ export default function Dashboard() {
                             </div>
                         )}
 
-                        {/* --- DUAL CORE CONTROLS --- */}
                         <div className="grid grid-cols-2 gap-6 mb-8 relative z-10">
-                            
-                            {/* CORE ALPHA: BASE (EMERALD) */}
                             <div className="flex flex-col items-center">
                                 <div className="text-[10px] font-mono font-bold text-cyber-emerald uppercase tracking-widest mb-3 flex items-center gap-2">
                                     <i className="fas fa-cube"></i> Factor X (Base)
                                 </div>
-                                
                                 <div className="relative group/alpha">
                                     <div className="absolute -inset-2 bg-cyber-emerald rounded-2xl opacity-10 blur-md group-hover/alpha:opacity-30 transition-opacity"></div>
                                     <div className="bg-black border border-cyber-emerald/50 rounded-2xl p-4 w-full flex flex-col items-center shadow-[inset_0_0_20px_rgba(16,185,129,0.1)] relative overflow-hidden">
-                                        {/* Particles */}
                                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1),transparent)] animate-pulse"></div>
-                                        
                                         <button onClick={() => setCustomMultiplier(p => Math.max(1, p+1))} className="w-full text-cyber-emerald hover:text-white mb-2 transition-colors"><i className="fas fa-chevron-up"></i></button>
-                                        
                                         <div className="text-4xl font-mono font-bold text-white relative z-10 drop-shadow-[0_0_10px_rgba(16,185,129,0.8)]">
                                             {customMultiplier}<span className="text-sm opacity-50">x</span>
                                         </div>
-                                        
                                         <button onClick={() => setCustomMultiplier(p => Math.max(1, p-1))} className="w-full text-cyber-emerald hover:text-white mt-2 transition-colors"><i className="fas fa-chevron-down"></i></button>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* CORE OMEGA: REVENTADOS (RED/HAZARD) */}
                             <div className="flex flex-col items-center border-l border-white/5 pl-6">
                                 <div className="text-[10px] font-mono font-bold text-red-500 uppercase tracking-widest mb-3 flex items-center gap-2 animate-pulse">
                                     <i className="fas fa-radiation"></i> Factor Ω (Rev)
                                 </div>
-                                
                                 <div className="relative group/omega">
                                     <div className="absolute -inset-2 bg-red-600 rounded-2xl opacity-10 blur-md group-hover/omega:opacity-30 transition-opacity"></div>
                                     <div className="bg-black border border-red-500/50 rounded-2xl p-4 w-full flex flex-col items-center shadow-[inset_0_0_20px_rgba(220,38,38,0.2)] relative overflow-hidden">
-                                        {/* Hazard Stripes */}
                                         <div className="absolute inset-0 opacity-10 bg-[repeating-linear-gradient(45deg,transparent,transparent_5px,#ff0000_5px,#ff0000_10px)]"></div>
-                                        
                                         <button onClick={() => setCustomReventadosMultiplier(p => Math.max(1, p+1))} className="w-full text-red-500 hover:text-white mb-2 transition-colors relative z-10"><i className="fas fa-chevron-up"></i></button>
-                                        
                                         <div className="text-4xl font-mono font-black text-red-500 relative z-10 drop-shadow-[0_0_10px_rgba(255,0,0,0.8)]">
                                             {customReventadosMultiplier}<span className="text-sm opacity-50">x</span>
                                         </div>
-                                        
                                         <button onClick={() => setCustomReventadosMultiplier(p => Math.max(1, p-1))} className="w-full text-red-500 hover:text-white mt-2 transition-colors relative z-10"><i className="fas fa-chevron-down"></i></button>
                                     </div>
                                 </div>
                             </div>
-
                         </div>
 
-                        {/* Action Buttons */}
                         <div className="flex gap-4 pt-4 border-t border-white/5">
                             <button onClick={() => setEditingMultiplier(false)} className="flex-1 py-4 rounded-xl text-[10px] font-bold text-slate-400 border border-slate-800 hover:border-slate-600 hover:text-white uppercase tracking-widest transition-colors bg-black">
                                 Cancelar
                             </button>
-                            
                             <button 
                                 onClick={handleUpdateMultiplier} 
                                 className="flex-1 py-4 rounded-xl text-[10px] font-bold text-black uppercase tracking-widest transition-all relative overflow-hidden group/btn shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:scale-[1.02]"
                             >
                                 <div className="absolute inset-0 bg-gradient-to-r from-cyber-emerald to-red-600"></div>
                                 <div className="absolute inset-0 bg-white/30 -translate-x-full group-hover/btn:animate-[shine_0.5s_ease-in-out]"></div>
-                                
                                 <span className="relative z-10 flex items-center justify-center gap-2">
                                     <i className="fas fa-save"></i> GUARDAR CAMBIOS
                                 </span>
                             </button>
                         </div>
-
                     </div>
                   </div>
               </div>
@@ -465,13 +444,9 @@ export default function Dashboard() {
             </div>
 
             <div className="flex items-center gap-6">
-                 {/* ADMIN CONTROL CENTER BUTTON - PERMANENT DEEP NEON BLUE BORDER */}
                  {user.role === UserRole.SuperAdmin && (
                      <div className="relative group/btn">
-                         {/* Deep Blue Backlight */}
                          <div className="absolute -inset-1 bg-[#1e3a8a] rounded-xl opacity-30 blur-xl animate-pulse transition-all duration-500 group-hover/btn:opacity-60 group-hover/btn:blur-2xl"></div>
-                         
-                         {/* CONTROL CENTER BUTTON - DEEP BLUE ABYSS PHOSPHORESCENT */}
                          <button 
                             onClick={() => setAdminResultOpen(true)}
                             className="relative overflow-hidden bg-[#050a14] border-2 border-[#1e3a8a] hover:border-[#3b82f6] text-[#3b82f6] px-8 py-3 rounded-xl backdrop-blur-md transition-all shadow-[0_0_20px_rgba(30,58,138,0.5)] hover:shadow-[0_0_40px_rgba(30,58,138,0.8)] group-hover/btn:scale-105"
@@ -494,12 +469,10 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* --- LIVE RESULTS PANEL --- */}
+      {/* --- LIVE RESULTS & TOP NUMBERS --- */}
       <div className="relative z-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
           <LiveResultsPanel />
       </div>
-
-      {/* --- TOP 10 NUMBERS (PREDICTIVE INTELLIGENCE) --- */}
       <div className="relative z-10 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-100">
           <TopNumbersPanel />
       </div>
@@ -528,6 +501,7 @@ export default function Dashboard() {
         
         <div className="lg:col-span-2 space-y-12 md:space-y-20">
             
+            {/* CONSOLE */}
             <div className="relative perspective-1000">
                 {isMarketClosed && (
                     <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm rounded-[3rem] border-2 border-red-900/50">
@@ -539,12 +513,10 @@ export default function Dashboard() {
 
                 <div className={`absolute -inset-1 ${isReventados ? 'bg-red-600 animate-pulse' : theme.glow} rounded-[3rem] opacity-30 blur-xl ${isReventados ? '' : 'animate-plasma-pulse'} theme-transition duration-1000`}></div>
                 
-                {/* CONSOLE CONTAINER: Solid Tint Core */}
                 <div 
                     className={`relative rounded-[3rem] p-1 overflow-hidden border ${consoleBorder} transition-all duration-700 z-10`}
-                    style={{ backgroundColor: consoleBgHex }} // Using inline style for immediate hex application
+                    style={{ backgroundColor: consoleBgHex }} 
                 >
-                    
                     {isReventados && <ReventadosEffect />}
 
                     <div className="relative z-10 p-6 md:p-12">
@@ -565,14 +537,12 @@ export default function Dashboard() {
                                 </div>
                             </div>
                             
-                            {/* --- MODE TOGGLE CONTAINER (PHOSPHORESCENT BORDER) --- */}
                             <div className={`p-1.5 rounded-full flex gap-2 border-2 backdrop-blur-md shadow-lg self-center md:self-auto relative z-20 transition-all duration-500 group/mode
                                 ${isReventados 
                                     ? 'bg-black/90 border-red-500 shadow-[0_0_20px_rgba(220,38,38,0.6)] hover:shadow-[0_0_40px_rgba(220,38,38,0.9)] hover:border-red-400' 
                                     : `bg-black/90 ${theme.border} ${theme.shadow} hover:shadow-[0_0_30px_currentColor]` 
                                 }
                             `}>
-                                {/* TIEMPOS BUTTON - INDEPENDENT BORDER */}
                                 <button 
                                     onClick={() => setGameMode(GameMode.TIEMPOS)}
                                     disabled={isMarketClosed}
@@ -586,7 +556,6 @@ export default function Dashboard() {
                                     Tiempos
                                 </button>
                                 
-                                {/* REVENTADOS BUTTON */}
                                 <button 
                                     onClick={() => setGameMode(GameMode.REVENTADOS)}
                                     disabled={isMarketClosed}
@@ -598,12 +567,9 @@ export default function Dashboard() {
                             </div>
                         </div>
 
-                        {/* DRAW SELECTORS - PERMANENT BORDERS */}
                         <div className="grid grid-cols-3 gap-3 md:gap-6 mb-10 md:mb-16">
                             {Object.values(DrawTime).map((time) => {
                                 const isSelected = selectedDraw === time;
-                                
-                                // Determine color based on the draw time itself, NOT the currently selected global theme
                                 let borderColor = 'border-blue-900';
                                 let textColor = 'text-blue-400';
                                 let shadowColor = 'shadow-[0_0_10px_rgba(30,58,138,0.3)]';
@@ -645,8 +611,6 @@ export default function Dashboard() {
                         </div>
                         
                         <div className="flex flex-col md:flex-row gap-8 items-stretch relative z-20">
-                            
-                            {/* INPUTS: PERMANENT PHOSPHORESCENT BORDER */}
                             <div className="flex-1 relative group/field">
                                 <div className={`absolute -inset-1 ${isReventados ? 'bg-red-500' : theme.glow} rounded-2xl opacity-0 group-focus-within/field:opacity-60 blur-md theme-transition duration-700`}></div>
                                 <div className={`relative bg-black/90 rounded-2xl border-2 p-1 h-full overflow-hidden transition-all duration-300 
@@ -714,68 +678,90 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {pendingBets.length > 0 && (
+            {/* --- BUFFER DE TRANSMISIÓN --- */}
+            {(pendingBets.length > 0 || batchSuccess) && (
                 <div className="animate-in slide-in-from-top-4 fade-in duration-500 relative">
                     <div className="absolute -inset-1 bg-cyber-success rounded-2xl opacity-20 blur-lg animate-pulse"></div>
 
-                    <div className="bg-cyber-panel/80 border border-cyber-success rounded-2xl p-6 shadow-[0_0_40px_rgba(10,255,96,0.15)] relative overflow-hidden backdrop-blur-md z-10">
+                    <div className="bg-cyber-panel/80 border border-cyber-success rounded-2xl p-6 shadow-[0_0_40px_rgba(10,255,96,0.15)] relative overflow-hidden backdrop-blur-md z-10 min-h-[300px] flex flex-col">
                         <div className="absolute top-0 left-0 w-full h-1 bg-cyber-success/50 shadow-neon-green animate-[scanline_2s_linear_infinite]"></div>
                         
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-display font-black text-white uppercase tracking-widest flex items-center gap-3">
-                                <i className="fas fa-satellite-dish text-cyber-success animate-pulse"></i>
-                                Buffer de Transmisión
-                                <span className="text-[10px] bg-cyber-success text-black px-2 py-0.5 rounded ml-2 font-mono shadow-[0_0_10px_#0aff60]">
-                                    {pendingBets.length} PENDIENTES
-                                </span>
-                            </h3>
-                            <button onClick={handleClearQueue} className="text-xs text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">
-                                <i className="fas fa-trash-alt mr-1"></i> Limpiar
-                            </button>
-                        </div>
+                        {batchSuccess ? (
+                            // SUCCESS ANIMATION STATE
+                            <div className="flex-1 flex flex-col items-center justify-center text-center animate-in zoom-in duration-500">
+                                <div className="w-24 h-24 bg-cyber-success rounded-full flex items-center justify-center shadow-[0_0_60px_#0aff60] mb-6 animate-bounce">
+                                    <i className="fas fa-check text-5xl text-black"></i>
+                                </div>
+                                <h3 className="text-3xl font-display font-black text-white uppercase tracking-tighter mb-2 drop-shadow-[0_0_15px_rgba(10,255,96,0.8)]">
+                                    Transmisión Exitosa
+                                </h3>
+                                <p className="text-cyber-success font-mono text-sm tracking-widest uppercase animate-pulse">
+                                    Paquete de datos sincronizado con el Núcleo
+                                </p>
+                                <div className="w-64 h-1 bg-gray-800 rounded-full mt-8 overflow-hidden">
+                                    <div className="h-full bg-cyber-success animate-[load_1s_ease-out_forwards]"></div>
+                                </div>
+                            </div>
+                        ) : (
+                            // LIST STATE
+                            <>
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-lg font-display font-black text-white uppercase tracking-widest flex items-center gap-3">
+                                        <i className="fas fa-satellite-dish text-cyber-success animate-pulse"></i>
+                                        Buffer de Transmisión
+                                        <span className="text-[10px] bg-cyber-success text-black px-2 py-0.5 rounded ml-2 font-mono shadow-[0_0_10px_#0aff60]">
+                                            {pendingBets.length} PENDIENTES
+                                        </span>
+                                    </h3>
+                                    <button onClick={handleClearQueue} className="text-xs text-red-400 hover:text-red-300 uppercase font-bold tracking-wider">
+                                        <i className="fas fa-trash-alt mr-1"></i> Limpiar
+                                    </button>
+                                </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
-                            {pendingBets.map((bet) => (
-                                <div key={bet.id} className={`bg-black/60 border ${bet.mode === GameMode.REVENTADOS ? 'border-red-900' : 'border-white/10'} rounded-lg p-3 flex justify-between items-center group hover:border-cyber-success/50 transition-colors relative overflow-hidden`}>
-                                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${bet.mode === GameMode.REVENTADOS ? 'bg-red-500' : 'bg-cyber-success/50'}`}></div>
-                                    <div>
-                                        <div className={`text-2xl font-mono font-bold ${bet.mode === GameMode.REVENTADOS ? 'text-red-500' : 'text-white'} text-glow-sm`}>{bet.number}</div>
-                                        <div className="text-[9px] text-slate-400 uppercase tracking-wider">
-                                            {bet.draw.split(' ')[0]} 
-                                            {bet.mode === GameMode.REVENTADOS && <span className="text-red-500 ml-1 font-bold">200x</span>}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+                                    {pendingBets.map((bet) => (
+                                        <div key={bet.id} className={`bg-black/60 border ${bet.mode === GameMode.REVENTADOS ? 'border-red-900' : 'border-white/10'} rounded-lg p-3 flex justify-between items-center group hover:border-cyber-success/50 transition-colors relative overflow-hidden`}>
+                                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${bet.mode === GameMode.REVENTADOS ? 'bg-red-500' : 'bg-cyber-success/50'}`}></div>
+                                            <div>
+                                                <div className={`text-2xl font-mono font-bold ${bet.mode === GameMode.REVENTADOS ? 'text-red-500' : 'text-white'} text-glow-sm`}>{bet.number}</div>
+                                                <div className="text-[9px] text-slate-400 uppercase tracking-wider">
+                                                    {bet.draw.split(' ')[0]} 
+                                                    {bet.mode === GameMode.REVENTADOS && <span className="text-red-500 ml-1 font-bold">200x</span>}
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-cyber-success font-bold font-mono text-glow-green">{formatCurrency(bet.amount)}</div>
+                                                <button onClick={() => handleRemoveFromQueue(bet.id)} className="text-[9px] text-red-500 hover:text-white mt-1 uppercase opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    Eliminar
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-cyber-success font-bold font-mono text-glow-green">{formatCurrency(bet.amount)}</div>
-                                        <button onClick={() => handleRemoveFromQueue(bet.id)} className="text-[9px] text-red-500 hover:text-white mt-1 uppercase opacity-0 group-hover:opacity-100 transition-opacity">
-                                            Eliminar
-                                        </button>
-                                    </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
 
-                        <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-t border-white/10 pt-6">
-                             <div className="text-center md:text-left">
-                                <div className="text-[10px] text-cyber-blue uppercase tracking-widest font-bold">Inversión Total del Lote</div>
-                                <div className="text-3xl font-mono font-bold text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">
-                                    {formatCurrency(queueTotal)}
+                                <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-t border-white/10 pt-6 mt-auto">
+                                     <div className="text-center md:text-left">
+                                        <div className="text-[10px] text-cyber-blue uppercase tracking-widest font-bold">Inversión Total del Lote</div>
+                                        <div className="text-3xl font-mono font-bold text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">
+                                            {formatCurrency(queueTotal)}
+                                        </div>
+                                     </div>
+
+                                     <button 
+                                        onClick={handleExecuteBatch}
+                                        disabled={executingBatch || isMarketClosed}
+                                        className="w-full md:w-auto px-12 py-4 rounded-xl font-display font-black uppercase tracking-[0.2em] relative overflow-hidden group/btn shadow-neon-green transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed border-2 border-cyber-success"
+                                     >
+                                        <div className="absolute inset-0 bg-cyber-success group-hover/btn:bg-white transition-colors"></div>
+                                        
+                                        <span className="relative z-10 flex items-center justify-center gap-3 text-black group-hover/btn:text-cyber-success">
+                                            {executingBatch ? <i className="fas fa-circle-notch fa-spin"></i> : <i className="fas fa-paper-plane"></i>}
+                                            {executingBatch ? 'SINCRONIZANDO...' : 'CONFIRMAR JUGADA'}
+                                        </span>
+                                     </button>
                                 </div>
-                             </div>
-
-                             <button 
-                                onClick={handleExecuteBatch}
-                                disabled={executingBatch || isMarketClosed}
-                                className="w-full md:w-auto px-12 py-4 rounded-xl font-display font-black uppercase tracking-[0.2em] relative overflow-hidden group/btn shadow-neon-green transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed border-2 border-cyber-success"
-                             >
-                                <div className="absolute inset-0 bg-cyber-success group-hover/btn:bg-white transition-colors"></div>
-                                
-                                <span className="relative z-10 flex items-center justify-center gap-3 text-black group-hover/btn:text-cyber-success">
-                                    {executingBatch ? <i className="fas fa-circle-notch fa-spin"></i> : <i className="fas fa-paper-plane"></i>}
-                                    {executingBatch ? 'SINCRONIZANDO...' : 'CONFIRMAR JUGADA'}
-                                </span>
-                             </button>
-                        </div>
+                            </>
+                        )}
                     </div>
                 </div>
             )}

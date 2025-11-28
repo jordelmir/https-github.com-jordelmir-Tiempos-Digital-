@@ -184,6 +184,14 @@ export interface RiskLimitStats {
     risk_percentage: number;
 }
 
+export interface RiskAnalysisReport {
+    riskLevel: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL';
+    projectedLoss: number;
+    suggestedGlobalLimit: number;
+    hotNumbers: string[];
+    anomaliesDetected: string[];
+}
+
 // --- DATA MAINTENANCE ---
 export interface WeeklyDataStats {
     year: number;

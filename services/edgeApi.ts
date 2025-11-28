@@ -1,6 +1,6 @@
 
 import { supabase } from '../lib/supabaseClient';
-import { ApiResponse, AppUser, TransactionResponse, DrawResultPayload, GameMode, DrawResult, Bet, AuditEventType, AuditSeverity, WeeklyDataStats } from '../types';
+import { ApiResponse, AppUser, TransactionResponse, DrawResultPayload, GameMode, DrawResult, Bet, AuditEventType, AuditSeverity, WeeklyDataStats, RiskAnalysisReport } from '../types';
 import { GoogleGenAI } from "@google/genai";
 
 // In a real deployment, these would point to your deployed Edge Functions
@@ -156,6 +156,21 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
                 generated_at: new Date().toISOString()
             };
             return { data: prediction as any };
+        }
+
+        // --- RISK ENGINE AI ANALYSIS ---
+        if (functionName === 'generateRiskAnalysis') {
+            await new Promise(r => setTimeout(r, 1500)); // AI thinking simulation
+            
+            const analysis: RiskAnalysisReport = {
+                riskLevel: Math.random() > 0.7 ? 'HIGH' : (Math.random() > 0.4 ? 'MODERATE' : 'LOW'),
+                projectedLoss: Math.floor(Math.random() * 5000000),
+                suggestedGlobalLimit: Math.floor(Math.random() * 500000) + 100000,
+                hotNumbers: Array.from({length: 3}, () => Math.floor(Math.random() * 100).toString().padStart(2, '0')),
+                anomaliesDetected: Math.random() > 0.8 ? ['Patrón Serpiente en N°33', 'Apuestas masivas desde IP Cluster'] : []
+            };
+            
+            return { data: analysis as any };
         }
 
         // 1. PLACE BET LOGIC
@@ -419,7 +434,10 @@ export const api = {
   getLiveResults: async () => invokeEdgeFunction<{ results: DrawResult[]; history: DrawResult[] }>('getLiveResults', {}),
   getGlobalBets: async (payload: any) => invokeEdgeFunction<{ bets: Bet[] }>('getGlobalBets', payload),
   generateAIAnalysis: async (payload: { drawTime: string }) => invokeEdgeFunction<any>('generateAIAnalysis', payload),
+  
+  // RISK
   getRiskLimits: async (payload: any) => invokeEdgeFunction<any>('getRiskLimits', payload),
   getRiskStats: async (payload: any) => invokeEdgeFunction<any>('getRiskStats', payload),
-  updateRiskLimit: async (payload: any) => invokeEdgeFunction<any>('updateRiskLimit', payload)
+  updateRiskLimit: async (payload: any) => invokeEdgeFunction<any>('updateRiskLimit', payload),
+  generateRiskAnalysis: async (payload: { draw: string }) => invokeEdgeFunction<RiskAnalysisReport>('generateRiskAnalysis', payload)
 };

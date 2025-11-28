@@ -1,32 +1,159 @@
-
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { api } from '../services/edgeApi';
 import { DrawTime, RiskLimit, RiskLimitStats } from '../types';
 import { formatCurrency } from '../constants';
 
+// --- TYPES & INTERFACES ---
+type ViewMode = 'SATURATION' | 'VOLUME' | 'VELOCITY';
+
+interface GridCell {
+    number: string;
+    percent: number;
+    amount: number;
+    limit: number;
+    velocity: number; // 0-100 scale of sales/minute
+    ticketCount: number;
+    isShielded: boolean;
+    isManual: boolean; // True if it has a specific limit overriding global
+    trend: number[]; // Array for sparkline
+}
+
+// --- MICRO-COMPONENTS ---
+
+// 1. SPARKLINE SVG (Gráfico de línea minimalista)
+const Sparkline = ({ data, color }: { data: number[], color: string }) => {
+    const max = Math.max(...data, 10);
+    const min = Math.min(...data);
+    const range = max - min || 1;
+    const width = 100;
+    const height = 30;
+    
+    const points = data.map((d, i) => {
+        const x = (i / (data.length - 1)) * width;
+        const y = height - ((d - min) / range) * height;
+        return `${x},${y}`;
+    }).join(' ');
+
+    return (
+        <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
+            <polyline points={points} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+            <circle cx={(data.length-1) / (data.length-1) * width} cy={height - ((data[data.length-1] - min) / range) * height} r="3" fill={color} className="animate-pulse" />
+        </svg>
+    );
+};
+
+// 2. RADAR CHART (Distribución)
+const DistributionBar = ({ player, vendor, color }: { player: number, vendor: number, color: string }) => {
+    const total = player + vendor || 1;
+    const pPerc = (player / total) * 100;
+    
+    return (
+        <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden flex">
+            <div className={`h-full ${color}`} style={{ width: `${pPerc}%` }}></div>
+            <div className="h-full bg-slate-600" style={{ width: `${100 - pPerc}%` }}></div>
+        </div>
+    );
+};
+
 export default function RiskLimitManager() {
+  // --- STATE ---
   const [activeDraw, setActiveDraw] = useState<DrawTime>(DrawTime.NOCHE);
+  const [viewMode, setViewMode] = useState<ViewMode>('SATURATION');
+  
   const [limits, setLimits] = useState<RiskLimit[]>([]);
   const [stats, setStats] = useState<RiskLimitStats[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Selection
+  // Selection Logic
   const [selectedNumber, setSelectedNumber] = useState<string | null>(null);
-  const [limitAmount, setLimitAmount] = useState<number | ''>('');
-  const [isGlobalMode, setIsGlobalMode] = useState(false);
+  const [hoveredNumber, setHoveredNumber] = useState<string | null>(null);
+  
+  // Input State
+  const [manualInputValue, setManualInputValue] = useState<string>('');
+  const [globalInputValue, setGlobalInputValue] = useState<string>('');
+  
+  // --- PROTOCOLO DE ANCLAJE LOCAL (Client-Truth persistence) ---
+  // Stores the user's latest global setting to override server lag/polling.
+  const [localGlobalAnchor, setLocalGlobalAnchor] = useState<{ val: number, timestamp: number } | null>(null);
 
-  // Animation States
+  // System Controls
+  const [isBlindajeActive, setIsBlindajeActive] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'IDLE' | 'SAVING' | 'SUCCESS'>('IDLE');
-  const [removeStatus, setRemoveStatus] = useState<'IDLE' | 'REMOVING' | 'SUCCESS'>('IDLE');
+  
+  // Prevent flicker during optimistic updates
+  const pendingWrites = useRef<Set<string>>(new Set());
 
+  // --- HELPER: Normalize Limit Value ---
+  // Converts DB specific values (like -1 for Infinity) to workable numbers
+  const normalizeLimit = (val: number | undefined) => {
+      if (val === undefined || val === -1 || val >= 999999999) return Infinity;
+      return val;
+  };
+
+  // --- DERIVED GLOBAL LIMIT (The Core Fix Logic) ---
+  // 1. Get from Server State
+  const serverGlobalLimitRaw = limits.find(l => l.number === 'ALL')?.max_amount;
+  const serverGlobalLimit = normalizeLimit(serverGlobalLimitRaw);
+  
+  // 2. Compute Effective Global Limit (Priority: Local Anchor > Server)
+  const effectiveGlobalLimit = useMemo(() => {
+      // If we have a local change less than 20 seconds old, use it (Client Truth)
+      if (localGlobalAnchor && (Date.now() - localGlobalAnchor.timestamp < 20000)) {
+          return localGlobalAnchor.val;
+      }
+      return serverGlobalLimit;
+  }, [serverGlobalLimit, localGlobalAnchor]);
+
+  // Update Input when Global Limit Changes (only if not editing)
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 10000); // Refresh every 10s
-    return () => clearInterval(interval);
-  }, [activeDraw]);
+      if (effectiveGlobalLimit !== Infinity && effectiveGlobalLimit !== 0) {
+          setGlobalInputValue((effectiveGlobalLimit / 100).toString());
+      } else {
+          setGlobalInputValue('');
+      }
+  }, [effectiveGlobalLimit]);
 
+  // --- MOCK DATA ENGINE (High Fidelity Simulation) ---
+  const gridData: GridCell[] = useMemo(() => {
+      return Array.from({ length: 100 }, (_, i) => {
+          const numStr = i.toString().padStart(2, '0');
+          const specificLimitObj = limits.find(l => l.number === numStr);
+          const stat = stats.find(s => s.number === numStr);
+          
+          // Determine effective limit for this cell
+          // If specific limit exists, use it. Otherwise inherit global.
+          const isManual = !!specificLimitObj;
+          const rawLimit = isManual ? specificLimitObj.max_amount : effectiveGlobalLimit;
+          const activeLimit = normalizeLimit(rawLimit);
+          
+          const amountSold = stat ? stat.total_sold : 0; 
+          
+          // Calculate Saturation Percentage
+          let percent = 0;
+          if (activeLimit === 0) percent = 100; // Locked
+          else if (activeLimit === Infinity) percent = 0; // Unlimited
+          else percent = Math.min((amountSold / activeLimit) * 100, 100);
+          
+          // Advanced metrics simulation
+          const velocity = Math.random() * 100;
+          const trend = Array.from({ length: 10 }, () => Math.random() * amountSold);
+
+          return {
+              number: numStr,
+              percent,
+              amount: amountSold,
+              limit: activeLimit,
+              velocity,
+              ticketCount: Math.floor(amountSold / 500),
+              isShielded: activeLimit === 0 || (isBlindajeActive && percent >= 95),
+              isManual,
+              trend
+          };
+      });
+  }, [limits, stats, isBlindajeActive, effectiveGlobalLimit]);
+
+  // --- DATA FETCHING ---
   const fetchData = async () => {
-    // Only set loading on initial fetch to avoid flickering on periodic refresh
     if (limits.length === 0) setLoading(true);
     try {
         const [limitsRes, statsRes] = await Promise.all([
@@ -34,544 +161,547 @@ export default function RiskLimitManager() {
             api.getRiskStats({ draw: activeDraw })
         ]);
         
-        if (limitsRes.data) setLimits(limitsRes.data.limits);
+        if (limitsRes.data) {
+            setLimits(prevLimits => {
+                // Merge pending writes to prevent UI flicker/rollback
+                if (pendingWrites.current.size > 0) {
+                    let merged = [...limitsRes.data!.limits];
+                    pendingWrites.current.forEach(lockedKey => {
+                        const local = prevLimits.find(l => l.number === lockedKey);
+                        if (local) {
+                            // Remove server version, keep local version
+                            merged = merged.filter(l => l.number !== lockedKey);
+                            merged.push(local);
+                        }
+                    });
+                    return merged;
+                }
+                return limitsRes.data!.limits;
+            });
+        }
         if (statsRes.data) setStats(statsRes.data.stats);
     } catch (e) {
-        console.error("Risk Manager Error", e);
+        console.error(e);
     } finally {
         setLoading(false);
     }
   };
 
-  // IDENTIFY GLOBAL LIMIT OBJECT
-  const globalLimitObj = useMemo(() => limits.find(l => l.number === 'ALL'), [limits]);
-
-  // AUTO-FILL INPUT ON SELECTION CHANGE
   useEffect(() => {
-      if (isGlobalMode) {
-          if (globalLimitObj) setLimitAmount(globalLimitObj.max_amount / 100);
-          else setLimitAmount('');
+    fetchData();
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
+  }, [activeDraw]);
+
+  // --- ACTIONS ---
+  
+  // 1. SELECTION TOGGLE (Fix for "Stuck" numbers)
+  const handleCellClick = (numStr: string) => {
+      if (selectedNumber === numStr) {
+          // Deselect if already selected
+          setSelectedNumber(null);
+          setManualInputValue('');
       } else {
-          if (selectedNumber) {
-              const limit = limits.find(l => l.number === selectedNumber);
-              if (limit) setLimitAmount(limit.max_amount / 100);
-              else setLimitAmount('');
+          // Select new number
+          setSelectedNumber(numStr);
+          const cell = gridData.find(c => c.number === numStr);
+          // Set input to current manual limit if exists
+          if (cell?.isManual && cell.limit !== Infinity) {
+              setManualInputValue((cell.limit / 100).toString());
+          } else {
+              setManualInputValue('');
           }
       }
-  }, [isGlobalMode, selectedNumber, globalLimitObj, limits]);
+  };
 
-  // MERGE DATA FOR GRID WITH INHERITANCE LOGIC
-  const gridData = useMemo(() => {
-      const grid = [];
-      const globalMax = globalLimitObj ? globalLimitObj.max_amount : Infinity;
-
-      for (let i = 0; i < 100; i++) {
-          const numStr = i.toString().padStart(2, '0');
-          const limit = limits.find(l => l.number === numStr);
-          const stat = stats.find(s => s.number === numStr);
-          
-          // Inheritance Logic: Specific > Global > Infinity
-          const hasSpecific = !!limit;
-          const max = hasSpecific ? limit!.max_amount : globalMax;
-          
-          const sold = stat ? stat.total_sold : 0;
-          const percent = max === Infinity ? 0 : (sold / max) * 100;
-          
-          grid.push({
-              number: numStr,
-              max,
-              sold,
-              percent,
-              isLimited: max !== Infinity,
-              limitSource: hasSpecific ? 'SPECIFIC' : (globalMax !== Infinity ? 'GLOBAL' : 'NONE')
+  // 2. SAVE LIMIT (Universal)
+  const saveLimit = async (targetNumber: string, amount: number) => {
+      setSaveStatus('SAVING');
+      pendingWrites.current.add(targetNumber);
+      
+      // Update Local Anchor if Global (Key fix for persistence)
+      if (targetNumber === 'ALL') {
+          setLocalGlobalAnchor({
+              val: amount === -1 ? Infinity : amount, 
+              timestamp: Date.now()
           });
       }
-      return grid;
-  }, [limits, stats, globalLimitObj]);
 
-  const handleSaveLimit = async () => {
-      if (!limitAmount || Number(limitAmount) < 0) return;
-      
-      setSaveStatus('SAVING');
-      
-      const targetNumber = isGlobalMode ? 'ALL' : selectedNumber!;
-      const newLimitVal = Number(limitAmount) * 100; // Cents
-
-      // --- OPTIMISTIC UPDATE START ---
-      // Instantly update UI before server response
-      const optimisticLimit: RiskLimit = {
-          id: `temp-${Date.now()}`,
-          draw_type: activeDraw,
-          number: targetNumber,
-          max_amount: newLimitVal,
-          created_at: new Date().toISOString()
+      // Optimistic Update for UI
+      const newLimit = { 
+          id: `temp-${Date.now()}`, 
+          draw_type: activeDraw, 
+          number: targetNumber, 
+          max_amount: amount, 
+          created_at: new Date().toISOString() 
       };
-
+      
       setLimits(prev => {
-          // Remove existing limit for this number/ALL to replace it
-          const clean = prev.filter(l => l.number !== targetNumber);
-          return [...clean, optimisticLimit];
+          const filtered = prev.filter(l => l.number !== targetNumber);
+          return [...filtered, newLimit];
       });
-      // --- OPTIMISTIC UPDATE END ---
 
-      // Simulate slight delay for "Processing" feel
-      await new Promise(r => setTimeout(r, 400));
-
-      await api.updateRiskLimit({
-          draw: activeDraw,
-          number: targetNumber,
-          max_amount: newLimitVal
-      });
+      // API Call
+      // Removed forced fetchData here to allow Anchor to hold truth
+      await new Promise(r => setTimeout(r, 600)); // Artificial network feel
+      await api.updateRiskLimit({ draw: activeDraw, number: targetNumber, max_amount: amount });
       
       setSaveStatus('SUCCESS');
-      
-      // Re-fetch to ensure sync with backend (IDs, etc)
-      fetchData();
-
-      // Reset animation
-      setTimeout(() => setSaveStatus('IDLE'), 2000);
+      setTimeout(() => {
+          setSaveStatus('IDLE');
+          pendingWrites.current.delete(targetNumber);
+      }, 1500);
   };
 
-  const handleRemoveLimit = async () => {
-      setRemoveStatus('REMOVING');
-      
-      const targetNumber = isGlobalMode ? 'ALL' : selectedNumber!;
-
-      // --- OPTIMISTIC UPDATE START ---
-      // Instantly remove from UI
-      setLimits(prev => prev.filter(l => l.number !== targetNumber));
-      // --- OPTIMISTIC UPDATE END ---
-      
-      await new Promise(r => setTimeout(r, 400));
-
-      await api.updateRiskLimit({
-          draw: activeDraw,
-          number: targetNumber,
-          max_amount: -1 // Signal to remove in backend
-      });
-      
-      setRemoveStatus('SUCCESS');
-      setLimitAmount(''); // Clear input
-      fetchData();
-
-      setTimeout(() => setRemoveStatus('IDLE'), 2000);
+  // 3. HANDLERS
+  const handleSaveSelected = () => {
+      if (!selectedNumber) return;
+      if (!manualInputValue) {
+          return;
+      }
+      const val = Number(manualInputValue) * 100; // Cents
+      saveLimit(selectedNumber, val);
   };
 
-  // --- THEMATIC ENGINE V2 ---
-  const currentDrawTheme = useMemo(() => {
-      if (activeDraw.includes('Mediodía')) return {
-          id: 'solar',
-          base: 'text-orange-500 border-orange-500',
-          glow: 'shadow-[0_0_15px_orange]',
-          bg: 'bg-orange-500',
-          bgHex: '#f97316',
-          hover: 'hover:border-orange-400 hover:shadow-orange-500/50',
-          cellActive: 'border-orange-500/60 bg-orange-900/30 text-orange-200 shadow-[inset_0_0_10px_rgba(249,115,22,0.3)]',
-          cellIdle: 'border-white/5 text-slate-500 hover:text-orange-400 hover:border-orange-500/50 hover:bg-orange-900/10',
-          icon: 'fa-sun'
+  const handleResetSelected = () => {
+      if (!selectedNumber) return;
+      setLimits(prev => prev.filter(l => l.number !== selectedNumber));
+      api.updateRiskLimit({ draw: activeDraw, number: selectedNumber, max_amount: -2 }); 
+      setManualInputValue('');
+  };
+
+  const handleSaveGlobal = () => {
+      if (!globalInputValue) return;
+      const val = Number(globalInputValue) * 100; // Cents
+      saveLimit('ALL', val);
+  };
+
+  const handleSetGlobalUnlimited = () => {
+      saveLimit('ALL', -1);
+      setGlobalInputValue('');
+  };
+
+  // --- THEME ---
+  const theme = useMemo(() => {
+      if (activeDraw.includes('Mediodía')) return { 
+          hex: '#ff5f00', name: 'solar', gradient: 'from-orange-500 to-red-600', 
+          border: 'border-cyber-solar', text: 'text-cyber-solar', bg: 'bg-cyber-solar' 
       };
-      if (activeDraw.includes('Tarde')) return {
-          id: 'vapor',
-          base: 'text-purple-500 border-purple-500',
-          glow: 'shadow-[0_0_15px_#a855f7]',
-          bg: 'bg-purple-500',
-          bgHex: '#a855f7',
-          hover: 'hover:border-purple-400 hover:shadow-purple-500/50',
-          cellActive: 'border-purple-500/60 bg-purple-900/30 text-purple-200 shadow-[inset_0_0_10px_rgba(168,85,247,0.3)]',
-          cellIdle: 'border-white/5 text-slate-500 hover:text-purple-400 hover:border-purple-500/50 hover:bg-purple-900/10',
-          icon: 'fa-cloud-sun'
+      if (activeDraw.includes('Tarde')) return { 
+          hex: '#7c3aed', name: 'vapor', gradient: 'from-purple-500 to-indigo-600', 
+          border: 'border-cyber-vapor', text: 'text-cyber-vapor', bg: 'bg-cyber-vapor' 
       };
-      // Noche (Default)
-      return {
-          id: 'abyss',
-          base: 'text-blue-500 border-blue-500',
-          glow: 'shadow-[0_0_15px_#3b82f6]',
-          bg: 'bg-blue-500',
-          bgHex: '#3b82f6',
-          hover: 'hover:border-blue-400 hover:shadow-blue-500/50',
-          cellActive: 'border-blue-500/60 bg-blue-900/30 text-blue-200 shadow-[inset_0_0_10px_rgba(59,130,246,0.3)]',
-          cellIdle: 'border-white/5 text-slate-500 hover:text-blue-400 hover:border-blue-500/50 hover:bg-blue-900/10',
-          icon: 'fa-moon'
+      return { 
+          hex: '#2563eb', name: 'abyss', gradient: 'from-blue-500 to-cyan-500', 
+          border: 'border-blue-500', text: 'text-blue-400', bg: 'bg-blue-500' 
       };
   }, [activeDraw]);
 
-  const getCellColor = (percent: number, isLimited: boolean) => {
-      const base = "border transition-all duration-300 relative overflow-hidden group font-mono font-bold text-xs";
-      
-      // 1. DANGER ZONES (Override Theme)
-      if (percent >= 100) return `${base} bg-red-950 border-red-500 text-red-100 shadow-[0_0_15px_red] animate-pulse z-10`;
-      if (percent >= 80) return `${base} bg-orange-950 border-orange-500 text-orange-200 shadow-[0_0_10px_orange] z-10`;
-      if (percent >= 50) return `${base} bg-yellow-950/30 border-yellow-600 text-yellow-200 shadow-[inset_0_0_5px_rgba(250,204,21,0.3)]`;
-
-      // 2. THEMATIC ACTIVE (Sales > 0 but Safe)
-      if (percent > 0) return `${base} ${currentDrawTheme.cellActive}`;
-
-      // 3. IDLE / EMPTY (Thematic Ghost)
-      return `${base} bg-black/40 ${currentDrawTheme.cellIdle}`;
-  };
-
-  // DYNAMIC THEME FOR CONTEXT
-  const themeContext = useMemo(() => {
-      if (isGlobalMode) return { color: 'cyber-purple', hex: '#bc13fe', shadow: 'shadow-neon-purple' };
-      if (selectedNumber) return { color: 'cyber-emerald', hex: '#10b981', shadow: 'shadow-neon-emerald' };
-      return { color: 'cyber-blue', hex: '#2463eb', shadow: 'shadow-neon-blue' };
-  }, [isGlobalMode, selectedNumber]);
+  // --- HELPERS ---
+  const activeCell = gridData.find(c => c.number === (hoveredNumber || selectedNumber)) || null;
+  const totalExposure = gridData.reduce((acc, curr) => acc + curr.amount, 0);
 
   return (
-    <div className="relative group perspective-1000">
-        
-        {/* --- LIVING BACKLIGHT --- */}
-        <div 
-            className="absolute -inset-1 rounded-[2rem] opacity-20 blur-2xl animate-[pulse_4s_ease-in-out_infinite] transition-all duration-1000"
-            style={{ backgroundColor: themeContext.hex }}
-        ></div>
-        
-        {/* Main Container - SOLID CORE */}
-        <div className={`relative bg-[#050a14] border-2 rounded-3xl p-8 overflow-hidden z-10 transition-all duration-500`}
-             style={{ borderColor: themeContext.hex, boxShadow: `0 0 30px ${themeContext.hex}33` }}
-        >
-            {/* HOLOGRAPHIC SCANLINE */}
-            <div className="absolute top-0 left-0 w-full h-1 bg-white opacity-10 blur-sm animate-[scanline_4s_linear_infinite] pointer-events-none z-20"></div>
+    <div className="w-full relative group font-sans">
+        {/* ATMOSPHERE */}
+        <div className={`absolute -inset-2 opacity-20 blur-3xl bg-gradient-to-r ${theme.gradient} animate-pulse pointer-events-none`}></div>
+
+        <div className="relative bg-[#02040a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col xl:flex-row min-h-[700px]">
             
-            {/* Background Grid */}
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[length:30px_30px] pointer-events-none"></div>
-
-            {/* HEADER */}
-            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-8 relative z-10 border-b border-white/10 pb-6 gap-6">
-                <div>
-                    <h3 className="text-xl font-display font-black text-white uppercase tracking-widest flex items-center gap-4 drop-shadow-lg">
-                        {/* LIVING ICON */}
-                        <div className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all relative overflow-hidden group/icon ${themeContext.shadow}`} style={{ borderColor: themeContext.hex }}>
-                            <div className="absolute inset-0 bg-white opacity-0 group-hover/icon:opacity-20 transition-opacity"></div>
-                            <div className={`absolute inset-0 ${themeContext.shadow.replace('shadow-', 'bg-')} opacity-20 blur-md animate-pulse`}></div>
-                            <i className="fas fa-shield-alt text-2xl relative z-10 animate-[pulse_3s_infinite]" style={{ color: themeContext.hex }}></i>
-                        </div>
-                        <div>
-                            <span>Gestión de Riesgo <span className="text-glow-sm transition-colors" style={{ color: themeContext.hex }}>Bancario</span></span>
-                            <div className="flex items-center gap-2 mt-1">
-                                <span className={`w-2 h-2 rounded-full animate-ping`} style={{ backgroundColor: themeContext.hex }}></span>
-                                <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">
-                                    Monitoreo Activo v4.0
-                                </p>
-                            </div>
-                        </div>
-                    </h3>
-                </div>
-
-                {/* --- THEMATIC DRAW SELECTOR --- */}
-                <div className="grid grid-cols-3 gap-3 w-full xl:w-auto bg-black/40 p-2 rounded-2xl border border-white/5">
-                    {Object.values(DrawTime).map((t) => {
-                        const isActive = activeDraw === t;
-                        // Determine local theme for this specific button
-                        let btnTheme = { border: '', text: '', glow: '', bg: '', icon: '' };
-                        if (t.includes('Mediodía')) btnTheme = { border: 'border-orange-500', text: 'text-orange-400', glow: 'shadow-[0_0_20px_orange]', bg: 'bg-orange-500', icon: 'fa-sun' };
-                        else if (t.includes('Tarde')) btnTheme = { border: 'border-purple-500', text: 'text-purple-400', glow: 'shadow-[0_0_20px_#a855f7]', bg: 'bg-purple-500', icon: 'fa-cloud-sun' };
-                        else btnTheme = { border: 'border-blue-500', text: 'text-blue-400', glow: 'shadow-[0_0_20px_#3b82f6]', bg: 'bg-blue-500', icon: 'fa-moon' };
-
-                        return (
-                            <button
-                                key={t}
-                                onClick={() => setActiveDraw(t)}
-                                className={`
-                                    relative px-6 py-3 rounded-xl text-[10px] font-bold uppercase transition-all duration-500 border-2 overflow-hidden group/btn flex flex-col items-center gap-1
-                                    ${isActive 
-                                        ? `${btnTheme.border} ${btnTheme.text} bg-black ${btnTheme.glow} scale-105 z-10` 
-                                        : 'border-white/5 text-slate-500 hover:border-white/20 hover:text-white bg-black/20'
-                                    }
-                                `}
-                            >
-                                {/* Active State Internals */}
-                                {isActive && (
-                                    <>
-                                        <div className={`absolute inset-0 ${btnTheme.bg} opacity-10 animate-pulse`}></div>
-                                        <div className={`absolute -inset-full ${btnTheme.bg} opacity-20 blur-xl animate-[spin_4s_linear_infinite]`}></div>
-                                    </>
-                                )}
-                                
-                                <i className={`fas ${btnTheme.icon} text-lg mb-1 relative z-10 ${isActive ? 'animate-bounce' : 'opacity-50'}`}></i>
-                                <span className="relative z-10 tracking-widest">{t.split(' ')[0]}</span>
-                            </button>
-                        )
-                    })}
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 relative z-10">
+            {/* ====================================================================================
+                LEFT PANEL: THE MATRIX (60%)
+               ==================================================================================== */}
+            <div className="xl:w-3/5 flex flex-col border-r border-white/5 relative">
                 
-                {/* LEFT: CONTROL PANEL - PHOSPHORESCENT */}
-                <div className={`xl:col-span-3 bg-black/40 border-2 rounded-2xl p-6 h-fit transition-all duration-500 shadow-lg backdrop-blur-md`} style={{ borderColor: `${themeContext.hex}40` }}>
-                    <h4 className="text-xs font-display font-bold text-white uppercase tracking-wider mb-6 border-l-4 pl-3 transition-colors" style={{ borderColor: themeContext.hex }}>
-                        Configuración de Límites
-                    </h4>
-
-                    {/* --- GLOBAL STATUS CARD (VISUAL FEEDBACK) --- */}
-                    <div className={`mb-6 rounded-xl border-2 p-4 transition-all duration-500 relative overflow-hidden group ${globalLimitObj ? 'bg-cyber-purple/10 border-cyber-purple shadow-[inset_0_0_20px_rgba(188,19,254,0.2)]' : 'bg-black/20 border-white/5'}`}>
-                        {globalLimitObj && <div className="absolute top-0 left-0 w-1 h-full bg-cyber-purple shadow-[0_0_10px_#bc13fe]"></div>}
-                        
-                        <div className="flex justify-between items-center relative z-10">
-                            <div>
-                                <div className="text-[9px] font-mono uppercase tracking-widest text-slate-500 mb-1 font-bold">Límite Global (Todos)</div>
-                                <div className={`text-xl font-mono font-black ${globalLimitObj ? 'text-cyber-purple text-glow-sm' : 'text-slate-600'}`}>
-                                    {globalLimitObj ? formatCurrency(globalLimitObj.max_amount) : 'ILIMITADO'}
-                                </div>
+                {/* 1. HUD HEADER */}
+                <div className="p-6 border-b border-white/5 bg-[#05070a]/50 backdrop-blur-sm z-20">
+                    <div className="flex justify-between items-start mb-6">
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <i className={`fas fa-shield-alt ${theme.text}`}></i>
+                                <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">Sistema de Defensa Financiera</span>
                             </div>
-                            <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center transition-all ${globalLimitObj ? 'border-cyber-purple text-cyber-purple shadow-neon-purple scale-110' : 'border-slate-800 text-slate-700'}`}>
-                                <i className="fas fa-globe"></i>
-                            </div>
+                            <h2 className="text-3xl font-display font-black text-white uppercase tracking-tighter flex items-center gap-3 text-shadow-lg">
+                                Matriz de <span className={`text-transparent bg-clip-text bg-gradient-to-r ${theme.gradient}`}>Riesgo</span>
+                            </h2>
                         </div>
                         
-                        {globalLimitObj && (
-                            <div className="mt-3 pt-3 border-t border-cyber-purple/20 flex gap-2">
-                                <button 
-                                    onClick={() => { setIsGlobalMode(true); setSelectedNumber(null); }}
-                                    className="flex-1 py-1.5 bg-cyber-purple/20 rounded-lg text-[9px] font-bold uppercase text-cyber-purple hover:bg-cyber-purple hover:text-black transition-all border border-cyber-purple/30"
-                                >
-                                    <i className="fas fa-edit mr-1"></i> Modificar
-                                </button>
+                        <div className="text-right">
+                            <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-1">Límite Global Actual</div>
+                            <div className={`text-xl font-mono font-bold ${effectiveGlobalLimit === Infinity ? 'text-cyber-neon' : 'text-white'} drop-shadow-md transition-all duration-500`}>
+                                {effectiveGlobalLimit === Infinity ? (
+                                    <span className="flex items-center justify-end gap-2 animate-pulse"><i className="fas fa-infinity"></i> ILIMITADO</span>
+                                ) : formatCurrency(effectiveGlobalLimit)}
                             </div>
-                        )}
-                    </div>
-
-                    <div className="mb-6">
-                        <div className="flex flex-col gap-3 mb-6">
-                            <button 
-                                onClick={() => { setIsGlobalMode(false); setSelectedNumber(null); }}
-                                className={`w-full py-3 rounded-lg border-2 text-[10px] font-bold uppercase transition-all relative overflow-hidden group/opt ${
-                                    !isGlobalMode 
-                                    ? 'bg-cyber-emerald/20 border-cyber-emerald text-cyber-emerald shadow-neon-emerald' 
-                                    : 'border-white/10 text-slate-500 hover:border-white/30 hover:text-white'
-                                }`}
-                            >
-                                {!isGlobalMode && <div className="absolute inset-0 bg-cyber-emerald opacity-20 blur-md animate-pulse"></div>}
-                                <span className="relative z-10 flex items-center justify-center gap-2"><i className="fas fa-crosshairs"></i> Por Número</span>
-                            </button>
-                            <button 
-                                onClick={() => { setIsGlobalMode(true); setSelectedNumber(null); }}
-                                className={`w-full py-3 rounded-lg border-2 text-[10px] font-bold uppercase transition-all relative overflow-hidden group/opt ${
-                                    isGlobalMode 
-                                    ? 'bg-cyber-purple/20 border-cyber-purple text-cyber-purple shadow-neon-purple' 
-                                    : 'border-white/10 text-slate-500 hover:border-white/30 hover:text-white'
-                                }`}
-                            >
-                                {isGlobalMode && <div className="absolute inset-0 bg-cyber-purple opacity-20 blur-md animate-pulse"></div>}
-                                <span className="relative z-10 flex items-center justify-center gap-2"><i className="fas fa-globe"></i> Global (Todos)</span>
-                            </button>
-                        </div>
-
-                        {!isGlobalMode && (
-                            <div className="mb-6 relative group/num perspective-500">
-                                <label className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-2 block ml-1">Número Seleccionado</label>
-                                <div className={`text-5xl font-mono font-black text-white bg-black border-2 rounded-xl py-6 text-center transition-all shadow-inner relative overflow-hidden ${selectedNumber ? 'border-cyber-emerald shadow-[inset_0_0_30px_rgba(16,185,129,0.3)]' : 'border-white/10'}`}>
-                                    {selectedNumber && <div className="absolute inset-0 bg-cyber-emerald/10 animate-pulse"></div>}
-                                    <span className="relative z-10 text-glow">{selectedNumber || '--'}</span>
-                                </div>
+                            <div className="text-[10px] font-mono text-slate-500 mt-1 flex items-center justify-end gap-1">
+                                Exp. Total: {formatCurrency(totalExposure)}
                             </div>
-                        )}
-
-                        <div className="relative group/input">
-                            <label className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-2 block ml-1">
-                                {isGlobalMode ? 'Nuevo Límite Global (CRC)' : 'Tope Máximo (CRC)'}
-                            </label>
-                            {/* Input Glow */}
-                            <div className="absolute -bottom-2 left-0 w-full h-4 bg-white blur-xl opacity-0 group-focus-within/input:opacity-20 transition-opacity"></div>
-                            
-                            <input 
-                                type="number" 
-                                value={limitAmount}
-                                onChange={e => setLimitAmount(Number(e.target.value))}
-                                className={`relative w-full bg-black border-2 rounded-xl py-3 px-4 text-white font-mono focus:outline-none transition-all shadow-inner z-10 text-lg placeholder-slate-700 ${isGlobalMode ? 'border-cyber-purple focus:border-cyber-purple focus:shadow-[0_0_15px_#bc13fe]' : 'border-white/20 focus:border-white'}`}
-                                placeholder="0.00"
-                            />
                         </div>
                     </div>
 
-                    <div className="flex flex-col gap-3">
-                        {/* APPLY BUTTON - REACTOR STYLE WITH ANIMATION */}
-                        <button 
-                            onClick={handleSaveLimit}
-                            disabled={(!isGlobalMode && !selectedNumber) || !limitAmount || saveStatus !== 'IDLE'}
-                            className={`w-full py-4 rounded-xl font-bold uppercase text-xs relative overflow-hidden group/btn disabled:opacity-50 disabled:cursor-not-allowed border-2 transition-all duration-300 ${
-                                saveStatus === 'SUCCESS' 
-                                ? 'border-emerald-500 bg-emerald-500 text-black shadow-[0_0_20px_#10b981]' 
-                                : isGlobalMode ? 'border-cyber-purple text-cyber-purple hover:bg-cyber-purple hover:text-black' : 'border-white text-black bg-white'
-                            }`}
-                        >
-                            {saveStatus === 'IDLE' && (
-                                <>
-                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-50 -translate-x-full group-hover/btn:animate-[shine_0.5s_ease-in-out]"></div>
-                                    <span className="relative z-10 flex items-center justify-center gap-2">
-                                        <i className="fas fa-check-circle"></i> {isGlobalMode ? 'Aplicar a Todos' : 'Aplicar Límite'}
-                                    </span>
-                                </>
-                            )}
-                            
-                            {saveStatus === 'SAVING' && (
-                                <div className="flex items-center justify-center gap-2 text-black/70 relative z-10">
-                                    <i className="fas fa-circle-notch fa-spin"></i>
-                                    <span>GUARDANDO...</span>
-                                </div>
-                            )}
-
-                            {saveStatus === 'SUCCESS' && (
-                                <div className="flex items-center justify-center gap-2 animate-in zoom-in duration-300 relative z-10">
-                                    <i className="fas fa-check-double text-lg animate-bounce"></i>
-                                    <span className="font-black tracking-widest">LÍMITE ESTABLECIDO</span>
-                                </div>
-                            )}
-                        </button>
+                    {/* CONTROLS BRIDGE */}
+                    <div className="flex flex-col md:flex-row justify-between items-end gap-4">
                         
-                        {/* DELETE BUTTON - REACTOR STYLE WITH ANIMATION */}
-                        <button 
-                            onClick={handleRemoveLimit}
-                            disabled={(!isGlobalMode && !selectedNumber) || removeStatus !== 'IDLE'}
-                            className={`w-full py-4 rounded-xl font-bold uppercase text-xs relative overflow-hidden group/btn disabled:opacity-50 disabled:cursor-not-allowed border-2 transition-all duration-300 ${
-                                removeStatus === 'SUCCESS'
-                                ? 'border-red-500 bg-red-600 text-white shadow-[0_0_30px_red]'
-                                : 'border-red-500/50 text-red-400 hover:border-red-500 hover:text-red-200 hover:shadow-neon-red'
-                            }`}
-                        >
-                            {removeStatus === 'IDLE' && (
-                                <>
-                                    <div className="absolute inset-0 bg-red-900/0 group-hover/btn:bg-red-900/20 transition-colors"></div>
-                                    <span className="relative z-10 flex items-center justify-center gap-2">
-                                        <i className="fas fa-trash-alt"></i> {isGlobalMode ? 'Quitar Límite Global' : 'Eliminar Límite'}
-                                    </span>
-                                </>
-                            )}
-
-                            {removeStatus === 'REMOVING' && (
-                                <div className="flex items-center justify-center gap-2 relative z-10">
-                                    <i className="fas fa-cog fa-spin text-red-500"></i>
-                                    <span className="animate-pulse">ELIMINANDO...</span>
-                                </div>
-                            )}
-
-                            {removeStatus === 'SUCCESS' && (
-                                <div className="flex items-center justify-center gap-2 animate-in zoom-in duration-300 relative z-10">
-                                    <i className="fas fa-unlock-alt text-lg animate-[shake_0.5s_ease-in-out]"></i>
-                                    <span className="font-black tracking-widest">RESTRICCIÓN ELIMINADA</span>
-                                </div>
-                            )}
-                        </button>
-                    </div>
-
-                    {/* Selected Info (Specific Mode) */}
-                    {selectedNumber && !isGlobalMode && (
-                        <div className="mt-6 pt-6 border-t border-white/10">
-                            <div className="text-[9px] font-mono text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                <i className="fas fa-info-circle"></i> Estado Actual ({selectedNumber})
-                            </div>
-                            <div className="flex justify-between text-xs font-mono mb-1">
-                                <span className="text-slate-400">Vendido:</span>
-                                <span className="text-white font-bold">{formatCurrency(gridData[parseInt(selectedNumber)].sold)}</span>
-                            </div>
-                            <div className="flex justify-between text-xs font-mono">
-                                <span className="text-slate-400">Límite:</span>
-                                <span className="text-cyber-emerald font-bold drop-shadow-[0_0_5px_rgba(16,185,129,0.8)]">
-                                    {gridData[parseInt(selectedNumber)].isLimited ? formatCurrency(gridData[parseInt(selectedNumber)].max) : 'ILIMITADO'}
-                                </span>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* RIGHT: RISK GRID - THEMATICALLY ALIVE (WIDESCREEN TRANSFORM) */}
-                <div className="xl:col-span-9 flex flex-col gap-4">
-                    <div className={`bg-[#02040a] rounded-2xl border-2 transition-all duration-700 p-4 overflow-hidden shadow-inner relative group/grid flex-1 ${currentDrawTheme.base.split(' ')[1]}`}>
-                        
-                        {/* Dynamic Background Fog matching Draw */}
-                        <div className={`absolute inset-0 ${currentDrawTheme.bg} opacity-5 blur-3xl animate-[pulse_6s_infinite]`}></div>
-
-                        <div className="grid grid-cols-5 sm:grid-cols-10 xl:grid-cols-20 gap-2 h-auto max-h-[500px] overflow-y-auto custom-scrollbar relative z-10">
-                            {gridData.map((cell) => (
+                        {/* Draw Tabs */}
+                        <div className="flex gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
+                            {Object.values(DrawTime).map(d => (
                                 <button
-                                    key={cell.number}
-                                    onClick={() => { setSelectedNumber(cell.number); setIsGlobalMode(false); }}
-                                    className={`
-                                        aspect-square rounded-md flex flex-col items-center justify-center relative overflow-hidden group
-                                        ${getCellColor(cell.percent, cell.isLimited)}
-                                        ${selectedNumber === cell.number ? 'ring-2 ring-white scale-110 z-20 shadow-[0_0_15px_white]' : 'hover:scale-110 hover:z-10'}
-                                    `}
+                                    key={d}
+                                    onClick={() => setActiveDraw(d)}
+                                    className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase transition-all duration-300 ${
+                                        activeDraw === d 
+                                        ? `bg-white/10 text-white shadow-inner border border-white/10` 
+                                        : 'text-slate-500 hover:text-white hover:bg-white/5'
+                                    }`}
                                 >
-                                    <span className="text-[10px] xl:text-xs relative z-10 drop-shadow-md">{cell.number}</span>
-                                    
-                                    {/* Limit Indicators */}
-                                    {cell.limitSource === 'GLOBAL' && (
-                                        <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-cyber-purple shadow-[0_0_5px_#bc13fe] z-20" title="Límite Global"></div>
-                                    )}
-                                    {cell.limitSource === 'SPECIFIC' && (
-                                        <div className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_5px_white] z-20" title="Límite Específico"></div>
-                                    )}
+                                    {d.split(' ')[0]}
+                                </button>
+                            ))}
+                        </div>
 
-                                    {/* Progress Bar for Limited Cells */}
-                                    {cell.isLimited && (
-                                        <div className="absolute bottom-0 left-0 w-full h-1 bg-black/60 z-10">
-                                            <div 
-                                                className={`h-full transition-all duration-700 ${
-                                                    cell.percent >= 100 ? 'bg-red-500' : 
-                                                    cell.percent >= 80 ? 'bg-orange-500' :
-                                                    currentDrawTheme.bg
-                                                }`} 
-                                                style={{ width: `${Math.min(cell.percent, 100)}%` }}
-                                            ></div>
-                                        </div>
-                                    )}
-                                    
-                                    {/* Living Glow on Hover */}
-                                    <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity blur-sm"></div>
+                        {/* View Mode X-RAY */}
+                        <div className="flex gap-2">
+                            <span className="text-[9px] font-bold text-slate-600 uppercase self-center mr-2">VISTA DE RAYOS-X:</span>
+                            {[
+                                { id: 'SATURATION', label: '% Satura', icon: 'fa-chart-pie' },
+                                { id: 'VOLUME', label: '$$ Volumen', icon: 'fa-coins' },
+                                { id: 'VELOCITY', label: 'Velocidad', icon: 'fa-tachometer-alt' }
+                            ].map(m => (
+                                <button
+                                    key={m.id}
+                                    onClick={() => setViewMode(m.id as ViewMode)}
+                                    className={`px-3 py-1.5 rounded border text-[9px] font-bold uppercase flex items-center gap-2 transition-all ${
+                                        viewMode === m.id 
+                                        ? `${theme.border} ${theme.text} bg-white/5 shadow-[0_0_10px_rgba(0,0,0,0.5)]` 
+                                        : 'border-slate-800 text-slate-600 hover:border-slate-600'
+                                    }`}
+                                >
+                                    <i className={`fas ${m.icon}`}></i> {m.label}
                                 </button>
                             ))}
                         </div>
                     </div>
+                </div>
+
+                {/* 2. THE GRID */}
+                <div className="flex-1 p-6 relative bg-[#020305]">
+                    {loading && (
+                        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+                            <i className={`fas fa-circle-notch fa-spin text-4xl ${theme.text} mb-4`}></i>
+                            <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400">Escaneando Vectores de Apuesta...</span>
+                        </div>
+                    )}
                     
-                    {/* LEGEND - NEON PHOSPHORESCENT LIFE */}
-                    <div className="relative mt-2 group/legend">
-                        {/* 1. The Neon Source (Backlight/Border Glow) */}
-                        <div className="absolute -inset-[2px] bg-gradient-to-r from-green-500 via-yellow-500 to-red-600 rounded-xl opacity-70 blur-md group-hover/legend:opacity-100 group-hover/legend:blur-lg transition-all duration-500 animate-pulse"></div>
+                    <div className="grid grid-cols-10 gap-1 h-full w-full">
+                        {gridData.map((cell) => {
+                            // DYNAMIC VISUAL ENGINE
+                            const isSelected = cell.number === selectedNumber;
+                            const isHighRisk = cell.percent >= 90;
+                            const isMedRisk = cell.percent >= 70;
+                            
+                            let bgStyle = { backgroundColor: '#0a0c10' };
+                            if (viewMode === 'SATURATION') {
+                                if (cell.percent > 0) {
+                                    const opacity = Math.max(0.1, cell.percent / 100);
+                                    bgStyle = { backgroundColor: isHighRisk ? `rgba(220, 38, 38, ${opacity})` : isMedRisk ? `rgba(234, 179, 8, ${opacity})` : `rgba(37, 99, 235, ${opacity})` };
+                                }
+                            }
 
-                        {/* 2. Light Beams (Coming out) */}
-                        <div className="absolute -inset-1 bg-gradient-to-r from-green-400 via-yellow-400 to-red-500 rounded-xl opacity-20 blur-xl"></div>
+                            return (
+                                <button
+                                    key={cell.number}
+                                    onMouseEnter={() => setHoveredNumber(cell.number)}
+                                    onMouseLeave={() => setHoveredNumber(null)}
+                                    onClick={() => handleCellClick(cell.number)}
+                                    className={`
+                                        relative rounded-sm border transition-all duration-150 flex flex-col items-center justify-center overflow-hidden group
+                                        ${isSelected ? 'border-white z-10 scale-110 shadow-[0_0_15px_rgba(255,255,255,0.5)]' : 'border-white/5 hover:border-white/30'}
+                                    `}
+                                    style={bgStyle}
+                                >
+                                    <span className={`text-[10px] font-mono font-bold z-10 ${isSelected ? 'text-white' : cell.percent > 0 ? 'text-white' : 'text-slate-700'}`}>
+                                        {cell.number}
+                                    </span>
 
-                        {/* 3. The Solid Container */}
-                        <div className="relative bg-[#050a14] rounded-xl p-4 flex justify-center gap-4 md:gap-12 items-center border border-white/10 shadow-[inset_0_0_20px_rgba(0,0,0,0.8)] overflow-hidden">
+                                    {/* MICRO-DATA OVERLAYS */}
+                                    {viewMode === 'VOLUME' && cell.amount > 0 && (
+                                        <span className="text-[7px] text-emerald-400 font-mono z-10">
+                                            {(cell.amount / 100000).toFixed(1)}k
+                                        </span>
+                                    )}
+                                    {viewMode === 'VELOCITY' && cell.velocity > 20 && (
+                                        <div className="absolute inset-0 flex items-center justify-center opacity-30">
+                                            <i className="fas fa-arrow-up text-white animate-bounce text-[8px]"></i>
+                                        </div>
+                                    )}
 
-                            {/* Scanline Shine */}
-                            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-12 translate-x-[-150%] animate-[shine_4s_linear_infinite]"></div>
+                                    {/* Risk Bar (Bottom) */}
+                                    <div className="absolute bottom-0 left-0 w-full h-1 bg-black/50">
+                                        <div 
+                                            className={`h-full transition-all duration-500 ${isHighRisk ? 'bg-red-500' : isMedRisk ? 'bg-yellow-500' : theme.bg}`} 
+                                            style={{ width: `${cell.percent}%` }}
+                                        ></div>
+                                    </div>
 
-                            {/* Items */}
-                            <div className="flex items-center gap-2 md:gap-3 group cursor-help relative z-10">
-                                <div className="relative">
-                                    <div className={`absolute inset-0 ${currentDrawTheme.bg} blur-md opacity-50 animate-pulse`}></div>
-                                    <div className={`w-3 h-3 ${currentDrawTheme.bg} rounded-full border border-white/50`}></div>
+                                    {/* Manual Override Indicator */}
+                                    {cell.isManual && (
+                                        <div className="absolute top-0 right-0 p-0.5">
+                                            <div className="w-1.5 h-1.5 bg-white rounded-full shadow-[0_0_5px_white]"></div>
+                                        </div>
+                                    )}
+                                </button>
+                            )
+                        })}
+                    </div>
+                </div>
+
+                {/* 3. ALARM TICKER */}
+                <div className="h-8 bg-[#0f0505] border-t border-red-900/30 flex items-center overflow-hidden relative">
+                    <div className="bg-red-900/20 px-3 h-full flex items-center text-[9px] font-bold text-red-500 uppercase tracking-widest z-10 border-r border-red-900/30">
+                        <i className="fas fa-exclamation-triangle mr-2 animate-pulse"></i> LIVE FEED
+                    </div>
+                    <div className="flex-1 whitespace-nowrap animate-scroll-ticker flex items-center text-[9px] font-mono text-red-400/80">
+                        <span className="mx-4">SISTEMA ACTIVO: MONITORIZANDO {gridData.length} VECTORES</span>
+                        <span className="mx-4">|</span>
+                        <span className="mx-4">LÍMITE GLOBAL: {effectiveGlobalLimit === Infinity ? 'ILIMITADO' : formatCurrency(effectiveGlobalLimit)}</span>
+                        <span className="mx-4">|</span>
+                        <span className="mx-4">SINCRONIZACIÓN: ESTABLE</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* ====================================================================================
+                RIGHT PANEL: DUAL MODE (Global vs Inspector)
+               ==================================================================================== */}
+            <div className="xl:w-2/5 bg-[#05070a] flex flex-col relative overflow-hidden transition-all duration-500">
+                
+                {/* Background Grid */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[length:30px_30px] pointer-events-none"></div>
+
+                {selectedNumber ? (
+                    // --- MODE A: NUMBER INSPECTOR (Specific) ---
+                    <div className="flex-1 flex flex-col p-8 relative z-10 animate-in slide-in-from-right-4 duration-300">
+                        
+                        {/* A. NUMBER IDENTITY HEADER */}
+                        <div className="flex justify-between items-start mb-8 relative">
+                            <button 
+                                onClick={() => setSelectedNumber(null)}
+                                className="absolute -top-4 -right-4 text-slate-500 hover:text-white p-2 transition-colors"
+                            >
+                                <i className="fas fa-times text-lg"></i>
+                            </button>
+                            <div className={`absolute -inset-4 ${theme.bg} opacity-10 blur-2xl rounded-full`}></div>
+                            <div>
+                                <div className="text-[10px] text-slate-500 uppercase tracking-widest font-mono mb-1">Análisis Táctico</div>
+                                <div className="text-7xl font-mono font-black text-white tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
+                                    {selectedNumber}
                                 </div>
-                                <span className={`text-[9px] md:text-[10px] font-mono font-bold uppercase tracking-widest ${currentDrawTheme.base.split(' ')[0]}`}>Normal</span>
                             </div>
-
-                            <div className="w-px h-4 bg-white/10"></div>
-
-                            <div className="flex items-center gap-2 md:gap-3 group cursor-help relative z-10">
-                                <div className="relative">
-                                    <div className="absolute inset-0 bg-yellow-500 blur-md opacity-50 animate-pulse"></div>
-                                    <div className="w-3 h-3 bg-yellow-500 shadow-[0_0_10px_orange] rounded-full border border-white/50"></div>
+                            <div className="text-right">
+                                <div className={`text-5xl font-mono font-bold ${activeCell?.percent && activeCell.percent >= 90 ? 'text-red-500 drop-shadow-[0_0_10px_red]' : 'text-white'}`}>
+                                    {activeCell?.percent.toFixed(0)}<span className="text-2xl opacity-50">%</span>
                                 </div>
-                                <span className="text-[9px] md:text-[10px] font-mono font-bold uppercase tracking-widest text-yellow-400 drop-shadow-[0_0_5px_rgba(250,204,21,0.8)]">Riesgo Medio</span>
-                            </div>
-
-                            <div className="w-px h-4 bg-white/10"></div>
-
-                            <div className="flex items-center gap-2 md:gap-3 group cursor-help relative z-10">
-                                <div className="relative">
-                                    <div className="absolute inset-0 bg-red-600 blur-md opacity-50 animate-pulse"></div>
-                                    <div className="w-3 h-3 bg-red-600 shadow-[0_0_10px_red] rounded-full border border-white/50 animate-ping"></div>
-                                    <div className="absolute inset-0 w-3 h-3 bg-red-600 rounded-full"></div>
-                                </div>
-                                <span className="text-[9px] md:text-[10px] font-mono font-bold uppercase tracking-widest text-red-500 drop-shadow-[0_0_5px_rgba(239,68,68,0.8)]">Saturado</span>
+                                <div className="text-[9px] text-slate-500 uppercase tracking-widest mt-1">Saturación</div>
                             </div>
                         </div>
+
+                        {/* B. MAIN METRICS */}
+                        {activeCell && (
+                            <>
+                                <div className="grid grid-cols-2 gap-4 mb-8">
+                                    <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
+                                        <div className="text-[9px] text-slate-400 uppercase mb-2">Volumen Financiero</div>
+                                        <div className="text-xl font-mono font-bold text-white">{formatCurrency(activeCell.amount)}</div>
+                                        <div className="w-full bg-black h-1 mt-2 rounded-full overflow-hidden">
+                                            <div className={`h-full ${theme.bg}`} style={{ width: `${activeCell.percent}%` }}></div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
+                                        <div className="text-[9px] text-slate-400 uppercase mb-2">Límite Vigente</div>
+                                        <div className="text-xl font-mono font-bold text-slate-300">
+                                            {activeCell.limit === Infinity ? 'ILIMITADO' : formatCurrency(activeCell.limit)}
+                                        </div>
+                                        <div className="text-[8px] text-slate-500 mt-2 flex items-center gap-1">
+                                            <i className={`fas fa-lock ${activeCell.isManual ? 'text-cyan-400' : 'text-slate-600'}`}></i>
+                                            {activeCell.isManual ? 'MANUAL' : 'GLOBAL DEFAULT'}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* D. CONTROL DECK */}
+                                <div className="mt-auto pt-6 border-t border-white/10">
+                                    <label className="text-[9px] text-slate-500 uppercase font-bold mb-3 block ml-1">Override Local (Individual)</label>
+                                    
+                                    <div className="flex gap-2 mb-4">
+                                        <div className="relative flex-1">
+                                            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-500 text-xs">CRC</div>
+                                            <input 
+                                                type="number"
+                                                value={manualInputValue}
+                                                onChange={e => setManualInputValue(e.target.value)}
+                                                className="bg-black border border-slate-700 rounded-xl px-4 py-3 pl-10 text-white font-mono text-lg w-full focus:border-white focus:outline-none transition-colors"
+                                                placeholder="Definir Límite Único"
+                                            />
+                                        </div>
+                                        <button 
+                                            onClick={handleSaveSelected}
+                                            disabled={saveStatus !== 'IDLE'}
+                                            className={`px-6 rounded-xl font-bold uppercase transition-all shadow-lg ${
+                                                saveStatus === 'SUCCESS' ? 'bg-green-500 text-black' : 'bg-white text-black hover:scale-105'
+                                            }`}
+                                        >
+                                            {saveStatus === 'SAVING' ? <i className="fas fa-circle-notch fa-spin"></i> : saveStatus === 'SUCCESS' ? <i className="fas fa-check"></i> : <i className="fas fa-save"></i>}
+                                        </button>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <button onClick={() => { setManualInputValue('0'); }} className="py-3 bg-red-950/30 border border-red-500/50 text-red-500 hover:bg-red-500 hover:text-white rounded-xl text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-2 group/btn">
+                                            <i className="fas fa-ban group-hover/btn:animate-ping"></i> 0.00 (Bloqueo)
+                                        </button>
+                                        <button onClick={handleResetSelected} className="py-3 bg-cyan-950/30 border border-cyan-500/50 text-cyan-500 hover:bg-cyan-500 hover:text-white rounded-xl text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-2">
+                                            <i className="fas fa-undo"></i> Heredar Global
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                    </div>
+                ) : (
+                    // --- MODE B: GLOBAL CONTROL CENTER (Default) ---
+                    <div className="flex-1 flex flex-col relative z-10 animate-in fade-in duration-500 bg-[#05070a]">
+                        
+                        {/* 1. REACTOR HEADER */}
+                        <div className="p-8 border-b border-white/5 bg-black/20">
+                            <h2 className="text-2xl font-display font-black text-white uppercase tracking-widest flex items-center gap-3">
+                                <i className="fas fa-atom text-cyber-blue animate-spin-slow"></i>
+                                Control de <span className="text-cyber-blue text-glow">Núcleo</span>
+                            </h2>
+                            <p className="text-[10px] font-mono text-slate-500 uppercase mt-2">
+                                Configuración Maestra de Límites Globales
+                            </p>
+                        </div>
+
+                        {/* 2. THE VISUALIZER (Reactor Core) */}
+                        <div className="flex-1 flex flex-col items-center justify-center relative p-8">
+                            
+                            {/* Energy Rings */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full border border-white/5"></div>
+                            <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-60 h-60 rounded-full border-2 border-dashed ${effectiveGlobalLimit === Infinity ? 'border-cyber-neon animate-[spin_10s_linear_infinite]' : 'border-red-500 animate-pulse'} opacity-30`}></div>
+
+                            {/* CORE STATUS DISPLAY */}
+                            <div className="text-center z-10">
+                                <div className={`text-[10px] font-bold uppercase tracking-[0.3em] mb-2 ${effectiveGlobalLimit === Infinity ? 'text-cyber-neon' : 'text-red-500'}`}>
+                                    {effectiveGlobalLimit === Infinity ? 'MODO: FLUJO LIBRE' : 'MODO: CONTENCIÓN'}
+                                </div>
+                                <div className={`text-5xl font-mono font-black ${effectiveGlobalLimit === Infinity ? 'text-white' : 'text-red-500 drop-shadow-[0_0_15px_red]'}`}>
+                                    {effectiveGlobalLimit === Infinity ? (
+                                        <i className="fas fa-infinity text-6xl"></i>
+                                    ) : (
+                                        formatCurrency(effectiveGlobalLimit).replace('CRC', '').trim()
+                                    )}
+                                </div>
+                                <div className="text-[9px] text-slate-500 font-mono mt-2 uppercase tracking-widest">
+                                    CRC / Vector
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 3. CONTROL DECK (Bottom) */}
+                        <div className="p-8 border-t border-white/10 bg-[#080a10]">
+                            
+                            {/* Mode Selector Switch - UPGRADED THEMATIC TOGGLE */}
+                            <div className="relative bg-black border border-white/10 rounded-2xl p-1.5 flex mb-6 shadow-inner overflow-hidden h-14">
+                                {/* PISTON BACKGROUND INDICATOR */}
+                                <div 
+                                    className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-xl transition-all duration-500 ease-out z-0 
+                                    ${effectiveGlobalLimit === Infinity 
+                                        ? 'translate-x-0 bg-cyber-neon/10 border border-cyber-neon/30 shadow-[0_0_20px_rgba(0,240,255,0.1)]' 
+                                        : 'translate-x-[100%] bg-red-900/30 border border-red-500/30 shadow-[0_0_20px_rgba(255,0,0,0.1)] left-[6px]'
+                                    }`}
+                                ></div>
+
+                                {/* UNLIMITED BUTTON */}
+                                <button 
+                                    onClick={handleSetGlobalUnlimited}
+                                    className={`relative flex-1 rounded-xl flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest transition-all duration-500 z-10 group
+                                    ${effectiveGlobalLimit === Infinity ? 'text-cyber-neon' : 'text-slate-500 hover:text-white'}`}
+                                >
+                                    {effectiveGlobalLimit === Infinity && (
+                                        <div className="absolute inset-0 bg-cyber-neon opacity-5 blur-md animate-pulse"></div>
+                                    )}
+                                    <i className={`fas fa-infinity text-lg ${effectiveGlobalLimit === Infinity ? 'animate-spin-slow drop-shadow-[0_0_5px_cyan]' : ''}`}></i>
+                                    <span>Ilimitado</span>
+                                </button>
+
+                                {/* RESTRICTED BUTTON */}
+                                <button 
+                                    onClick={() => { if(effectiveGlobalLimit === Infinity) setGlobalInputValue('50000'); }}
+                                    className={`relative flex-1 rounded-xl flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest transition-all duration-500 z-10 overflow-hidden group
+                                    ${effectiveGlobalLimit !== Infinity ? 'text-red-500' : 'text-slate-500 hover:text-white'}`}
+                                >
+                                    {effectiveGlobalLimit !== Infinity && (
+                                        <>
+                                            <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_5px,#ff0000_5px,#ff0000_10px)] opacity-10 animate-[pulse_2s_infinite]"></div>
+                                            <div className="absolute inset-0 bg-red-500 opacity-5 blur-md"></div>
+                                        </>
+                                    )}
+                                    <i className={`fas fa-lock text-lg ${effectiveGlobalLimit !== Infinity ? 'drop-shadow-[0_0_5px_red]' : ''}`}></i>
+                                    <span>Restringido</span>
+                                </button>
+                            </div>
+
+                            {/* Manual Input Area */}
+                            <div className={`transition-all duration-500 overflow-hidden ${effectiveGlobalLimit !== Infinity || globalInputValue ? 'max-h-40 opacity-100' : 'max-h-0 opacity-50'}`}>
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1 group/input">
+                                        <div className="absolute -inset-0.5 bg-red-500/30 rounded-xl blur opacity-0 group-focus-within/input:opacity-100 transition-opacity"></div>
+                                        <input 
+                                            type="number"
+                                            value={globalInputValue}
+                                            onChange={e => setGlobalInputValue(e.target.value)}
+                                            className="relative w-full bg-black border border-red-900/50 rounded-xl px-4 py-4 text-center text-white font-mono text-xl focus:border-red-500 focus:outline-none transition-colors"
+                                            placeholder="DEFINIR LÍMITE..."
+                                        />
+                                    </div>
+                                    <button 
+                                        onClick={handleSaveGlobal}
+                                        disabled={saveStatus !== 'IDLE' || !globalInputValue}
+                                        className="w-20 bg-red-600 hover:bg-white hover:text-red-600 text-black font-bold rounded-xl flex items-center justify-center text-xl transition-all shadow-[0_0_20px_rgba(220,38,38,0.4)] disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {saveStatus === 'SAVING' ? <i className="fas fa-circle-notch fa-spin"></i> : <i className="fas fa-check"></i>}
+                                    </button>
+                                </div>
+                                <p className="text-[8px] text-red-400/50 text-center mt-2 font-mono uppercase">
+                                    * Este valor sobrescribirá todos los límites no manuales.
+                                </p>
+                            </div>
+
+                        </div>
+
+                    </div>
+                )}
+
+                {/* --- BLINDAJE MASTER SWITCH (Fixed Bottom) --- */}
+                <div className="p-4 border-t border-white/10 bg-[#02040a] relative z-20">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <div className="text-[9px] font-bold text-slate-500 uppercase">Protocolo de Emergencia</div>
+                            <div className="text-xs text-white font-mono">Blindaje Automático</div>
+                        </div>
+                        <button 
+                            onClick={() => setIsBlindajeActive(!isBlindajeActive)}
+                            className={`relative w-16 h-8 rounded-full transition-colors duration-300 ${isBlindajeActive ? 'bg-red-600 shadow-[0_0_15px_red]' : 'bg-slate-800'}`}
+                        >
+                            <div className={`absolute top-1 bottom-1 w-6 h-6 bg-white rounded-full transition-transform duration-300 shadow-md flex items-center justify-center ${isBlindajeActive ? 'translate-x-9' : 'translate-x-1'}`}>
+                                {isBlindajeActive && <i className="fas fa-lock text-[8px] text-red-600"></i>}
+                            </div>
+                        </button>
                     </div>
                 </div>
 
             </div>
+
         </div>
     </div>
   );
