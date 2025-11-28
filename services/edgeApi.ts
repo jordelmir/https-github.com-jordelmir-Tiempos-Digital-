@@ -1,30 +1,9 @@
 
-import { supabase } from '../lib/supabaseClient';
+import { supabase, MockDB } from '../lib/supabaseClient';
 import { ApiResponse, AppUser, TransactionResponse, DrawResultPayload, GameMode, DrawResult, Bet, AuditEventType, AuditSeverity, WeeklyDataStats, RiskAnalysisReport } from '../types';
-import { GoogleGenAI } from "@google/genai";
 
 // In a real deployment, these would point to your deployed Edge Functions
 const FUNCTION_BASE_URL = '/functions/v1'; 
-
-// --- SECURE SERVER-SIDE CONFIGURATION ---
-// Safe access to env var, defaulting to empty if not found
-const getApiKey = () => {
-    // 1. Check Vite standard
-    // @ts-ignore
-    if (import.meta.env && import.meta.env.VITE_GOOGLE_API_KEY) return import.meta.env.VITE_GOOGLE_API_KEY;
-    
-    // 2. Check process.env (injected by vite define)
-    // @ts-ignore
-    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) return process.env.API_KEY;
-    // @ts-ignore
-    if (typeof process !== 'undefined' && process.env && process.env.VITE_GOOGLE_API_KEY) return process.env.VITE_GOOGLE_API_KEY;
-
-    return 'AIzaSyCAt1OtlHnxOVGD0K-Al7PIFLJ0poIG9B4'; // Placeholder/Demo
-};
-
-const SERVER_SECRETS = {
-    AI_GLOBAL_KEY: getApiKey()
-};
 
 // Helper to generate Cyberpunk Ticket IDs
 const generateTicketCode = (prefix: string) => {
@@ -36,401 +15,339 @@ const generateTicketCode = (prefix: string) => {
     return `${prefix}-${result.substring(0,3)}-${result.substring(3,6)}`;
 };
 
-// Simulate simple hashing for demo purposes (In prod: use bcrypt)
-const mockHash = (pin: string) => `hash_sha256_${pin.split('').reverse().join('')}_salt_${Date.now()}`;
-
 async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<ApiResponse<T>> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     
-    // DEMO MODE INTERCEPTION
-    // @ts-ignore - access internal property for demo check
-    if ((supabase as any).supabaseUrl === 'https://demo.local' || (supabase as any).supabaseUrl.includes('mock') || (supabase as any).supabaseUrl.includes('your-project')) {
+    // --- DEMO MODE INTERCEPTOR ---
+    // Use true persistent data instead of random mocks
+    if ((supabase as any).supabaseUrl === 'https://demo.local' || !session?.access_token.startsWith('ey')) { 
         
-        // Faster response for clock sync
+        await new Promise(r => setTimeout(r, 600)); // Cinematic latency
+
+        console.log(`[Mock Edge] Invoking ${functionName}`, body);
+
+        // 1. CLOCK
         if (functionName === 'getServerTime') {
              return { data: { 
                  server_time: new Date().toISOString(),
-                 draw_config: {
-                     mediodia: '12:55:00',
-                     tarde: '16:30:00',
-                     noche: '19:30:00'
-                 }
+                 draw_config: { mediodia: '12:55:00', tarde: '16:30:00', noche: '19:30:00' }
              } as any };
         }
 
-        // Live Results Mock
+        // 2. LIVE RESULTS (Reading from persistent DB)
         if (functionName === 'getLiveResults') {
-            const { data } = await supabase.from('lottery_results').select('*');
-            return { data: { results: data || [], history: [] } as any };
+            const results = MockDB.getResults();
+            const mapped = results.map((r: any) => ({
+                ...r,
+                drawTime: r.draw_time,
+                winningNumber: r.winning_number,
+                isReventado: r.is_reventado,
+                reventadoNumber: r.reventado_number
+            }));
+            return { data: { results: mapped, history: mapped } as any };
         }
 
-        await new Promise(r => setTimeout(r, 500)); // Simulate Edge latency
-
-        if (!session) return { error: 'No autorizado (Demo)' };
-
-        // --- NEW: WEEKLY DATA STATS ---
-        if (functionName === 'getWeeklyDataStats') {
-            const { year } = body;
-            const { data: bets } = await supabase.from('bets').select('created_at');
-            const betsList = bets as any[];
-            
-            const stats: Record<number, WeeklyDataStats> = {};
-            
-            // Generate basic structure for all weeks
-            for(let i=1; i<=52; i++) {
-                // Approximate start date calculation
-                const date = new Date(year, 0, 1 + (i - 1) * 7);
-                const endDate = new Date(date);
-                endDate.setDate(date.getDate() + 6);
-                
-                stats[i] = {
-                    year,
-                    weekNumber: i,
-                    recordCount: 0,
-                    startDate: date.toISOString().split('T')[0],
-                    endDate: endDate.toISOString().split('T')[0],
-                    sizeEstimate: '0 KB'
-                };
-            }
-
-            // Populate counts
-            betsList.forEach(b => {
-                const date = new Date(b.created_at);
-                if (date.getFullYear() === year) {
-                    const firstDay = new Date(date.getFullYear(), 0, 1);
-                    const pastDays = (date.getTime() - firstDay.getTime()) / 86400000;
-                    const weekNum = Math.ceil((pastDays + firstDay.getDay() + 1) / 7);
-                    
-                    if (stats[weekNum]) {
-                        stats[weekNum].recordCount++;
-                        // Estimate 0.5KB per record
-                        const kb = stats[weekNum].recordCount * 0.5;
-                        stats[weekNum].sizeEstimate = kb > 1024 ? `${(kb/1024).toFixed(2)} MB` : `${kb.toFixed(0)} KB`;
-                    }
-                }
-            });
-
-            return { data: { stats: Object.values(stats) } as any };
-        }
-
-        // --- PURGE SYSTEM (V3.1 Implementation) ---
-        if (functionName === 'purgeSystem') {
-             const { confirm_phrase, actor_id } = body;
-             if (confirm_phrase !== 'CONFIRMAR PURGA TOTAL') {
-                 return { error: 'Frase de confirmación inválida' };
-             }
-             // Log the schedule event
-             await supabase.from('audit_trail').insert([{
-                 actor_app_user: actor_id,
-                 action: 'SCHEDULE_PURGE',
-                 object_type: 'SYSTEM',
-                 payload: { confirm_phrase }
-             }]);
-             return { data: { ok: true, message: 'Purga Programada: Snapshot creado, multisig pendiente.' } as any };
-        }
-
-        // --- NEW: PURGE WEEKLY DATA ---
-        if (functionName === 'purgeWeeklyData') {
-            const { year, weekNumber, confirmation } = body;
-            if (!confirmation.includes(`ELIMINAR SEMANA ${weekNumber}`)) {
-                return { error: 'Frase de confirmación incorrecta.' };
-            }
-            
-            await supabase.from('audit_trail').insert([{
-                actor_app_user: body.actor_id,
-                action: 'WEEKLY_DATA_PURGE',
-                object_type: 'bets',
-                payload: { year, weekNumber, recovered_space: 'Estimated' }
-            }]);
-            
-            return { data: { success: true, message: `Datos de Semana ${weekNumber} eliminados.` } as any };
-        }
-
-        // --- CREATE USER (V3.1 Implementation) ---
+        // 3. CREATE USER (Writing to persistent DB)
         if (functionName === 'createUser') {
-            const { name, email, phone, cedula, role, balance_bigint, pin, issuer_id } = body;
-            const { data: existingUsers } = await supabase.from('app_users').select('*');
-            const usersList = existingUsers as any[];
-            
-            const duplicateCI = usersList.find(u => u.cedula === cedula);
-            if (duplicateCI) return { error: `IDENTIDAD DUPLICADA: ${cedula} ya existe.` };
+             const { name, email, role, balance_bigint, issuer_id } = body;
+             const newUser = {
+                 name, email, role, balance_bigint: balance_bigint ?? 0, issuer_id,
+                 id: `user-${Date.now()}`,
+                 created_at: new Date().toISOString(),
+                 status: 'Active',
+                 currency: 'CRC'
+             };
+             
+             // Audit & Save
+             MockDB.saveUser(newUser);
+             MockDB.addAudit({
+                 action: 'CREATE_USER',
+                 actor_id: issuer_id,
+                 target_resource: newUser.id,
+                 severity: 'WARNING',
+                 metadata: { role }
+             });
 
-            const { data: newUser, error } = await supabase.from('app_users').insert([{
-                    name, email: email || `no-email-${Date.now()}@phront.local`, phone, cedula, role,
-                    balance_bigint: balance_bigint || 0, pin_hash: mockHash(pin), issuer_id,
-                    auth_uid: `auth-${cedula}-${Date.now()}`, status: 'Active'
-                }]).select().single();
-            
-            if (error) return { error: error.message };
-            
-            // Audit Log in Mock
-            await supabase.from('audit_trail').insert([{
-                actor_app_user: issuer_id,
-                action: 'CREATE_USER',
-                object_type: 'app_users',
-                object_id: newUser.id,
-                payload: { name, role, balance_bigint }
-            }]);
-
-            return { data: { user: newUser as AppUser } as any };
+             return { data: { user: newUser } as any };
         }
 
-        // --- AI SECURE GATEWAY (SERVER SIDE ONLY) ---
-        if (functionName === 'generateAIAnalysis') {
-            const apiKey = SERVER_SECRETS.AI_GLOBAL_KEY; 
-            if (!apiKey) return { error: "Configuration Error: AI Key Missing" };
-
-            let predictionText = 'Patrones neuronales indican alta probabilidad en sector 40-50.';
-
-            try {
-                const ai = new GoogleGenAI({ apiKey: apiKey });
-                const response = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
-                    contents: `Analyze the lottery draw for ${body.drawTime || 'NEXT'} and provide a brief prediction insight.`,
-                });
-                
-                if (response.text) {
-                    predictionText = response.text;
-                }
-            } catch (e) {
-                console.warn("AI Generation Failed, using fallback", e);
-            }
-
-            const prediction = {
-                draw: body.drawTime || 'NEXT',
-                confidence: '87%',
-                insight: predictionText,
-                generated_at: new Date().toISOString()
-            };
-            return { data: prediction as any };
-        }
-
-        // --- RISK ENGINE AI ANALYSIS ---
-        if (functionName === 'generateRiskAnalysis') {
-            await new Promise(r => setTimeout(r, 1500)); // AI thinking simulation
-            
-            const analysis: RiskAnalysisReport = {
-                riskLevel: Math.random() > 0.7 ? 'HIGH' : (Math.random() > 0.4 ? 'MODERATE' : 'LOW'),
-                projectedLoss: Math.floor(Math.random() * 5000000),
-                suggestedGlobalLimit: Math.floor(Math.random() * 500000) + 100000,
-                hotNumbers: Array.from({length: 3}, () => Math.floor(Math.random() * 100).toString().padStart(2, '0')),
-                anomaliesDetected: Math.random() > 0.8 ? ['Patrón Serpiente en N°33', 'Apuestas masivas desde IP Cluster'] : []
-            };
-            
-            return { data: analysis as any };
-        }
-
-        // 1. PLACE BET LOGIC
+        // 4. PLACE BET (REAL LOGIC)
         if (functionName === 'placeBet') {
-             const { data: profile } = await supabase.from('app_users').select('*').eq('auth_uid', session.user.id).single();
-             if (!profile) return { error: 'Usuario no encontrado' };
+             const { numbers, amount, draw_id } = body;
+             const user = MockDB.getUsers().find((u: any) => u.id === session?.user?.id);
+             
+             if (!user) return { error: 'Usuario no encontrado' };
+             if (user.balance_bigint < amount) return { error: 'Saldo insuficiente' };
 
-             if (profile.balance_bigint < body.amount) {
-                 return { error: 'Saldo insuficiente en el Núcleo (Demo)' };
+             // Check Risk Limits (Mock Calculation)
+             const drawType = draw_id; // e.g. "Noche (19:30)"
+             const limits = MockDB.getLimits();
+             const specificLimit = limits.find((l: any) => l.draw_type === drawType && l.number === numbers);
+             const globalLimit = limits.find((l: any) => l.draw_type === drawType && l.number === 'ALL');
+             
+             // Calculate current exposure
+             const currentBets = MockDB.getBets().filter((b: any) => b.draw_id === drawType && b.numbers === numbers);
+             const currentExposure = currentBets.reduce((acc: number, b: any) => acc + b.amount_bigint, 0);
+             
+             const limit = specificLimit?.max_amount ?? globalLimit?.max_amount ?? Infinity;
+             if (limit !== -1 && (currentExposure + amount) > limit) {
+                 return { error: `LIMIT_REACHED: Límite de riesgo excedido para ${numbers}.` };
              }
 
-             // Risk Limit Check
-             const draw = body.draw_id;
-             const number = body.numbers;
-             const { data: allLimits } = await supabase.from('limits_per_number').select('*').eq('draw_type', draw);
-             const limitsArray = allLimits as any[];
-             const activeLimit = limitsArray.find(l => l.number === number) || limitsArray.find(l => l.number === 'ALL');
+             // Execute Transaction
+             user.balance_bigint -= amount;
+             MockDB.saveUser(user);
 
-             if (activeLimit) {
-                 const { data: bets } = await supabase.from('bets').select('*');
-                 const totalSold = (bets as any[])
-                    .filter(b => b.draw_id === draw && b.numbers === number && b.status === 'PENDING')
-                    .reduce((sum, b) => sum + b.amount_bigint, 0);
-                 
-                 const remaining = activeLimit.max_amount - totalSold;
-                 if (remaining <= 0 || body.amount > remaining) {
-                     return { error: `LIMIT_REACHED: Límite excedido para ${number}.` };
-                 }
+             const newBet = {
+                 id: `bet-${Date.now()}`,
+                 ticket_code: generateTicketCode('BT'),
+                 user_id: user.id,
+                 draw_id: drawType,
+                 amount_bigint: amount,
+                 numbers,
+                 status: 'PENDING',
+                 created_at: new Date().toISOString()
+             };
+             
+             MockDB.addBet(newBet);
+             MockDB.addTransaction({
+                 id: `tx-${Date.now()}`,
+                 user_id: user.id,
+                 amount_bigint: -amount,
+                 balance_after: user.balance_bigint,
+                 type: 'BET',
+                 created_at: new Date().toISOString()
+             });
+
+             return { data: { bet_id: newBet.id, ticket_code: newBet.ticket_code } as any };
+        }
+
+        // 5. TRANSACTIONS (REAL BALANCE UPDATE)
+        if (functionName === 'rechargeUser' || functionName === 'withdrawUser') {
+             const { target_user_id, amount, actor_id } = body;
+             const targetUser = MockDB.getUsers().find((u: any) => u.id === target_user_id);
+             
+             if (!targetUser) return { error: 'Usuario destino no encontrado' };
+
+             if (functionName === 'withdrawUser' && targetUser.balance_bigint < amount) {
+                 return { error: 'Fondos insuficientes en la cuenta destino' };
              }
 
-             const newBalance = profile.balance_bigint - body.amount;
-             await supabase.from('app_users').update({ balance_bigint: newBalance }).eq('id', profile.id).select().single();
+             const realAmount = functionName === 'rechargeUser' ? amount : -amount;
+             targetUser.balance_bigint += realAmount;
+             MockDB.saveUser(targetUser);
 
-             const ticketCode = generateTicketCode('BET');
-             const { data: bet } = await supabase.from('bets').insert([{
-                 user_id: profile.id,
-                 ticket_code: ticketCode,
-                 amount_bigint: body.amount,
-                 numbers: body.numbers,
-                 draw_id: body.draw_id, 
-                 status: 'PENDING'
-             }]).select().single();
+             const tx = {
+                 id: `tx-${Date.now()}`,
+                 ticket_code: generateTicketCode('TX'),
+                 user_id: targetUser.id,
+                 amount_bigint: realAmount,
+                 balance_after: targetUser.balance_bigint,
+                 type: realAmount > 0 ? 'CREDIT' : 'DEBIT',
+                 created_at: new Date().toISOString(),
+                 meta: { actor: actor_id }
+             };
+             MockDB.addTransaction(tx);
 
-             return { data: { bet_id: bet.id, ticket_code: ticketCode } as any };
+             return { data: { 
+                 tx_id: tx.id, 
+                 ticket_code: tx.ticket_code, 
+                 new_balance: targetUser.balance_bigint 
+             } as any };
         }
 
-        // RISK MANAGEMENT ENDPOINTS
-        if (functionName === 'getRiskLimits') {
-            const { data } = await supabase.from('limits_per_number').select('*').eq('draw_type', body.draw);
-            return { data: { limits: data } as any };
+        // 6. GLOBAL BETS (READ REAL MOCK DATA)
+        if (functionName === 'getGlobalBets') {
+            const allBets = MockDB.getBets();
+            // Augment with user names
+            const augmented = allBets.map((b: any) => {
+                const u = MockDB.getUsers().find((user: any) => user.id === b.user_id);
+                return {
+                    ...b,
+                    user_name: u ? u.name : 'Desconocido',
+                    origin: u?.role === 'Vendedor' ? 'Vendedor' : 'Jugador'
+                };
+            }).reverse(); // Newest first
+            return { data: { bets: augmented } as any };
         }
 
+        // 7. RISK STATS (CALCULATE REAL EXPOSURE)
         if (functionName === 'getRiskStats') {
-            const { draw } = body;
-            const { data: bets } = await supabase.from('bets').select('*');
-            const stats: any[] = [];
-            const drawBets = (bets as any[]).filter(b => b.draw_id === draw && b.status === 'PENDING');
+            const bets = MockDB.getBets().filter((b: any) => b.draw_id === body.draw);
             
-            const grouped = drawBets.reduce((acc, b) => {
-                acc[b.numbers] = (acc[b.numbers] || 0) + b.amount_bigint;
-                return acc;
-            }, {});
-
-            Object.keys(grouped).forEach(num => {
-                stats.push({ number: num, total_sold: grouped[num] });
+            // Aggregate
+            const map: Record<string, number> = {};
+            bets.forEach((b: any) => {
+                map[b.numbers] = (map[b.numbers] || 0) + b.amount_bigint;
             });
 
+            const stats = Object.keys(map).map(num => ({
+                number: num,
+                total_sold: map[num],
+                risk_percentage: 0 // Will be calc'd by frontend against limit
+            }));
+
+            // Fill holes for 00-99 if needed or just send active
+            // Let's send top active
             return { data: { stats } as any };
+        }
+
+        // 8. RISK LIMITS
+        if (functionName === 'getRiskLimits') {
+            const limits = MockDB.getLimits().filter((l: any) => l.draw_type === body.draw);
+            return { data: { limits } as any };
         }
 
         if (functionName === 'updateRiskLimit') {
             const { draw, number, max_amount } = body;
-            await supabase.from('limits_per_number').insert([{ draw_type: draw, number, max_amount }]);
+            MockDB.saveLimit({
+                id: `lim-${Date.now()}`,
+                draw_type: draw,
+                number,
+                max_amount,
+                created_at: new Date().toISOString()
+            });
             return { data: { success: true } as any };
-        }
-
-        if (functionName === 'checkIdentity') {
-            const { cedula } = body;
-            const { data: existingUsers } = await supabase.from('app_users').select('*');
-            const found = (existingUsers as any[]).find(u => u.cedula === cedula);
-            return { data: found || null as any };
-        }
-
-        if (functionName === 'rechargeUser') {
-          const { data: target } = await supabase.from('app_users').select('*').eq('id', body.target_user_id).single();
-          if (target) {
-             const newBalance = target.balance_bigint + body.amount;
-             const ticketCode = generateTicketCode('DEP');
-             await supabase.from('app_users').update({ balance_bigint: newBalance }).eq('id', body.target_user_id);
-             await supabase.from('ledger_transactions').insert([{
-                 user_id: body.target_user_id, ticket_code: ticketCode, amount_bigint: body.amount,
-                 balance_before: target.balance_bigint, balance_after: newBalance, type: 'CREDIT',
-                 reference_id: `DEP-${Date.now()}`, meta: { actor: body.actor_id }
-             }]);
-             return { data: { tx_id: `tx-rec-${Date.now()}`, ticket_code: ticketCode, new_balance: newBalance, timestamp: new Date().toISOString() } as any };
-          }
-          return { error: "Usuario destino no encontrado" };
-        }
-
-        if (functionName === 'withdrawUser') {
-            const { data: target } = await supabase.from('app_users').select('*').eq('id', body.target_user_id).single();
-            if (!target) return { error: 'Usuario no encontrado.' };
-            if (target.balance_bigint < body.amount) return { error: 'FONDOS INSUFICIENTES.' };
-
-            const newBalance = target.balance_bigint - body.amount;
-            const ticketCode = generateTicketCode('RET');
-            await supabase.from('app_users').update({ balance_bigint: newBalance }).eq('id', body.target_user_id);
-            await supabase.from('ledger_transactions').insert([{
-                user_id: body.target_user_id, ticket_code: ticketCode, amount_bigint: -body.amount,
-                balance_before: target.balance_bigint, balance_after: newBalance, type: 'DEBIT',
-                reference_id: `LIQ-${Date.now()}`, meta: { actor: body.actor_id }
-            }]);
-            return { data: { tx_id: `tx-wd-${Date.now()}`, ticket_code: ticketCode, new_balance: newBalance, timestamp: new Date().toISOString() } as any };
         }
 
         if (functionName === 'payVendor') {
-            const { target_user_id, amount, concept, notes, actor_id } = body;
-            const { data: target } = await supabase.from('app_users').select('*').eq('id', target_user_id).single();
-            const { data: admin } = await supabase.from('app_users').select('*').eq('id', actor_id).single();
-            if (!target || !admin) return { error: "Entidad no encontrada" };
-            if (admin.balance_bigint < amount) return { error: "Fondos insuficientes en Caja Central." };
-
-            const newAdminBalance = admin.balance_bigint - amount;
-            const newTargetBalance = target.balance_bigint + amount;
-            const ticketCode = generateTicketCode('PAY');
-
-            await supabase.from('app_users').update({ balance_bigint: newAdminBalance }).eq('id', actor_id);
-            await supabase.from('app_users').update({ balance_bigint: newTargetBalance }).eq('id', target_user_id);
-            await supabase.from('ledger_transactions').insert([{
-                user_id: target_user_id, ticket_code: ticketCode, amount_bigint: amount,
-                balance_before: target.balance_bigint, balance_after: newTargetBalance, type: 'COMMISSION_PAYOUT',
-                reference_id: `PAY-${Date.now()}`, meta: { concept, notes, payer: actor_id }
-            }]);
-            return { data: { success: true, ticket_code: ticketCode, timestamp: new Date().toISOString() } as any };
-        }
-
-        if (functionName === 'updateGlobalMultiplier') {
-            return { message: 'Multiplicadores actualizados.' } as any;
-        }
-
-        if (functionName === 'publishDrawResult') {
-            const { drawTime, winningNumber, isReventado, reventadoNumber } = body;
-            await supabase.from('lottery_results').update({ winningNumber, isReventado, reventadoNumber, status: 'CLOSED' }).eq('drawTime', drawTime);
-            
-            // Simple payout simulation loop
-            const { data: allBets } = await supabase.from('bets').select('*');
-            const pendingBets = (allBets as any[]).filter(b => b.status === 'PENDING' && b.draw_id === drawTime);
-            let processedCount = 0;
-            for (const bet of pendingBets) {
-                const isWin = bet.numbers === winningNumber;
-                if (isWin) {
-                    const multiplier = (isReventado && bet.mode === GameMode.REVENTADOS) ? 200 : 90;
-                    const prize = bet.amount_bigint * multiplier;
-                    const { data: winner } = await supabase.from('app_users').select('*').eq('id', bet.user_id).single();
-                    if(winner) {
-                        await supabase.from('app_users').update({ balance_bigint: winner.balance_bigint + prize }).eq('id', winner.id);
-                        await supabase.from('ledger_transactions').insert([{
-                            user_id: winner.id, ticket_code: generateTicketCode('WIN'), amount_bigint: prize,
-                            balance_before: winner.balance_bigint, balance_after: winner.balance_bigint + prize,
-                            type: 'CREDIT', reference_id: `WIN-${drawTime}`, meta: { notes: 'PREMIO' }
-                        }]);
-                        bet.status = 'WON';
-                        processedCount++;
-                    }
-                } else {
-                    bet.status = 'LOST';
-                }
+            const { target_user_id, amount, concept } = body;
+            const user = MockDB.getUsers().find((u: any) => u.id === target_user_id);
+            if(user) {
+                user.balance_bigint += amount; // Assuming payment adds to balance
+                MockDB.saveUser(user);
+                MockDB.addTransaction({
+                    id: `pay-${Date.now()}`,
+                    user_id: user.id,
+                    amount_bigint: amount,
+                    balance_after: user.balance_bigint,
+                    type: 'COMMISSION_PAYOUT',
+                    meta: { concept }
+                });
             }
-            return { data: { success: true, message: 'Liquidación completada', processed: processedCount } as any };
+            return { data: { ticket_code: generateTicketCode('PY') } as any };
         }
 
-        if (functionName === 'updateUserStatus') {
-            const { data } = await supabase.from('app_users').update({ status: body.status }).eq('id', body.target_user_id).select().single();
-            return { data: { success: true, user: data } as any };
+        if (functionName === 'checkIdentity') {
+            const user = MockDB.getUsers().find((u: any) => u.cedula === body.cedula);
+            return { data: user || null } as any;
         }
 
         if (functionName === 'deleteUser') {
-            await supabase.from('app_users').delete().eq('id', body.target_user_id);
+            const user = MockDB.getUsers().find((u: any) => u.id === body.target_user_id);
+            if (user) {
+                user.status = 'Deleted'; // Soft delete or handle real delete in supabaseClient
+                MockDB.saveUser(user);
+            }
             return { data: { success: true } as any };
         }
 
-        if (functionName === 'getGlobalBets') {
-            const { role, userId, timeFilter, statusFilter } = body;
-            const { data: allBets } = await supabase.from('bets').select('*');
-            let filteredBets = allBets as any[];
-            if (role === 'Cliente') filteredBets = filteredBets.filter(b => b.user_id === userId);
-            
-            if (timeFilter && timeFilter !== 'ALL') filteredBets = filteredBets.filter(b => b.draw_id && b.draw_id.includes(timeFilter));
-            if (statusFilter && statusFilter !== 'ALL') filteredBets = filteredBets.filter(b => b.status === statusFilter);
-
-            const { data: allUsers } = await supabase.from('app_users').select('*');
-            const enrichedBets = filteredBets.map(bet => {
-                const user = (allUsers as any[]).find(u => u.id === bet.user_id);
-                return { ...bet, user_name: user ? user.name : 'Unknown', user_role: user?.role, origin: user?.role === 'Vendedor' ? 'Vendedor' : 'Jugador' };
-            });
-            enrichedBets.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-            return { data: { bets: enrichedBets } as any };
+        if (functionName === 'updateUserStatus') {
+            const user = MockDB.getUsers().find((u: any) => u.id === body.target_user_id);
+            if (user) {
+                user.status = body.status;
+                MockDB.saveUser(user);
+            }
+            return { data: { success: true } as any };
         }
 
-        return { message: 'Función ejecutada (Demo)' };
+        if (functionName === 'publishDrawResult') {
+            const { drawTime, winningNumber, isReventado, reventadoNumber, date } = body;
+            MockDB.saveResult({
+                date,
+                draw_time: drawTime,
+                winning_number: winningNumber,
+                is_reventado: isReventado,
+                reventado_number: reventadoNumber,
+                status: 'CLOSED',
+                created_at: new Date().toISOString()
+            });
+            
+            // Process Payouts (Mock Logic)
+            const winningBets = MockDB.getBets().filter((b: any) => 
+                b.draw_id === drawTime && 
+                b.numbers === winningNumber && 
+                b.status === 'PENDING'
+            );
+            
+            winningBets.forEach((bet: any) => {
+                bet.status = 'WON';
+                const user = MockDB.getUsers().find((u: any) => u.id === bet.user_id);
+                if (user) {
+                    const prize = bet.amount_bigint * 90; // Standard multiplier
+                    user.balance_bigint += prize;
+                    MockDB.saveUser(user);
+                }
+            });
+            
+            return { data: { success: true, processed: winningBets.length } as any };
+        }
+
+        // Default fallback for any other function
+        return { message: 'Función simulada correctamente' } as any;
     }
 
-    if (!session) return { error: 'No autorizado' };
+    // --- REAL PRODUCTION CALLS ---
+    // Direct DB Calls (RLS)
+    if (functionName === 'getLiveResults') {
+        const { data, error } = await supabase.from('draw_results').select('*').order('created_at', { ascending: false }).limit(10);
+        if (error) throw error;
+        // Map snake_case to camelCase
+        const mapped = data.map((r: any) => ({
+            ...r,
+            drawTime: r.draw_time,
+            winningNumber: r.winning_number,
+            isReventado: r.is_reventado,
+            reventadoNumber: r.reventado_number
+        }));
+        return { data: { results: mapped, history: mapped } as any };
+    }
 
+    if (functionName === 'getRiskLimits') {
+        const { data, error } = await supabase.from('limits_per_number').select('*').eq('draw_type', body.draw);
+        if (error) throw error;
+        return { data: { limits: data } as any };
+    }
+
+    if (functionName === 'updateRiskLimit') {
+        const { draw, number, max_amount } = body;
+        const { data: existing } = await supabase.from('limits_per_number').select('id').eq('draw_type', draw).eq('number', number).single();
+        if (existing) {
+             const { error } = await supabase.from('limits_per_number').update({ max_amount }).eq('id', existing.id);
+             if (error) throw error;
+        } else {
+             const { error } = await supabase.from('limits_per_number').insert([{ draw_type: draw, number, max_amount }]);
+             if (error) throw error;
+        }
+        return { data: { success: true } as any };
+    }
+
+    if (functionName === 'publishDrawResult') {
+        const { drawTime, winningNumber, isReventado, reventadoNumber, date } = body;
+        const { error } = await supabase.from('draw_results').upsert({
+            date,
+            draw_time: drawTime,
+            winning_number: winningNumber,
+            is_reventado: isReventado,
+            reventado_number: reventadoNumber,
+            status: 'CLOSED'
+        }, { onConflict: 'date,draw_time' });
+
+        if (error) throw error;
+        return { data: { success: true, processed: 0 } as any }; 
+    }
+
+    // Edge Functions (via Relay)
     const response = await fetch(`${(supabase as any).supabaseUrl}${FUNCTION_BASE_URL}/${functionName}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
       body: JSON.stringify(body)
     });
     return await response.json() as ApiResponse<T>;
 
   } catch (error: any) {
+    console.error("API Error:", error);
     return { error: error.message || 'Error de red' };
   }
 }
@@ -439,11 +356,8 @@ export const api = {
   createUser: async (payload: any) => invokeEdgeFunction<{ user: AppUser }>('createUser', payload),
   checkIdentityAvailability: async (cedula: string) => invokeEdgeFunction<AppUser | null>('checkIdentity', { cedula }),
   purgeSystem: async (payload: { confirm_phrase: string; actor_id?: string }) => invokeEdgeFunction<{ ok: boolean; message: string }>('purgeSystem', payload),
-  
-  // NEW: Maintenance Methods
   getWeeklyDataStats: async (payload: { year: number }) => invokeEdgeFunction<{ stats: WeeklyDataStats[] }>('getWeeklyDataStats', payload),
   purgeWeeklyData: async (payload: { year: number; weekNumber: number; confirmation: string; actor_id: string }) => invokeEdgeFunction<{ success: boolean; message: string }>('purgeWeeklyData', payload),
-
   placeBet: async (payload: any) => invokeEdgeFunction<{ bet_id: string; ticket_code: string }>('placeBet', payload),
   rechargeUser: async (payload: any) => invokeEdgeFunction<TransactionResponse>('rechargeUser', payload),
   withdrawUser: async (payload: any) => invokeEdgeFunction<TransactionResponse>('withdrawUser', payload),
@@ -456,8 +370,6 @@ export const api = {
   getLiveResults: async () => invokeEdgeFunction<{ results: DrawResult[]; history: DrawResult[] }>('getLiveResults', {}),
   getGlobalBets: async (payload: any) => invokeEdgeFunction<{ bets: Bet[] }>('getGlobalBets', payload),
   generateAIAnalysis: async (payload: { drawTime: string }) => invokeEdgeFunction<any>('generateAIAnalysis', payload),
-  
-  // RISK
   getRiskLimits: async (payload: any) => invokeEdgeFunction<any>('getRiskLimits', payload),
   getRiskStats: async (payload: any) => invokeEdgeFunction<any>('getRiskStats', payload),
   updateRiskLimit: async (payload: any) => invokeEdgeFunction<any>('updateRiskLimit', payload),
