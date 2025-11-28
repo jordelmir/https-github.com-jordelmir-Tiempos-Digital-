@@ -58,6 +58,35 @@ export default function GlobalBetsTable({ onRefresh }: GlobalBetsTableProps) {
     const totalWagered = useMemo(() => filteredBets.reduce((acc, b) => acc + b.amount_bigint, 0), [filteredBets]);
     const totalWon = useMemo(() => filteredBets.filter(b => b.status === 'WON').length, [filteredBets]);
     
+    // --- THEME HELPER FOR FILTERS ---
+    const getFilterButtonStyle = (isActive: boolean, type: 'TIME' | 'STATUS' | 'ORIGIN', value: string) => {
+        if (!isActive) return 'border-transparent text-slate-500 hover:text-white hover:bg-white/5';
+
+        // ACTIVE STATE LOGIC
+        const base = "shadow-[0_0_15px_currentColor] border-current bg-opacity-20 scale-105 z-10";
+        
+        if (type === 'TIME') {
+            if (value === 'Mediodía') return `border-orange-500 text-orange-400 bg-orange-900/30 ${base} shadow-[0_0_20px_orange]`;
+            if (value === 'Tarde') return `border-purple-500 text-purple-400 bg-purple-900/30 ${base} shadow-[0_0_20px_#a855f7]`;
+            if (value === 'Noche') return `border-blue-600 text-blue-400 bg-blue-900/30 ${base} shadow-[0_0_20px_#3b82f6]`;
+            return `border-white text-white bg-white/10 ${base}`; // All
+        }
+        
+        if (type === 'STATUS') {
+            if (value === 'WON') return `border-green-500 text-green-400 bg-green-900/30 ${base} shadow-[0_0_20px_#22c55e]`;
+            if (value === 'PENDING') return `border-blue-500 text-blue-400 bg-blue-900/30 ${base} shadow-[0_0_20px_#3b82f6]`;
+            return `border-white text-white bg-white/10 ${base}`; // All
+        }
+
+        if (type === 'ORIGIN') {
+            if (value === 'Jugador') return `border-cyan-400 text-cyan-400 bg-cyan-900/30 ${base} shadow-[0_0_20px_cyan]`;
+            if (value === 'Vendedor') return `border-purple-500 text-purple-400 bg-purple-900/30 ${base} shadow-[0_0_20px_#a855f7]`;
+            return `border-white text-white bg-white/10 ${base}`; // All
+        }
+
+        return `border-white text-white bg-white/10 ${base}`;
+    };
+
     if (!user) return null;
 
     return (
@@ -87,39 +116,73 @@ export default function GlobalBetsTable({ onRefresh }: GlobalBetsTableProps) {
                             </div>
                         </div>
 
-                        {/* FILTERS */}
-                        <div className="flex flex-wrap gap-2">
+                        {/* FILTERS CONTAINER */}
+                        <div className="flex flex-wrap gap-4">
                             
-                            {/* Time Filter */}
-                            <div className="flex bg-black border border-white/10 rounded-lg p-1">
-                                {['ALL', 'Mediodía', 'Tarde', 'Noche'].map((t) => (
-                                    <button
-                                        key={t}
-                                        onClick={() => setTimeFilter(t)}
-                                        className={`px-3 py-1.5 rounded text-[9px] font-bold uppercase transition-all ${
-                                            timeFilter === t 
-                                            ? 'bg-cyber-blue text-white shadow-[0_0_10px_#2463eb]' 
-                                            : 'text-slate-500 hover:text-white'
-                                        }`}
-                                    >
-                                        {t === 'ALL' ? 'Todo' : t}
-                                    </button>
-                                ))}
+                            {/* Time Filter Group */}
+                            <div className="relative group/filter">
+                                <div className="absolute -inset-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl opacity-0 group-hover/filter:opacity-20 blur-md transition-opacity"></div>
+                                <div className="relative flex bg-black border border-white/10 rounded-xl p-1 shadow-inner overflow-hidden">
+                                    {['ALL', 'Mediodía', 'Tarde', 'Noche'].map((t) => (
+                                        <button
+                                            key={t}
+                                            onClick={() => setTimeFilter(t)}
+                                            className={`
+                                                relative px-4 py-2 rounded-lg text-[9px] font-bold uppercase transition-all duration-300 border
+                                                ${getFilterButtonStyle(timeFilter === t, 'TIME', t)}
+                                            `}
+                                        >
+                                            {t === 'ALL' ? 'Todo' : t}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
-                            {/* Status Filter */}
-                            <div className="flex bg-black border border-white/10 rounded-lg p-1">
-                                <button onClick={() => setStatusFilter('ALL')} className={`px-3 py-1.5 rounded text-[9px] font-bold uppercase transition-all ${statusFilter === 'ALL' ? 'bg-white/20 text-white' : 'text-slate-500 hover:text-white'}`}>Todo</button>
-                                <button onClick={() => setStatusFilter('WON')} className={`px-3 py-1.5 rounded text-[9px] font-bold uppercase transition-all ${statusFilter === 'WON' ? 'bg-green-600 text-white' : 'text-slate-500 hover:text-green-400'}`}>Ganes</button>
-                                <button onClick={() => setStatusFilter('PENDING')} className={`px-3 py-1.5 rounded text-[9px] font-bold uppercase transition-all ${statusFilter === 'PENDING' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-blue-400'}`}>En Juego</button>
+                            {/* Status Filter Group */}
+                            <div className="relative group/filter">
+                                <div className="absolute -inset-2 bg-gradient-to-r from-green-600 to-blue-600 rounded-2xl opacity-0 group-hover/filter:opacity-20 blur-md transition-opacity"></div>
+                                <div className="relative flex bg-black border border-white/10 rounded-xl p-1 shadow-inner overflow-hidden">
+                                    {[
+                                        { id: 'ALL', label: 'Todo' },
+                                        { id: 'WON', label: 'Ganes' },
+                                        { id: 'PENDING', label: 'En Juego' }
+                                    ].map((opt) => (
+                                        <button 
+                                            key={opt.id}
+                                            onClick={() => setStatusFilter(opt.id as any)} 
+                                            className={`
+                                                relative px-4 py-2 rounded-lg text-[9px] font-bold uppercase transition-all duration-300 border
+                                                ${getFilterButtonStyle(statusFilter === opt.id, 'STATUS', opt.id)}
+                                            `}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
                             {/* Origin Filter (Admin/Vendor only) */}
                             {user.role !== UserRole.Cliente && (
-                                <div className="flex bg-black border border-white/10 rounded-lg p-1">
-                                    <button onClick={() => setOriginFilter('ALL')} className={`px-3 py-1.5 rounded text-[9px] font-bold uppercase transition-all ${originFilter === 'ALL' ? 'bg-white/20 text-white' : 'text-slate-500 hover:text-white'}`}>Todo</button>
-                                    <button onClick={() => setOriginFilter('Jugador')} className={`px-3 py-1.5 rounded text-[9px] font-bold uppercase transition-all ${originFilter === 'Jugador' ? 'bg-cyber-neon/20 text-cyber-neon border border-cyber-neon/50' : 'text-slate-500 hover:text-cyber-neon'}`}>Jugador</button>
-                                    <button onClick={() => setOriginFilter('Vendedor')} className={`px-3 py-1.5 rounded text-[9px] font-bold uppercase transition-all ${originFilter === 'Vendedor' ? 'bg-cyber-purple/20 text-cyber-purple border border-cyber-purple/50' : 'text-slate-500 hover:text-cyber-purple'}`}>Vendedor</button>
+                                <div className="relative group/filter">
+                                    <div className="absolute -inset-2 bg-gradient-to-r from-cyan-600 to-purple-600 rounded-2xl opacity-0 group-hover/filter:opacity-20 blur-md transition-opacity"></div>
+                                    <div className="relative flex bg-black border border-white/10 rounded-xl p-1 shadow-inner overflow-hidden">
+                                        {[
+                                            { id: 'ALL', label: 'Todo' },
+                                            { id: 'Jugador', label: 'Jugador' },
+                                            { id: 'Vendedor', label: 'Vendedor' }
+                                        ].map((opt) => (
+                                            <button 
+                                                key={opt.id}
+                                                onClick={() => setOriginFilter(opt.id as any)} 
+                                                className={`
+                                                    relative px-4 py-2 rounded-lg text-[9px] font-bold uppercase transition-all duration-300 border
+                                                    ${getFilterButtonStyle(originFilter === opt.id, 'ORIGIN', opt.id)}
+                                                `}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -142,7 +205,7 @@ export default function GlobalBetsTable({ onRefresh }: GlobalBetsTableProps) {
                             </div>
                         </div>
                         <div className="text-right">
-                            <button onClick={fetchBets} className="text-[9px] font-bold text-cyber-neon border border-cyber-neon/30 px-3 py-2 rounded hover:bg-cyber-neon hover:text-black transition-all uppercase tracking-wider">
+                            <button onClick={fetchBets} className="text-[9px] font-bold text-cyber-neon border border-cyber-neon/30 px-3 py-2 rounded hover:bg-cyber-neon hover:text-black transition-all uppercase tracking-wider shadow-[0_0_10px_rgba(0,240,255,0.1)] hover:shadow-neon-cyan">
                                 <i className="fas fa-redo mr-1"></i> Refrescar Datos
                             </button>
                         </div>

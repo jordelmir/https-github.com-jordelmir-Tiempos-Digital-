@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/edgeApi';
-import { AppUser, UserRole } from '../types';
+import { AppUser } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
-import { formatCurrency, formatDate } from '../constants';
+import { formatCurrency } from '../constants';
 
 interface VendorPaymentModalProps {
   isOpen: boolean;
@@ -36,12 +36,12 @@ export default function VendorPaymentModal({ isOpen, onClose, targetUser, onSucc
         const timer = setInterval(() => setSystemTime(new Date()), 1000);
         return () => clearInterval(timer);
     }
-  }, [isOpen]);
+  }, [isOpen, targetUser]);
 
   if (!isOpen || !targetUser || !currentUser) return null;
 
   const handleSubmit = async () => {
-    if (!amount || amount <= 0) return;
+    if (!amount || Number(amount) <= 0) return;
     setLoading(true);
 
     try {
@@ -55,33 +55,38 @@ export default function VendorPaymentModal({ isOpen, onClose, targetUser, onSucc
 
         if (res.error) {
             alert(res.error);
-            setLoading(false); // Enable retry if error
+            // Loading will be reset in finally
         } else {
             setTxId(res.data?.ticket_code || 'TX-000');
             setSuccess(true);
+            // Auto Close Logic
             setTimeout(() => {
-                onSuccess?.();
-                // Close is handled by timeout, state reset happens on next open
-                onClose();
+                if (isOpen) {
+                    onSuccess?.();
+                    onClose();
+                }
             }, 2500);
         }
     } catch (e) {
-        alert("Error en el sistema contable.");
+        console.error(e);
+        alert("Error crítico en el sistema contable.");
+    } finally {
+        // CRITICAL FIX: Always unlock loading state
         setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
-        <div className="relative max-w-md w-full mx-4 my-8 flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in duration-300 overflow-y-auto custom-scrollbar">
+        <div className="relative max-w-md w-full mx-4 my-8 flex flex-col min-h-[auto]">
             
             {/* --- LIVING BREATHING AURA (Purple) --- */}
             <div className="absolute -inset-1 bg-cyber-purple rounded-2xl opacity-20 blur-xl animate-[pulse_4s_ease-in-out_infinite] transition-all duration-1000 fixed-backlight"></div>
 
-            <div className="bg-[#0a0a0f] border border-cyber-purple/40 rounded-2xl overflow-hidden shadow-[0_0_80px_rgba(188,19,254,0.2)] relative z-10 group flex flex-col">
+            <div className="bg-[#0a0a0f] border border-cyber-purple/40 rounded-2xl overflow-hidden shadow-[0_0_80px_rgba(188,19,254,0.2)] relative z-10 group flex flex-col w-full">
                 
                 {/* Header Contable - STICKY TOP */}
-                <div className="bg-[#1a1a24]/95 backdrop-blur-xl p-6 border-b border-cyber-purple/20 flex justify-between items-start relative overflow-hidden z-50 shrink-0">
+                <div className="bg-[#1a1a24]/95 backdrop-blur-xl p-6 border-b border-cyber-purple/20 flex justify-between items-start relative overflow-hidden sticky top-0 z-50 shrink-0">
                     {/* Top Scanline */}
                     <div className="absolute top-0 left-0 w-full h-1 bg-cyber-purple/50 shadow-[0_0_10px_#bc13fe] animate-[scanline_3s_linear_infinite]"></div>
                     
@@ -97,16 +102,16 @@ export default function VendorPaymentModal({ isOpen, onClose, targetUser, onSucc
                             </p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors z-10 bg-black/20 rounded-full w-8 h-8 flex items-center justify-center">
+                    <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors z-10 bg-black/20 rounded-full w-8 h-8 flex items-center justify-center hover:bg-cyber-purple/20">
                         <i className="fas fa-times text-lg"></i>
                     </button>
                 </div>
 
                 {/* Body - SCROLLABLE CONTENT */}
-                <div className="p-6 space-y-6 bg-gradient-to-b from-[#0a0a0f] to-[#050508] overflow-y-auto custom-scrollbar">
+                <div className="p-6 space-y-6 bg-gradient-to-b from-[#0a0a0f] to-[#050508] flex-1">
                     
                     {/* Beneficiary Card */}
-                    <div className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5 relative overflow-hidden group/card flex-shrink-0">
+                    <div className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5 relative overflow-hidden group/card flex-shrink-0 shadow-inner">
                         <div className="absolute inset-0 bg-cyber-purple/5 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500"></div>
                         <div className="relative w-12 h-12 rounded-lg bg-cyber-purple/10 flex items-center justify-center text-cyber-purple font-bold border border-cyber-purple/30 shadow-neon-purple">
                             {targetUser.name.substring(0,2).toUpperCase()}
@@ -187,7 +192,7 @@ export default function VendorPaymentModal({ isOpen, onClose, targetUser, onSucc
                             </div>
 
                             {/* Summary Preview */}
-                            <div className="bg-red-950/20 border border-red-900/40 p-3 rounded-lg flex justify-between items-center relative overflow-hidden">
+                            <div className="bg-red-950/20 border border-red-900/40 p-3 rounded-lg flex justify-between items-center relative overflow-hidden shadow-inner">
                                 <div className="absolute inset-0 bg-red-900/5 animate-pulse"></div>
                                 <span className="text-[10px] text-red-400 uppercase font-mono relative z-10 font-bold">Debitar de Caja Central</span>
                                 <span className="text-red-500 font-bold font-mono text-lg relative z-10 drop-shadow-[0_0_5px_rgba(220,38,38,0.5)]">

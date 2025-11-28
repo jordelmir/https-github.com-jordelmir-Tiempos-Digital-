@@ -183,3 +183,13 @@ export interface RiskLimitStats {
     total_sold: number;
     risk_percentage: number;
 }
+
+// --- DATA MAINTENANCE ---
+export interface WeeklyDataStats {
+    year: number;
+    weekNumber: number;
+    recordCount: number;
+    startDate: string;
+    endDate: string;
+    sizeEstimate: string; // e.g., "1.2 MB"
+}

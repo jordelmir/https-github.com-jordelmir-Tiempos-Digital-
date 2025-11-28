@@ -12,7 +12,8 @@ import ReventadosEffect from './ReventadosEffect';
 import CountdownTimer from './CountdownTimer';
 import LiveResultsPanel from './LiveResultsPanel'; 
 import GlobalBetsTable from './GlobalBetsTable'; 
-import RiskLimitManager from './RiskLimitManager'; // IMPORT
+import RiskLimitManager from './RiskLimitManager';
+import TopNumbersPanel from './TopNumbersPanel'; // IMPORTED
 import { useServerClock } from '../hooks/useServerClock';
 import { formatCurrency } from '../constants';
 import { supabase } from '../lib/supabaseClient';
@@ -69,7 +70,10 @@ export default function Dashboard() {
   // Admin God Mode State
   const [adminResultOpen, setAdminResultOpen] = useState(false);
   const [editingMultiplier, setEditingMultiplier] = useState(false);
+  
+  // Dual Core Multiplier State
   const [customMultiplier, setCustomMultiplier] = useState(90);
+  const [customReventadosMultiplier, setCustomReventadosMultiplier] = useState(200);
   const [savingMultiplier, setSavingMultiplier] = useState(false);
 
   // Betting State
@@ -175,7 +179,11 @@ export default function Dashboard() {
       if(!user) return;
       setSavingMultiplier(true);
       await new Promise(resolve => setTimeout(resolve, 2000));
-      await api.updateGlobalMultiplier({ newValue: customMultiplier, actor_id: user.id });
+      await api.updateGlobalMultiplier({ 
+          baseValue: customMultiplier,
+          reventadosValue: customReventadosMultiplier,
+          actor_id: user.id 
+      });
       setSavingMultiplier(false);
       setEditingMultiplier(false);
   };
@@ -322,64 +330,120 @@ export default function Dashboard() {
         onClose={() => setAdminResultOpen(false)}
       />
 
-      {/* --- EDIT MULTIPLIER MODAL --- */}
+      {/* --- EDIT MULTIPLIER MODAL (DUAL CORE REACTOR) --- */}
       {editingMultiplier && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-xl animate-in fade-in duration-300">
-              {/* ... Multiplier Modal Content ... */}
-              <div className="relative w-96 perspective-1000">
-                  <div className={`absolute -inset-4 bg-cyber-emerald-dark rounded-full blur-3xl opacity-40 animate-breathe transition-all duration-1000 ${savingMultiplier ? 'scale-150 opacity-80 bg-emerald-400' : ''}`}></div>
-                  <div className="absolute -inset-1 bg-cyber-emerald rounded-2xl blur-md opacity-60 animate-pulse"></div>
+              <div className="relative w-[500px] perspective-1000">
+                  
+                  {/* Global Reactor Glow */}
+                  <div className={`absolute -inset-4 rounded-full blur-3xl opacity-30 animate-breathe transition-all duration-1000 bg-gradient-to-r from-cyber-emerald to-red-600 ${savingMultiplier ? 'scale-150 opacity-80' : ''}`}></div>
+                  <div className="absolute -inset-1 bg-gradient-to-r from-cyber-emerald to-red-600 rounded-3xl blur-md opacity-40 animate-pulse"></div>
 
-                  <div className="bg-[#02040a] border-2 border-cyber-emerald/50 p-8 rounded-2xl relative z-10 w-full overflow-hidden shadow-[0_0_50px_rgba(16,185,129,0.2)]">
-                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 mix-blend-overlay"></div>
-                    {savingMultiplier && <div className="absolute inset-0 bg-emerald-500/20 animate-pulse z-0"></div>}
-
-                    {!savingMultiplier ? (
-                        <div className="relative z-10 animate-in zoom-in duration-300">
-                            <div className="text-center mb-6">
-                                <div className="w-16 h-16 mx-auto bg-cyber-emerald/10 rounded-full border border-cyber-emerald flex items-center justify-center shadow-[0_0_20px_#10b981] mb-4 animate-[spin_10s_linear_infinite]">
-                                    <i className="fas fa-atom text-3xl text-cyber-emerald"></i>
-                                </div>
+                  <div className="bg-[#02040a] border-2 border-white/10 p-0 rounded-3xl relative z-10 w-full overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.8)]">
+                    
+                    {/* Header */}
+                    <div className="bg-black/50 border-b border-white/10 p-6 flex justify-between items-center relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyber-emerald to-red-600 opacity-80"></div>
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-white/5 border border-white/20 flex items-center justify-center">
+                                <i className={`fas fa-cogs text-white text-lg ${savingMultiplier ? 'animate-spin' : ''}`}></i>
+                            </div>
+                            <div>
                                 <h3 className="text-white font-display font-black uppercase tracking-[0.2em] text-sm text-glow-sm">Calibración de Núcleo</h3>
-                                <p className="text-[9px] font-mono text-cyber-emerald uppercase mt-1">Ajuste de Multiplicador Global</p>
-                            </div>
-
-                            <div className="flex items-center justify-center gap-6 mb-8">
-                                <button onClick={() => setCustomMultiplier(p => Math.max(1, p-1))} className="w-12 h-12 rounded-xl bg-black border border-cyber-emerald/30 text-cyber-emerald hover:bg-cyber-emerald hover:text-black font-bold text-2xl transition-all shadow-lg flex items-center justify-center active:scale-95">-</button>
-                                <div className="w-32 h-20 bg-black border border-cyber-emerald/50 rounded-xl flex flex-col items-center justify-center shadow-[inset_0_0_20px_rgba(16,185,129,0.2)] relative overflow-hidden group">
-                                    <div className="absolute inset-0 bg-cyber-emerald/5 animate-pulse"></div>
-                                    <input 
-                                        type="number" 
-                                        value={customMultiplier} 
-                                        onChange={e => setCustomMultiplier(Number(e.target.value))}
-                                        className="bg-transparent text-center text-cyber-emerald font-mono text-4xl font-bold focus:outline-none w-full relative z-10 drop-shadow-[0_0_10px_rgba(16,185,129,0.8)]"
-                                    />
-                                    <div className="text-[8px] font-mono text-emerald-700 uppercase tracking-widest mt-[-5px]">FACTOR X</div>
-                                </div>
-                                <button onClick={() => setCustomMultiplier(p => p+1)} className="w-12 h-12 rounded-xl bg-black border border-cyber-emerald/30 text-cyber-emerald hover:bg-cyber-emerald hover:text-black font-bold text-2xl transition-all shadow-lg flex items-center justify-center active:scale-95">+</button>
-                            </div>
-
-                            <div className="flex gap-3">
-                                <button onClick={() => setEditingMultiplier(false)} className="flex-1 py-4 rounded-xl text-[10px] font-bold text-slate-400 border border-slate-800 hover:border-slate-600 hover:text-white uppercase tracking-widest transition-colors">Cancelar</button>
-                                <button onClick={handleUpdateMultiplier} className="flex-1 py-4 rounded-xl text-[10px] font-bold bg-cyber-emerald text-black shadow-[0_0_20px_rgba(16,185,129,0.4)] hover:bg-white hover:shadow-[0_0_40px_rgba(16,185,129,0.8)] uppercase tracking-widest transition-all relative overflow-hidden group/btn">
-                                    <div className="absolute inset-0 bg-white/30 -translate-x-full group-hover/btn:animate-[shine_0.5s_ease-in-out]"></div>
-                                    <span className="relative z-10 flex items-center justify-center gap-2"><i className="fas fa-save"></i> GUARDAR</span>
-                                </button>
+                                <p className="text-[9px] font-mono text-slate-500 uppercase mt-1">Sincronización Dual de Pagos</p>
                             </div>
                         </div>
-                    ) : (
-                        <div className="relative z-10 flex flex-col items-center justify-center py-10 animate-in zoom-in duration-500">
-                            <div className="relative w-32 h-32 mb-6">
-                                <div className="absolute inset-0 rounded-full border-4 border-t-cyber-emerald border-r-transparent border-b-cyber-emerald border-l-transparent animate-[spin_1s_linear_infinite]"></div>
-                                <div className="absolute inset-2 rounded-full border-4 border-t-transparent border-r-white border-b-transparent border-l-white animate-[spin_2s_linear_infinite_reverse] opacity-50"></div>
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                    <span className="text-4xl font-mono font-bold text-white animate-pulse">{customMultiplier}x</span>
+                    </div>
+
+                    <div className="p-8 relative">
+                        {/* Carbon Fiber BG */}
+                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 mix-blend-overlay pointer-events-none"></div>
+                        
+                        {savingMultiplier && (
+                            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in duration-500">
+                                <div className="relative w-32 h-32 mb-6">
+                                    <div className="absolute inset-0 rounded-full border-4 border-t-cyber-emerald border-r-transparent border-b-red-600 border-l-transparent animate-[spin_1s_linear_infinite]"></div>
+                                    <div className="absolute inset-2 rounded-full border-4 border-t-transparent border-r-white border-b-transparent border-l-white animate-[spin_2s_linear_infinite_reverse] opacity-50"></div>
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <i className="fas fa-sync-alt text-4xl text-white animate-pulse"></i>
+                                    </div>
+                                </div>
+                                <h3 className="text-xl font-display font-black text-white uppercase tracking-widest animate-pulse">SINCRONIZANDO...</h3>
+                                <p className="text-[10px] font-mono text-slate-400 mt-2">ACTUALIZANDO PROTOCOLOS DE PAGO</p>
+                            </div>
+                        )}
+
+                        {/* --- DUAL CORE CONTROLS --- */}
+                        <div className="grid grid-cols-2 gap-6 mb-8 relative z-10">
+                            
+                            {/* CORE ALPHA: BASE (EMERALD) */}
+                            <div className="flex flex-col items-center">
+                                <div className="text-[10px] font-mono font-bold text-cyber-emerald uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <i className="fas fa-cube"></i> Factor X (Base)
+                                </div>
+                                
+                                <div className="relative group/alpha">
+                                    <div className="absolute -inset-2 bg-cyber-emerald rounded-2xl opacity-10 blur-md group-hover/alpha:opacity-30 transition-opacity"></div>
+                                    <div className="bg-black border border-cyber-emerald/50 rounded-2xl p-4 w-full flex flex-col items-center shadow-[inset_0_0_20px_rgba(16,185,129,0.1)] relative overflow-hidden">
+                                        {/* Particles */}
+                                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1),transparent)] animate-pulse"></div>
+                                        
+                                        <button onClick={() => setCustomMultiplier(p => Math.max(1, p+1))} className="w-full text-cyber-emerald hover:text-white mb-2 transition-colors"><i className="fas fa-chevron-up"></i></button>
+                                        
+                                        <div className="text-4xl font-mono font-bold text-white relative z-10 drop-shadow-[0_0_10px_rgba(16,185,129,0.8)]">
+                                            {customMultiplier}<span className="text-sm opacity-50">x</span>
+                                        </div>
+                                        
+                                        <button onClick={() => setCustomMultiplier(p => Math.max(1, p-1))} className="w-full text-cyber-emerald hover:text-white mt-2 transition-colors"><i className="fas fa-chevron-down"></i></button>
+                                    </div>
                                 </div>
                             </div>
-                            <h3 className="text-xl font-display font-black text-cyber-emerald uppercase tracking-widest animate-pulse">RECALIBRANDO...</h3>
-                            <p className="text-[10px] font-mono text-emerald-400/70 mt-2">SINCRONIZANDO NÚCLEO DE APUESTAS</p>
+
+                            {/* CORE OMEGA: REVENTADOS (RED/HAZARD) */}
+                            <div className="flex flex-col items-center border-l border-white/5 pl-6">
+                                <div className="text-[10px] font-mono font-bold text-red-500 uppercase tracking-widest mb-3 flex items-center gap-2 animate-pulse">
+                                    <i className="fas fa-radiation"></i> Factor Ω (Rev)
+                                </div>
+                                
+                                <div className="relative group/omega">
+                                    <div className="absolute -inset-2 bg-red-600 rounded-2xl opacity-10 blur-md group-hover/omega:opacity-30 transition-opacity"></div>
+                                    <div className="bg-black border border-red-500/50 rounded-2xl p-4 w-full flex flex-col items-center shadow-[inset_0_0_20px_rgba(220,38,38,0.2)] relative overflow-hidden">
+                                        {/* Hazard Stripes */}
+                                        <div className="absolute inset-0 opacity-10 bg-[repeating-linear-gradient(45deg,transparent,transparent_5px,#ff0000_5px,#ff0000_10px)]"></div>
+                                        
+                                        <button onClick={() => setCustomReventadosMultiplier(p => Math.max(1, p+1))} className="w-full text-red-500 hover:text-white mb-2 transition-colors relative z-10"><i className="fas fa-chevron-up"></i></button>
+                                        
+                                        <div className="text-4xl font-mono font-black text-red-500 relative z-10 drop-shadow-[0_0_10px_rgba(255,0,0,0.8)]">
+                                            {customReventadosMultiplier}<span className="text-sm opacity-50">x</span>
+                                        </div>
+                                        
+                                        <button onClick={() => setCustomReventadosMultiplier(p => Math.max(1, p-1))} className="w-full text-red-500 hover:text-white mt-2 transition-colors relative z-10"><i className="fas fa-chevron-down"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
-                    )}
+
+                        {/* Action Buttons */}
+                        <div className="flex gap-4 pt-4 border-t border-white/5">
+                            <button onClick={() => setEditingMultiplier(false)} className="flex-1 py-4 rounded-xl text-[10px] font-bold text-slate-400 border border-slate-800 hover:border-slate-600 hover:text-white uppercase tracking-widest transition-colors bg-black">
+                                Cancelar
+                            </button>
+                            
+                            <button 
+                                onClick={handleUpdateMultiplier} 
+                                className="flex-1 py-4 rounded-xl text-[10px] font-bold text-black uppercase tracking-widest transition-all relative overflow-hidden group/btn shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:scale-[1.02]"
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-r from-cyber-emerald to-red-600"></div>
+                                <div className="absolute inset-0 bg-white/30 -translate-x-full group-hover/btn:animate-[shine_0.5s_ease-in-out]"></div>
+                                
+                                <span className="relative z-10 flex items-center justify-center gap-2">
+                                    <i className="fas fa-save"></i> GUARDAR CAMBIOS
+                                </span>
+                            </button>
+                        </div>
+
+                    </div>
                   </div>
               </div>
           </div>
@@ -435,6 +499,11 @@ export default function Dashboard() {
           <LiveResultsPanel />
       </div>
 
+      {/* --- TOP 10 NUMBERS (PREDICTIVE INTELLIGENCE) --- */}
+      <div className="relative z-10 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-100">
+          <TopNumbersPanel />
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-10 relative z-10">
         <PowerCard 
             label={user.role === UserRole.Cliente ? "Tu Saldo Disponible" : "Fondo Operativo"}
@@ -445,7 +514,7 @@ export default function Dashboard() {
         />
         <PowerCard 
             label="Multiplicador Activo" 
-            value={gameMode === GameMode.REVENTADOS ? "200x" : `${customMultiplier}x`} 
+            value={gameMode === GameMode.REVENTADOS ? `${customReventadosMultiplier}x` : `${customMultiplier}x`} 
             icon="fa-crosshairs" 
             theme={theme}
             isWarning={gameMode === GameMode.REVENTADOS}
