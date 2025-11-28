@@ -56,7 +56,6 @@ export default function DataPurgeCard({ theme }: { theme?: { name: string, shado
     setLoading(true);
     
     try {
-        let resultMsg = '';
         if (mode === 'TOTAL') {
             const res = await api.purgeSystem({ confirm_phrase: confirm, actor_id: user.id });
             if (res.error) {
@@ -64,7 +63,6 @@ export default function DataPurgeCard({ theme }: { theme?: { name: string, shado
                 setLoading(false);
                 return;
             }
-            resultMsg = 'RESETEO DE FÁBRICA COMPLETADO';
         } else {
             if (!selectedWeek) return;
             const res = await api.purgeWeeklyData({
@@ -78,7 +76,6 @@ export default function DataPurgeCard({ theme }: { theme?: { name: string, shado
                 setLoading(false);
                 return;
             }
-            resultMsg = `SEMANA ${selectedWeek.weekNumber} DEPURADA`;
             setRecoveredInfo(selectedWeek.sizeEstimate);
         }
 

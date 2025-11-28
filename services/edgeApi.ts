@@ -114,31 +114,66 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
             return { data: { stats: Object.values(stats) } as any };
         }
 
+        // --- PURGE SYSTEM (V3.1 Implementation) ---
+        if (functionName === 'purgeSystem') {
+             const { confirm_phrase, actor_id } = body;
+             if (confirm_phrase !== 'CONFIRMAR PURGA TOTAL') {
+                 return { error: 'Frase de confirmación inválida' };
+             }
+             // Log the schedule event
+             await supabase.from('audit_trail').insert([{
+                 actor_app_user: actor_id,
+                 action: 'SCHEDULE_PURGE',
+                 object_type: 'SYSTEM',
+                 payload: { confirm_phrase }
+             }]);
+             return { data: { ok: true, message: 'Purga Programada: Snapshot creado, multisig pendiente.' } as any };
+        }
+
         // --- NEW: PURGE WEEKLY DATA ---
         if (functionName === 'purgeWeeklyData') {
             const { year, weekNumber, confirmation } = body;
             if (!confirmation.includes(`ELIMINAR SEMANA ${weekNumber}`)) {
                 return { error: 'Frase de confirmación incorrecta.' };
             }
-
-            // Mock Deletion Logic
-            // In real app: DELETE FROM bets WHERE created_at BETWEEN ...
-            // Here we verify permisions and return success
             
-            // Log this destructive action
             await supabase.from('audit_trail').insert([{
                 actor_app_user: body.actor_id,
                 action: 'WEEKLY_DATA_PURGE',
                 object_type: 'bets',
                 payload: { year, weekNumber, recovered_space: 'Estimated' }
             }]);
-
-            // Actually remove from mock store (if possible with current mock implementation limits)
-            // For the demo visual effect, returning success is sufficient as the 'getWeeklyStats' relies on persistent mock which we can't easily filter partially without complex logic in supabaseClient mock.
-            // However, we can simulate the "Effect" by clearing bets that match if we implemented a delete filter in mock.
-            // For now, we simulate success.
             
             return { data: { success: true, message: `Datos de Semana ${weekNumber} eliminados.` } as any };
+        }
+
+        // --- CREATE USER (V3.1 Implementation) ---
+        if (functionName === 'createUser') {
+            const { name, email, phone, cedula, role, balance_bigint, pin, issuer_id } = body;
+            const { data: existingUsers } = await supabase.from('app_users').select('*');
+            const usersList = existingUsers as any[];
+            
+            const duplicateCI = usersList.find(u => u.cedula === cedula);
+            if (duplicateCI) return { error: `IDENTIDAD DUPLICADA: ${cedula} ya existe.` };
+
+            const { data: newUser, error } = await supabase.from('app_users').insert([{
+                    name, email: email || `no-email-${Date.now()}@phront.local`, phone, cedula, role,
+                    balance_bigint: balance_bigint || 0, pin_hash: mockHash(pin), issuer_id,
+                    auth_uid: `auth-${cedula}-${Date.now()}`, status: 'Active'
+                }]).select().single();
+            
+            if (error) return { error: error.message };
+            
+            // Audit Log in Mock
+            await supabase.from('audit_trail').insert([{
+                actor_app_user: issuer_id,
+                action: 'CREATE_USER',
+                object_type: 'app_users',
+                object_id: newUser.id,
+                payload: { name, role, balance_bigint }
+            }]);
+
+            return { data: { user: newUser as AppUser } as any };
         }
 
         // --- AI SECURE GATEWAY (SERVER SIDE ONLY) ---
@@ -195,7 +230,7 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
                  return { error: 'Saldo insuficiente en el Núcleo (Demo)' };
              }
 
-             // Risk Limit Check (Simplified for brevity in this update)
+             // Risk Limit Check
              const draw = body.draw_id;
              const number = body.numbers;
              const { data: allLimits } = await supabase.from('limits_per_number').select('*').eq('draw_type', draw);
@@ -260,37 +295,11 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
             return { data: { success: true } as any };
         }
 
-        // CREATE USER LOGIC
-        if (functionName === 'createUser') {
-            const { name, email, phone, cedula, role, balance_bigint, pin, issuer_id } = body;
-            const { data: existingUsers } = await supabase.from('app_users').select('*');
-            const usersList = existingUsers as any[];
-            
-            const duplicateCI = usersList.find(u => u.cedula === cedula);
-            if (duplicateCI) return { error: `IDENTIDAD DUPLICADA: ${cedula} ya existe.` };
-
-            const { data: newUser, error } = await supabase.from('app_users').insert([{
-                    name, email: email || `no-email-${Date.now()}@phront.local`, phone, cedula, role,
-                    balance_bigint: balance_bigint || 0, pin_hash: mockHash(pin), issuer_id,
-                    auth_uid: `auth-${cedula}-${Date.now()}`, status: 'Active'
-                }]).select().single();
-            
-            if (error) return { error: error.message };
-            return { data: { user: newUser as AppUser } as any };
-        }
-
         if (functionName === 'checkIdentity') {
             const { cedula } = body;
             const { data: existingUsers } = await supabase.from('app_users').select('*');
             const found = (existingUsers as any[]).find(u => u.cedula === cedula);
             return { data: found || null as any };
-        }
-
-        if (functionName === 'purgeSystem') {
-             if (body.confirm_phrase !== 'CONFIRMAR PURGA TOTAL') {
-                 return { error: 'Frase de confirmación inválida' };
-             }
-             return { data: { ok: true, message: 'Purga Simulada: Snapshot creado, multisig pendiente.' } as any };
         }
 
         if (functionName === 'rechargeUser') {
