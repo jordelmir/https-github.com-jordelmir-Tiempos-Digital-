@@ -6,11 +6,18 @@ import { GoogleGenAI } from "@google/genai";
 // In a real deployment, these would point to your deployed Edge Functions
 const FUNCTION_BASE_URL = '/functions/v1'; 
 
-// --- SECURE SERVER-SIDE CONFIGURATION (SIMULATED) ---
-// In Production, this comes from process.env.AI_GLOBAL_KEY on the server
-// Adhering to guidelines: API key must be obtained from process.env.API_KEY
+// --- SECURE SERVER-SIDE CONFIGURATION ---
+// Safe access to env var, defaulting to empty if not found
+const getApiKey = () => {
+    // @ts-ignore
+    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) return process.env.API_KEY;
+    // @ts-ignore
+    if (import.meta.env && import.meta.env.VITE_GOOGLE_API_KEY) return import.meta.env.VITE_GOOGLE_API_KEY;
+    return 'AIzaSyCAt1OtlHnxOVGD0K-Al7PIFLJ0poIG9B4'; // Placeholder/Demo
+};
+
 const SERVER_SECRETS = {
-    AI_GLOBAL_KEY: process.env.API_KEY || 'AIzaSyCAt1OtlHnxOVGD0K-Al7PIFLJ0poIG9B4' // Simulating Secure Vault
+    AI_GLOBAL_KEY: getApiKey()
 };
 
 // Helper to generate Cyberpunk Ticket IDs

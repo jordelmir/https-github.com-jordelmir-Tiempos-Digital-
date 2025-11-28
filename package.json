@@ -9,12 +9,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react-dom": "18.2.0",
-    "react": "18.2.0",
-    "react-router-dom": "6.22.3",
-    "@supabase/supabase-js": "2.39.7",
+    "react-dom": "^19.2.0",
+    "react": "^19.2.0",
     "zustand": "^5.0.8",
-    "@google/genai": "^1.30.0"
+    "react-router-dom": "^7.9.6",
+    "@google/genai": "^1.30.0",
+    "@vitejs/plugin-react": "^5.1.1",
+    "vite": "^7.2.4",
+    "@supabase/supabase-js": "^2.86.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

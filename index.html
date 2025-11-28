@@ -174,34 +174,26 @@
         transition-duration: 700ms;
       }
     </style>
-    <script type="importmap">
+    <!-- CRITICAL: Entry Point for Vite App -->
+    <script type="module" src="/index.tsx"></script>
+  <script type="importmap">
 {
   "imports": {
-    "react-dom/": "https://esm.sh/react-dom@18.2.0/",
-    "react-dom": "https://esm.sh/react-dom@18.2.0",
-    "react/": "https://esm.sh/react@18.2.0/",
-    "react": "https://esm.sh/react@18.2.0",
-    "react-router-dom": "https://esm.sh/react-router-dom@6.22.3?external=react,react-dom",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.7",
-    "zustand": "https://esm.sh/zustand@4.5.2?external=react",
-    "zustand/middleware": "https://esm.sh/zustand@4.5.2/middleware?external=react",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
     "zustand/": "https://aistudiocdn.com/zustand@^5.0.8/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
+    "zustand": "https://aistudiocdn.com/zustand@^5.0.8",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.86.0"
   }
 }
 </script>
-  </head>
+</head>
   <body>
-    <script>
-        // Process Shim - SECURITY UPDATE: REMOVED SENSITIVE KEYS
-        window.process = {
-            env: {
-                NODE_ENV: 'development',
-                REACT_APP_SUPABASE_URL: '',
-                REACT_APP_SUPABASE_ANON_KEY: ''
-            }
-        };
-    </script>
     <div class="neural-bg">
       <div class="neural-web"></div>
       <div class="neural-breath"></div>
