@@ -9,10 +9,16 @@ const FUNCTION_BASE_URL = '/functions/v1';
 // --- SECURE SERVER-SIDE CONFIGURATION ---
 // Safe access to env var, defaulting to empty if not found
 const getApiKey = () => {
+    // 1. Check Vite standard
+    // @ts-ignore
+    if (import.meta.env && import.meta.env.VITE_GOOGLE_API_KEY) return import.meta.env.VITE_GOOGLE_API_KEY;
+    
+    // 2. Check process.env (injected by vite define)
     // @ts-ignore
     if (typeof process !== 'undefined' && process.env && process.env.API_KEY) return process.env.API_KEY;
     // @ts-ignore
-    if (import.meta.env && import.meta.env.VITE_GOOGLE_API_KEY) return import.meta.env.VITE_GOOGLE_API_KEY;
+    if (typeof process !== 'undefined' && process.env && process.env.VITE_GOOGLE_API_KEY) return process.env.VITE_GOOGLE_API_KEY;
+
     return 'AIzaSyCAt1OtlHnxOVGD0K-Al7PIFLJ0poIG9B4'; // Placeholder/Demo
 };
 
@@ -39,7 +45,7 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
     
     // DEMO MODE INTERCEPTION
     // @ts-ignore - access internal property for demo check
-    if ((supabase as any).supabaseUrl === 'https://demo.local' || (supabase as any).supabaseUrl.includes('mock')) {
+    if ((supabase as any).supabaseUrl === 'https://demo.local' || (supabase as any).supabaseUrl.includes('mock') || (supabase as any).supabaseUrl.includes('your-project')) {
         
         // Faster response for clock sync
         if (functionName === 'getServerTime') {
