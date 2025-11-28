@@ -1,8 +1,9 @@
-
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { LedgerTransaction } from '../types';
-import { formatCurrency, formatDate } from '../constants';
+import { LedgerTransaction, UserRole } from '../types';
+import { formatCurrency, formatDate, ROUTES } from '../constants';
+import { useAuthStore } from '../store/useAuthStore';
+import { Navigate } from 'react-router-dom';
 
 // --- MOCK DATA GENERATOR FOR CHART ---
 const generateCashFlowData = () => {
@@ -31,10 +32,16 @@ const generateCashFlowData = () => {
 };
 
 export default function LedgerView() {
+  const { user } = useAuthStore();
   const [txs, setTxs] = useState<LedgerTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [chartData] = useState(generateCashFlowData());
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+
+  // --- ACCESS CONTROL GUARD ---
+  if (!user || user.role !== UserRole.SuperAdmin) {
+      return <Navigate to={ROUTES.DASHBOARD} replace />;
+  }
 
   useEffect(() => {
     async function fetchLedger() {
@@ -93,12 +100,12 @@ export default function LedgerView() {
   return (
     <div className="p-8 space-y-12 relative animate-in fade-in duration-500">
       
-      {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-end border-b-2 border-cyber-emerald/30 pb-6 relative">
-        <div className="absolute bottom-0 left-0 w-1/3 h-0.5 bg-cyber-emerald shadow-[0_0_15px_#10b981]"></div>
+      {/* Header - LIVING PHOSPHORESCENT */}
+      <header className="flex flex-col md:flex-row justify-between items-end border-b-2 border-cyber-emerald relative pb-6 shadow-[0_10px_20px_rgba(16,185,129,0.1)]">
+        <div className="absolute bottom-0 left-0 w-1/3 h-0.5 bg-cyber-emerald shadow-[0_0_20px_#10b981] animate-[pulse_3s_infinite]"></div>
         <div>
             <h2 className="text-4xl font-display font-black text-white italic tracking-tighter uppercase mb-2 drop-shadow-lg flex items-center gap-3">
-                <i className="fas fa-book-journal-whills text-cyber-emerald animate-pulse"></i>
+                <i className="fas fa-book-journal-whills text-cyber-emerald animate-pulse drop-shadow-[0_0_10px_rgba(16,185,129,0.8)]"></i>
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500 text-glow-green">LIBRO</span> FINANCIERO
             </h2>
             <p className="text-cyber-emerald/80 text-xs font-mono uppercase tracking-[0.3em] font-bold pl-1">
@@ -114,18 +121,18 @@ export default function LedgerView() {
       </header>
 
       {/* --- EXECUTIVE CASH FLOW CHART --- */}
-      <div className="relative group">
+      <div className="relative group h-[400px] md:h-[500px]">
         {/* Living Backlight */}
         <div className="absolute -inset-1 bg-cyber-emerald rounded-[2rem] opacity-20 blur-2xl animate-pulse transition-opacity duration-1000 group-hover:opacity-30"></div>
         
-        {/* SOLID CORE CONTAINER */}
-        <div className="relative bg-[#050a14] border-2 border-cyber-emerald/50 rounded-3xl p-8 shadow-[0_0_50px_rgba(16,185,129,0.15)] overflow-hidden z-10">
+        {/* SOLID CORE CONTAINER - EMERALD PHOSPHORESCENT */}
+        <div className="relative bg-[#050a14] border-2 border-cyber-emerald/50 rounded-3xl p-8 shadow-[0_0_50px_rgba(16,185,129,0.15)] overflow-hidden z-10 h-full flex flex-col">
             
             {/* Background Grid */}
             <div className="absolute inset-0 bg-[linear-gradient(rgba(16,185,129,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.03)_1px,transparent_1px)] bg-[length:30px_30px] pointer-events-none"></div>
 
             {/* Header del Gráfico */}
-            <div className="flex justify-between items-center mb-8 border-b border-white/5 pb-4 relative z-10">
+            <div className="flex justify-between items-center mb-4 border-b border-white/5 pb-4 relative z-10 flex-shrink-0">
                 <div>
                     <h3 className="text-lg font-display font-bold text-white uppercase tracking-wider flex items-center gap-2">
                         <i className="fas fa-chart-line text-cyber-emerald"></i> Análisis de Liquidez 2024
@@ -135,11 +142,11 @@ export default function LedgerView() {
                     </p>
                 </div>
                 <div className="flex gap-4 text-[10px] font-mono">
-                    <div className="flex items-center gap-2 px-3 py-1 rounded border border-cyber-success/30 bg-cyber-success/10">
+                    <div className="flex items-center gap-2 px-3 py-1 rounded border-2 border-cyber-success bg-cyber-success/10 shadow-[0_0_10px_rgba(10,255,96,0.2)]">
                         <div className="w-2 h-2 bg-cyber-success rounded-full shadow-[0_0_5px_lime]"></div>
                         <span className="text-cyber-success font-bold">Superávit</span>
                     </div>
-                    <div className="flex items-center gap-2 px-3 py-1 rounded border border-cyber-danger/30 bg-cyber-danger/10">
+                    <div className="flex items-center gap-2 px-3 py-1 rounded border-2 border-cyber-danger bg-cyber-danger/10 shadow-[0_0_10px_rgba(255,0,60,0.2)]">
                         <div className="w-2 h-2 bg-cyber-danger rounded-full shadow-[0_0_5px_red]"></div>
                         <span className="text-cyber-danger font-bold">Déficit</span>
                     </div>
@@ -147,14 +154,14 @@ export default function LedgerView() {
             </div>
 
             {/* Chart Container */}
-            <div className="relative w-full h-[350px] select-none z-10">
+            <div className="relative w-full flex-1 select-none z-10">
                 {/* Tooltip Overlay - CENTERED TOP */}
                 {hoverIndex !== null && (
                     <div 
                         className="absolute z-30 bg-[#0a0a0f] border-2 border-cyber-emerald p-4 rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.8)] pointer-events-none text-xs font-mono min-w-[220px] animate-in fade-in zoom-in-95 duration-200"
                         style={{ 
                             left: '50%', 
-                            top: '-10px',
+                            top: '0px',
                             transform: 'translateX(-50%)'
                         }}
                     >
@@ -180,7 +187,7 @@ export default function LedgerView() {
                 )}
 
                 {/* SVG Chart */}
-                <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full overflow-visible">
+                <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="w-full h-full overflow-visible">
                     {/* Grid Lines (Background) */}
                     {[0, 0.25, 0.5, 0.75, 1].map((tick) => (
                         <line 
@@ -300,16 +307,16 @@ export default function LedgerView() {
         ))}
       </div>
 
-      {/* Ledger Table - SOLID CORE */}
-      <div className="relative group">
+      {/* Ledger Table - SOLID CORE WITH CYAN BLUE PHOSPHORESCENT BORDER */}
+      <div className="relative group min-h-[400px]">
         <div className="absolute -inset-1 bg-cyber-blue rounded-2xl opacity-10 blur-xl animate-pulse"></div>
         
-        <div className="relative bg-[#050a14] border-2 border-cyber-blue/30 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-xl z-10">
+        <div className="relative bg-[#050a14] border-2 border-cyber-blue shadow-neon-blue rounded-2xl overflow-hidden backdrop-blur-xl z-10">
             
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[600px] custom-scrollbar">
             <table className="w-full text-left border-collapse">
-                <thead>
-                <tr className="bg-[#02040a] border-b-2 border-cyber-blue/20 text-[10px] font-display uppercase tracking-[0.2em] text-cyber-blue">
+                <thead className="sticky top-0 bg-[#02040a] z-20 shadow-xl">
+                <tr className="border-b-2 border-cyber-blue/20 text-[10px] font-display uppercase tracking-[0.2em] text-cyber-blue">
                     <th className="p-6">ID Transacción</th>
                     <th className="p-6">Fecha & Hora</th>
                     <th className="p-6 text-center">Tipo de Evento</th>
@@ -359,7 +366,7 @@ export default function LedgerView() {
             </div>
             
             {/* Footer */}
-            <div className="bg-[#02040a] p-3 border-t border-white/5 flex justify-between items-center text-[9px] font-mono text-slate-600 uppercase tracking-widest">
+            <div className="bg-[#02040a] p-3 border-t border-white/5 flex justify-between items-center text-[9px] font-mono text-slate-600 uppercase tracking-widest sticky bottom-0 z-20">
                 <div>Hash Seguro: SHA-256</div>
                 <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div> Ledger Sincronizado</div>
             </div>

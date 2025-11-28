@@ -1,9 +1,9 @@
-
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AppUser, UserRole } from '../types';
 import { formatCurrency } from '../constants';
 import UserControlModal from './UserControlModal';
 import VendorPaymentModal from './VendorPaymentModal';
+import { useAuthStore } from '../store/useAuthStore';
 
 interface UserManagementPanelProps {
   players: AppUser[];
@@ -14,7 +14,16 @@ interface UserManagementPanelProps {
 }
 
 export default function UserManagementPanel({ players, vendors, onRecharge, onWithdraw, onRefresh }: UserManagementPanelProps) {
+  const currentUser = useAuthStore(s => s.user);
+  
+  // LOGIC: If Vendor, force tab to CLIENTES and lock it.
+  const isVendor = currentUser?.role === UserRole.Vendedor;
   const [activeTab, setActiveTab] = useState<'CLIENTES' | 'VENDEDORES'>('CLIENTES');
+  
+  useEffect(() => {
+      if (isVendor) setActiveTab('CLIENTES');
+  }, [isVendor]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACTIVE' | 'SUSPENDED'>('ALL');
   
@@ -44,7 +53,13 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
         glowHex: 'rgba(188,19,254,0.5)'
       };
 
-  const sourceList = activeTab === 'CLIENTES' ? players : vendors;
+  // SEGREGATION LOGIC: Vendors only see players assigned to them (Mock Logic in edgeApi already handles this, but safety here too)
+  // SuperAdmin sees all.
+  let sourceList = activeTab === 'CLIENTES' ? players : vendors;
+  
+  if (isVendor && activeTab === 'VENDEDORES') {
+      sourceList = []; // Vendor should never see this, but safety net
+  }
   
   // --- ADVANCED SEARCH ENGINE ---
   const filteredUsers = useMemo(() => {
@@ -95,6 +110,7 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
                 </h3>
 
                 {/* TAB CONTROLS - PERMANENT PHOSPHORESCENT BORDERS */}
+                {/* HIDE VENDOR TAB IF CURRENT USER IS VENDOR */}
                 <div className={`flex bg-black/60 p-1.5 rounded-2xl border-2 ${theme.border} shadow-lg transition-all duration-500`}>
                     <button 
                         onClick={() => setActiveTab('CLIENTES')} 
@@ -106,16 +122,18 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
                     >
                         Jugadores
                     </button>
-                    <button 
-                        onClick={() => setActiveTab('VENDEDORES')} 
-                        className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 border-2 border-cyber-purple ${
-                            activeTab === 'VENDEDORES' 
-                            ? 'bg-cyber-purple text-white shadow-[0_0_15px_#bc13fe]' 
-                            : 'bg-transparent text-slate-500 shadow-[0_0_10px_rgba(188,19,254,0.2)] hover:text-cyber-purple hover:shadow-[0_0_15px_#bc13fe]'
-                        }`}
-                    >
-                        Vendedores
-                    </button>
+                    {!isVendor && (
+                        <button 
+                            onClick={() => setActiveTab('VENDEDORES')} 
+                            className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 border-2 border-cyber-purple ${
+                                activeTab === 'VENDEDORES' 
+                                ? 'bg-cyber-purple text-white shadow-[0_0_15px_#bc13fe]' 
+                                : 'bg-transparent text-slate-500 shadow-[0_0_10px_rgba(188,19,254,0.2)] hover:text-cyber-purple hover:shadow-[0_0_15px_#bc13fe]'
+                            }`}
+                        >
+                            Vendedores
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -175,7 +193,7 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
         </div>
 
         {/* TABLE AREA */}
-        <div className="relative overflow-x-auto min-h-[400px] max-h-[600px] custom-scrollbar bg-[#080c14]">
+        <div className="relative overflow-x-auto min-h-[auto] max-h-[600px] custom-scrollbar bg-[#080c14]">
              <table className="w-full text-left border-collapse relative z-10">
                 <thead className="sticky top-0 bg-[#02040a] z-20 shadow-xl">
                     <tr className={`text-[9px] font-mono ${theme.text} uppercase border-b border-white/10 tracking-widest transition-colors duration-500`}>
@@ -198,10 +216,10 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
                         </tr>
                     ) : (
                         filteredUsers.map(u => (
-                            <tr key={u.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group/row">
+                            <tr key={u.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group/row hover:shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]">
                                 <td className="p-4 pl-6">
                                     <div className="flex items-center gap-4">
-                                        <div className={`relative w-10 h-10 rounded-full bg-black flex items-center justify-center border-2 border-white/10 group-hover/row:${theme.border} transition-all duration-300`}>
+                                        <div className={`relative w-10 h-10 rounded-full bg-black flex items-center justify-center border-2 border-white/10 group-hover/row:${theme.border} group-hover/row:${theme.shadow.replace('shadow-', 'shadow-[0_0_15px_')} transition-all duration-300`}>
                                             <span className="font-display font-bold text-white">{u.name.substring(0,2).toUpperCase()}</span>
                                             <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-black rounded-full flex items-center justify-center">
                                                 <div className={`w-1.5 h-1.5 rounded-full ${u.status === 'Active' ? 'bg-green-500 shadow-[0_0_5px_lime]' : 'bg-red-500 shadow-[0_0_5px_red]'}`}></div>
@@ -220,7 +238,7 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
                                 <td className="p-4 text-right">
                                     <div className={`font-bold text-sm ${u.balance_bigint > 0 ? theme.text : 'text-slate-500'} text-glow-sm transition-colors duration-500`}>{formatCurrency(u.balance_bigint)}</div>
                                     {activeTab === 'VENDEDORES' && (
-                                        <button onClick={() => setPayUser(u)} className="mt-1 px-2 py-0.5 bg-cyber-purple/10 border border-cyber-purple/30 rounded text-[8px] font-bold text-cyber-purple hover:bg-cyber-purple hover:text-black transition-all ml-auto">LIQUIDAR</button>
+                                        <button onClick={() => setPayUser(u)} className="mt-1 px-2 py-0.5 bg-cyber-purple/10 border border-cyber-purple/30 rounded text-[8px] font-bold text-cyber-purple hover:bg-cyber-purple hover:text-black transition-all ml-auto shadow-[0_0_10px_rgba(188,19,254,0.1)]">LIQUIDAR</button>
                                     )}
                                 </td>
                                 <td className="p-4 text-center">

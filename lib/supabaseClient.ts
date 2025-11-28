@@ -37,6 +37,39 @@ const MOCK_ADMIN_PROFILE = {
   updated_at: new Date().toISOString()
 };
 
+// --- STATIC TEST USERS FOR VISUAL VERIFICATION ---
+const TEST_VENDOR = {
+    id: 'test-vendor-01',
+    auth_uid: 'auth-vendor-test',
+    email: 'vendedor@test.com',
+    name: 'Vendedor Test (Purple)',
+    cedula: '2-2222-2222',
+    phone: '+506 2222-2222',
+    role: 'Vendedor',
+    balance_bigint: 2500000,
+    currency: 'CRC',
+    status: 'Active',
+    issuer_id: 'app-user-001',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+};
+
+const TEST_PLAYER = {
+    id: 'test-player-01',
+    auth_uid: 'auth-player-test',
+    email: 'jugador@test.com',
+    name: 'Jugador Test (Cyan)',
+    cedula: '3-3333-3333',
+    phone: '+506 3333-3333',
+    role: 'Cliente',
+    balance_bigint: 50000,
+    currency: 'CRC',
+    status: 'Active',
+    issuer_id: 'test-vendor-01', // Assigned to test vendor
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+};
+
 const generateUsers = (role: string, count: number) => {
   return Array.from({ length: count }).map((_, i) => ({
       id: `${role.toLowerCase()}-${i}`,
@@ -55,9 +88,9 @@ const generateUsers = (role: string, count: number) => {
   }));
 };
 
-// Initialize only once
-const MOCK_CLIENTS = generateUsers('Cliente', 50);
-const MOCK_VENDORS = generateUsers('Vendedor', 50);
+// Initialize only once - INJECT TEST USERS FIRST
+const MOCK_CLIENTS = [TEST_PLAYER, ...generateUsers('Cliente', 50)];
+const MOCK_VENDORS = [TEST_VENDOR, ...generateUsers('Vendedor', 50)];
 
 // MOCK RESULTS - INITIALIZE FOR TODAY
 const todayStr = new Date().toISOString().split('T')[0];
@@ -119,60 +152,11 @@ const MOCK_AUDIT = [
             error: 'CROSS_ROLE_VIOLATION_BLOCK' 
         },
         hash: 'sha256-88d4266fd4e6338d13b845fcf289579d209c897823b9217da3e161936f031589'
-    },
-    // 3. High Value Transaction
-    {
-        id: 1003,
-        event_id: 'evt-tx-003',
-        timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-        actor_id: 'app-user-001',
-        actor_role: 'SuperAdmin',
-        actor_name: 'Admin PHRONT',
-        ip_address: '10.0.0.5',
-        device_fingerprint: 'Chrome / MacOS',
-        type: AuditEventType.TX_DEPOSIT,
-        action: 'MANUAL_RECHARGE_EXEC',
-        severity: AuditSeverity.CRITICAL,
-        target_resource: 'cliente-5',
-        metadata: { amount_cents: 5000000, previous_balance: 200, new_balance: 5000200 },
-        hash: 'sha256-04e77bf5f45ed0b6c228f6749c51d73c12594695b5774a255d42344a37874799'
-    },
-    // 4. Routine Bet
-    {
-        id: 1004,
-        event_id: 'evt-bet-004',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-        actor_id: 'cliente-10',
-        actor_role: 'Cliente',
-        actor_name: 'Cliente Unidad 110',
-        ip_address: '186.15.22.101',
-        device_fingerprint: 'Android / Chrome',
-        type: AuditEventType.GAME_BET,
-        action: 'BET_PLACED',
-        severity: AuditSeverity.INFO,
-        target_resource: 'bet-ref-332',
-        metadata: { number: '42', amount: 5000, draw: 'NOCHE' },
-        hash: 'sha256-valid'
-    },
-    // 5. Login Success
-    {
-        id: 1005,
-        event_id: 'evt-log-005',
-        timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-        actor_id: 'app-user-001',
-        actor_role: 'SuperAdmin',
-        actor_name: 'Admin PHRONT',
-        ip_address: '10.0.0.5',
-        device_fingerprint: 'Chrome / MacOS',
-        type: AuditEventType.SESSION_LOGIN,
-        action: 'AUTH_SUCCESS_MFA',
-        severity: AuditSeverity.SUCCESS,
-        target_resource: 'session-token',
-        metadata: { method: 'PASSWORD + PIN' },
-        hash: 'sha256-valid'
     }
 ];
 
+// RISK LIMITS STORE (New Table)
+const MOCK_LIMITS: any[] = [];
 
 if (isDemo) {
   console.warn('⚠️ TIEMPOSPRO v3.1: Ejecutando en MODO DEMO (Sin URL de Supabase válida). Usando mocks en memoria.');
@@ -183,19 +167,41 @@ if (isDemo) {
     auth: {
       getUser: async () => {
         const hasSession = localStorage.getItem(MOCK_STORAGE_KEY);
-        if (hasSession) return { data: { user: MOCK_AUTH_USER }, error: null };
+        if (hasSession) {
+            // Check if stored session is one of our test users
+            const stored = JSON.parse(hasSession);
+            return { data: { user: stored.user }, error: null };
+        }
         return { data: { user: null }, error: null };
       },
       getSession: async () => {
         const hasSession = localStorage.getItem(MOCK_STORAGE_KEY);
-        if (hasSession) return { data: { session: { access_token: 'mock-jwt-token', user: MOCK_AUTH_USER } }, error: null };
+        if (hasSession) {
+            const stored = JSON.parse(hasSession);
+            return { data: { session: stored }, error: null };
+        }
         return { data: { session: null }, error: null };
       },
       signInWithPassword: async ({ email, password }: any) => {
         await new Promise(resolve => setTimeout(resolve, 800));
-        if (password === 'error') return { data: { user: null, session: null }, error: { message: 'Error de Inicio de Sesión Simulado' } };
-        localStorage.setItem(MOCK_STORAGE_KEY, 'true');
-        return { data: { user: MOCK_AUTH_USER, session: { access_token: 'mock-jwt-token', user: MOCK_AUTH_USER } }, error: null };
+        
+        let targetUser = MOCK_AUTH_USER;
+        let targetProfile = MOCK_ADMIN_PROFILE;
+
+        // CHECK FOR TEST USERS
+        if (email === TEST_VENDOR.email) {
+            targetUser = { ...MOCK_AUTH_USER, id: TEST_VENDOR.auth_uid, email: TEST_VENDOR.email };
+            targetProfile = TEST_VENDOR as any;
+        } else if (email === TEST_PLAYER.email) {
+            targetUser = { ...MOCK_AUTH_USER, id: TEST_PLAYER.auth_uid, email: TEST_PLAYER.email };
+            targetProfile = TEST_PLAYER as any;
+        } else if (password === 'error') {
+            return { data: { user: null, session: null }, error: { message: 'Error de Inicio de Sesión Simulado' } };
+        }
+
+        const sessionData = { access_token: 'mock-jwt-token', user: targetUser };
+        localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(sessionData));
+        return { data: { user: targetUser, session: sessionData }, error: null };
       },
       signOut: async () => {
         localStorage.removeItem(MOCK_STORAGE_KEY);
@@ -224,18 +230,20 @@ if (isDemo) {
         limit: (num: number) => chain,
         single: async () => {
             await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // AUTH PROFILE LOOKUP
             if (table === 'app_users' && currentFilterField === 'auth_uid') {
+                if (currentFilterValue === TEST_VENDOR.auth_uid) return { data: TEST_VENDOR, error: null };
+                if (currentFilterValue === TEST_PLAYER.auth_uid) return { data: TEST_PLAYER, error: null };
                 return { data: MOCK_ADMIN_PROFILE, error: null };
             }
-            if (table === 'app_users' && currentFilterField === 'id' && currentFilterValue === MOCK_ADMIN_PROFILE.id) {
-                return { data: MOCK_ADMIN_PROFILE, error: null };
-            }
+
             if (table === 'app_users' && currentFilterField === 'id') {
-                 // Busca en Clientes
+                 if (currentFilterValue === TEST_VENDOR.id) return { data: TEST_VENDOR, error: null };
+                 if (currentFilterValue === TEST_PLAYER.id) return { data: TEST_PLAYER, error: null };
+                 
                  let user = MOCK_CLIENTS.find(c => c.id === currentFilterValue);
                  if (!user) user = MOCK_VENDORS.find(v => v.id === currentFilterValue);
-                 
-                 // Busca Admin
                  if (!user && currentFilterValue === MOCK_ADMIN_PROFILE.id) user = MOCK_ADMIN_PROFILE;
                  
                  if (user) return { data: user, error: null };
@@ -243,9 +251,12 @@ if (isDemo) {
                  return { data: null, error: { message: 'User Not Found' } };
             }
             if (table === 'lottery_results' && currentFilterField === 'drawTime') {
-                // Find result for today and this draw time
                 const res = MOCK_RESULTS.find(r => r.drawTime === currentFilterValue);
                 return { data: res || null, error: null };
+            }
+            if (table === 'limits_per_number' && currentFilterField === 'draw_type') {
+                const limits = MOCK_LIMITS.filter(l => l.draw_type === currentFilterValue);
+                return { data: limits, error: null };
             }
             return { data: null, error: { message: 'No encontrado' } };
         },
@@ -253,21 +264,20 @@ if (isDemo) {
             setTimeout(() => {
                 let data: any[] = [];
                 if (table === 'app_users') {
-                    // FIX: Improved Query Resolver for Uniqueness Check
                     if (currentFilterValue === 'Cliente') {
-                        data = [...MOCK_CLIENTS]; // RETURN COPY TO FORCE RE-RENDER
+                        data = [...MOCK_CLIENTS]; 
                     } else if (currentFilterValue === 'Vendedor') {
-                        data = [...MOCK_VENDORS]; // RETURN COPY TO FORCE RE-RENDER
+                        data = [...MOCK_VENDORS];
                     } else if (currentFilterField === 'auth_uid') {
-                        data = [MOCK_ADMIN_PROFILE];
+                        // Mock Auth Lookup
+                        if (currentFilterValue === TEST_VENDOR.auth_uid) data = [TEST_VENDOR];
+                        else if (currentFilterValue === TEST_PLAYER.auth_uid) data = [TEST_PLAYER];
+                        else data = [MOCK_ADMIN_PROFILE];
                     } else {
-                        // GLOBAL FETCH (Crucial for Cross-Role Validation)
-                        // If no specific role or ID is requested, return EVERYONE
                         data = [...MOCK_CLIENTS, ...MOCK_VENDORS, MOCK_ADMIN_PROFILE];
                     }
                 } else if (table === 'ledger_transactions') {
                     data = [...MOCK_LEDGER];
-                    // Sort ledger
                     data.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
                 } else if (table === 'audit_trail') {
                     data = [...MOCK_AUDIT];
@@ -284,6 +294,12 @@ if (isDemo) {
                     });
                 } else if (table === 'lottery_results') {
                     data = [...MOCK_RESULTS];
+                } else if (table === 'limits_per_number') {
+                    if (currentFilterField === 'draw_type') {
+                        data = MOCK_LIMITS.filter(l => l.draw_type === currentFilterValue);
+                    } else {
+                        data = [...MOCK_LIMITS];
+                    }
                 }
                 callback({ data, error: null });
             }, 300);
@@ -317,14 +333,25 @@ if (isDemo) {
                         return { data: newItem, error: null };
                     }
 
-                    // SUPPORT AUDIT LOG INSERTS
                     if (table === 'audit_trail') {
-                        newItem.id = Date.now(); // Simple numeric ID
+                        newItem.id = Date.now();
                         newItem.event_id = `evt-${Date.now()}-${Math.random().toString(36).substring(7)}`;
                         newItem.timestamp = new Date().toISOString();
                         newItem.hash = `sha256-mock-${Date.now()}`;
                         MOCK_AUDIT.unshift(newItem);
                         return { data: newItem, error: null };
+                    }
+
+                    if (table === 'limits_per_number') {
+                        const existingIdx = MOCK_LIMITS.findIndex(l => l.draw_type === newItem.draw_type && l.number === newItem.number);
+                        if (existingIdx >= 0) {
+                            MOCK_LIMITS[existingIdx] = { ...MOCK_LIMITS[existingIdx], ...newItem };
+                            return { data: MOCK_LIMITS[existingIdx], error: null };
+                        } else {
+                            newItem.id = `limit-${Date.now()}`;
+                            MOCK_LIMITS.push(newItem);
+                            return { data: newItem, error: null };
+                        }
                     }
                     
                     return { data: null, error: { message: 'Insert not mocked for this table' } };
@@ -347,9 +374,12 @@ if (isDemo) {
                     let target = MOCK_CLIENTS.find(u => u[field] === value);
                     if (!target) target = MOCK_VENDORS.find(u => u[field] === value);
                     if (!target && value === MOCK_ADMIN_PROFILE.id) target = MOCK_ADMIN_PROFILE;
+                    
+                    // Check Test Users
+                    if (!target && value === TEST_VENDOR.id) target = TEST_VENDOR;
+                    if (!target && value === TEST_PLAYER.id) target = TEST_PLAYER;
 
                     if (target) {
-                        // Apply updates specifically
                         Object.assign(target, payload);
                         return { data: target, error: null };
                     }
@@ -360,7 +390,6 @@ if (isDemo) {
                     select: () => ({
                         single: executeUpdate
                     }),
-                    // Allow await direct on eq() chain by providing thenable
                     then: (onfulfilled: any) => executeUpdate().then(onfulfilled)
                 };
             }
@@ -370,6 +399,15 @@ if (isDemo) {
                  return {
                      then: (callback: any) => {
                          setTimeout(() => {
+                             if (table === 'limits_per_number') {
+                                 const idx = MOCK_LIMITS.findIndex(l => l[field] === value);
+                                 if (idx !== -1) {
+                                     MOCK_LIMITS.splice(idx, 1);
+                                     callback({ data: true, error: null });
+                                     return;
+                                 }
+                             }
+
                              let idx = MOCK_CLIENTS.findIndex(u => u[field] === value);
                              if (idx !== -1) {
                                  MOCK_CLIENTS.splice(idx, 1);

@@ -25,8 +25,14 @@ export default function VendorPaymentModal({ isOpen, onClose, targetUser, onSucc
   // Live Clock for Automatic Timestamp Logic
   const [systemTime, setSystemTime] = useState(new Date());
 
+  // AGGRESSIVE STATE RESET ON OPEN
   useEffect(() => {
     if (isOpen) {
+        setLoading(false);
+        setSuccess(false);
+        setAmount('');
+        setNotes('');
+        setTxId('');
         const timer = setInterval(() => setSystemTime(new Date()), 1000);
         return () => clearInterval(timer);
     }
@@ -49,35 +55,33 @@ export default function VendorPaymentModal({ isOpen, onClose, targetUser, onSucc
 
         if (res.error) {
             alert(res.error);
+            setLoading(false); // Enable retry if error
         } else {
             setTxId(res.data?.ticket_code || 'TX-000');
             setSuccess(true);
             setTimeout(() => {
                 onSuccess?.();
-                setSuccess(false);
-                setAmount('');
-                setNotes('');
+                // Close is handled by timeout, state reset happens on next open
                 onClose();
             }, 2500);
         }
     } catch (e) {
         alert("Error en el sistema contable.");
-    } finally {
         setLoading(false);
     }
   };
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in duration-300">
-        <div className="relative max-w-md w-full mx-4">
+        <div className="relative max-w-md w-full mx-4 my-8 flex flex-col max-h-[90vh]">
             
             {/* --- LIVING BREATHING AURA (Purple) --- */}
-            <div className="absolute -inset-1 bg-cyber-purple rounded-2xl opacity-20 blur-xl animate-[pulse_4s_ease-in-out_infinite] transition-all duration-1000"></div>
+            <div className="absolute -inset-1 bg-cyber-purple rounded-2xl opacity-20 blur-xl animate-[pulse_4s_ease-in-out_infinite] transition-all duration-1000 fixed-backlight"></div>
 
-            <div className="bg-[#0a0a0f] border border-cyber-purple/40 rounded-2xl overflow-hidden shadow-[0_0_80px_rgba(188,19,254,0.2)] relative z-10 group">
+            <div className="bg-[#0a0a0f] border border-cyber-purple/40 rounded-2xl overflow-hidden shadow-[0_0_80px_rgba(188,19,254,0.2)] relative z-10 group flex flex-col">
                 
-                {/* Header Contable */}
-                <div className="bg-[#1a1a24]/80 p-6 border-b border-cyber-purple/20 flex justify-between items-start relative overflow-hidden">
+                {/* Header Contable - STICKY TOP */}
+                <div className="bg-[#1a1a24]/95 backdrop-blur-xl p-6 border-b border-cyber-purple/20 flex justify-between items-start relative overflow-hidden z-50 shrink-0">
                     {/* Top Scanline */}
                     <div className="absolute top-0 left-0 w-full h-1 bg-cyber-purple/50 shadow-[0_0_10px_#bc13fe] animate-[scanline_3s_linear_infinite]"></div>
                     
@@ -93,16 +97,16 @@ export default function VendorPaymentModal({ isOpen, onClose, targetUser, onSucc
                             </p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors z-10">
+                    <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors z-10 bg-black/20 rounded-full w-8 h-8 flex items-center justify-center">
                         <i className="fas fa-times text-lg"></i>
                     </button>
                 </div>
 
-                {/* Body */}
-                <div className="p-6 space-y-6 bg-gradient-to-b from-[#0a0a0f] to-[#050508]">
+                {/* Body - SCROLLABLE CONTENT */}
+                <div className="p-6 space-y-6 bg-gradient-to-b from-[#0a0a0f] to-[#050508] overflow-y-auto custom-scrollbar">
                     
                     {/* Beneficiary Card */}
-                    <div className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5 relative overflow-hidden group/card">
+                    <div className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/5 relative overflow-hidden group/card flex-shrink-0">
                         <div className="absolute inset-0 bg-cyber-purple/5 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500"></div>
                         <div className="relative w-12 h-12 rounded-lg bg-cyber-purple/10 flex items-center justify-center text-cyber-purple font-bold border border-cyber-purple/30 shadow-neon-purple">
                             {targetUser.name.substring(0,2).toUpperCase()}
@@ -198,7 +202,7 @@ export default function VendorPaymentModal({ isOpen, onClose, targetUser, onSucc
                                 className="relative w-full py-4 mt-2 group/btn overflow-visible rounded-lg"
                             >
                                 <div className="absolute -inset-1 bg-cyber-purple rounded-lg blur opacity-0 group-hover/btn:opacity-50 transition-opacity duration-300 animate-pulse"></div>
-                                <div className="relative bg-cyber-purple text-black font-display font-black uppercase tracking-widest rounded-lg py-4 flex items-center justify-center gap-2 group-hover/btn:bg-white group-hover/btn:text-cyber-purple transition-colors shadow-neon-purple">
+                                <div className="relative bg-cyber-purple text-black font-display font-black uppercase tracking-widest rounded-lg py-4 flex items-center justify-center gap-2 group-hover/btn:bg-white group-hover/btn:text-cyber-purple transition-colors shadow-neon-purple disabled:opacity-50 disabled:cursor-not-allowed">
                                     {loading ? <i className="fas fa-circle-notch fa-spin"></i> : <i className="fas fa-fingerprint"></i>}
                                     {loading ? 'AUTORIZANDO...' : 'EJECUTAR PAGO'}
                                 </div>

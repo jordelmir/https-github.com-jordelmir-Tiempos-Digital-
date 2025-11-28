@@ -168,3 +168,18 @@ export interface DrawResult {
     status: 'OPEN' | 'CLOSED' | 'VERIFYING';
     created_at: string;
 }
+
+// --- RISK MANAGEMENT ---
+export interface RiskLimit {
+    id: string;
+    draw_type: string; // DrawTime
+    number: string; // '00'-'99' or 'ALL'
+    max_amount: number; // Cents
+    created_at: string;
+}
+
+export interface RiskLimitStats {
+    number: string;
+    total_sold: number;
+    risk_percentage: number;
+}
