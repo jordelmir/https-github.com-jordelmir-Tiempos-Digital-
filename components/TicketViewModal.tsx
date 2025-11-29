@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Bet } from '../types';
 import { formatCurrency, formatDate } from '../constants';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
@@ -11,13 +12,13 @@ interface TicketViewModalProps {
 }
 
 export default function TicketViewModal({ isOpen, onClose, bet }: TicketViewModalProps) {
-  useBodyScrollLock(isOpen);
+  useBodyScrollLock(isOpen); // LOCK SCROLL
 
   if (!isOpen || !bet) return null;
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
-        <div className="relative max-w-sm w-full mx-4 perspective-1000">
+  return createPortal(
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="relative max-w-sm w-full mx-4 perspective-1000 max-h-[90vh] overflow-y-auto custom-scrollbar">
             
             {/* CLOSE BUTTON OUTSIDE */}
             <button 
@@ -114,6 +115,7 @@ export default function TicketViewModal({ isOpen, onClose, bet }: TicketViewModa
                 <p className="text-cyber-neon text-xs font-mono animate-pulse">Ticket Digital Verificado por Blockchain</p>
             </div>
         </div>
-    </div>
+    </div>,
+    document.body
   );
 }

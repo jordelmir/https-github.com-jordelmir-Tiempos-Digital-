@@ -5,33 +5,16 @@ import { useMaintenanceStore } from '../store/useMaintenanceStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { SystemSetting, MasterCatalogItem, PurgeTarget } from '../types';
 import { formatCurrency } from '../constants';
-import { useBodyScrollLock } from '../hooks/useBodyScrollLock'; // Import Hook
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
-// ... [SettingRow, CatalogRow, SectorVisualizer, CatalogEditorModal components remain unchanged] ...
-// To save space in XML response, I'm skipping the re-definition of sub-components if they haven't changed logic.
-// Assuming sub-components are defined above here in the actual file.
+// --- SUB-COMPONENTS ---
 
-// --- RE-INSERT SUB-COMPONENTS TO ENSURE FILE INTEGRITY ---
 const SettingRow: React.FC<{ setting: SystemSetting; onSave: (val: any) => void }> = ({ setting, onSave }) => {
     const [val, setVal] = useState<string>(String(setting.value));
     const [isDirty, setIsDirty] = useState(false);
-
     useEffect(() => { setVal(String(setting.value)); }, [setting.value]);
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setVal(e.target.value);
-        setIsDirty(e.target.value !== String(setting.value));
-    };
-
-    const handleSave = () => {
-        let finalVal: any = val;
-        if (!isNaN(Number(val)) && val.trim() !== '') finalVal = Number(val);
-        if (val === 'true') finalVal = true;
-        if (val === 'false') finalVal = false;
-        onSave(finalVal);
-        setIsDirty(false);
-    };
-
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => { setVal(e.target.value); setIsDirty(e.target.value !== String(setting.value)); };
+    const handleSave = () => { let finalVal: any = val; if (!isNaN(Number(val)) && val.trim() !== '') finalVal = Number(val); if (val === 'true') finalVal = true; if (val === 'false') finalVal = false; onSave(finalVal); setIsDirty(false); };
     return (
         <div className="flex items-center justify-between p-4 bg-black/40 border border-white/5 rounded-none border-b-0 last:border-b hover:bg-white/5 transition-all group relative overflow-hidden">
             <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyber-blue opacity-0 group-hover:opacity-100 transition-opacity"></div>
@@ -54,144 +37,87 @@ const CatalogRow: React.FC<{ item: MasterCatalogItem, onEdit: (item: MasterCatal
     <div className="grid grid-cols-12 gap-4 p-3 border-b border-white/5 items-center hover:bg-white/5 transition-colors text-xs font-mono group relative">
         <div className="col-span-2 text-slate-500 group-hover:text-cyber-purple transition-colors font-bold">{item.code}</div>
         <div className="col-span-4 text-white font-bold tracking-wide">{item.label}</div>
-        <div className="col-span-3">
-            <span className="text-[9px] uppercase tracking-wider text-cyber-purple/80 bg-cyber-purple/10 px-2 py-0.5 rounded border border-cyber-purple/20">
-                {item.category}
-            </span>
-        </div>
-        <div className="col-span-2 text-center">
-            <span className={`px-2 py-0.5 rounded text-[8px] uppercase font-bold border ${item.status === 'ACTIVE' ? 'border-green-500/30 text-green-400 bg-green-900/10' : 'border-slate-700 text-slate-500 bg-slate-900/50'}`}>
-                {item.status}
-            </span>
-        </div>
-        <div className="col-span-1 text-right opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={() => onEdit(item)} className="text-slate-400 hover:text-white transition-colors hover:scale-110 transform">
-                <i className="fas fa-edit"></i>
-            </button>
-        </div>
+        <div className="col-span-3"><span className="text-[9px] uppercase tracking-wider text-cyber-purple/80 bg-cyber-purple/10 px-2 py-0.5 rounded border border-cyber-purple/20">{item.category}</span></div>
+        <div className="col-span-2 text-center"><span className={`px-2 py-0.5 rounded text-[8px] uppercase font-bold border ${item.status === 'ACTIVE' ? 'border-green-500/30 text-green-400 bg-green-900/10' : 'border-slate-700 text-slate-500 bg-slate-900/50'}`}>{item.status}</span></div>
+        <div className="col-span-1 text-right opacity-0 group-hover:opacity-100 transition-opacity"><button onClick={() => onEdit(item)} className="text-slate-400 hover:text-white transition-colors hover:scale-110 transform"><i className="fas fa-edit"></i></button></div>
     </div>
 );
 
-const SectorVisualizer: React.FC<{ 
-    isScanning: boolean; 
-    hasAnalysis: boolean; 
-    riskLevel: 'LOW'|'MEDIUM'|'HIGH';
-    isPurging: boolean;
-    isClean: boolean;
-}> = ({ isScanning, hasAnalysis, riskLevel, isPurging, isClean }) => {
-    const cells = 64; 
-    const gridCells = useMemo(() => Array.from({length: cells}), []);
-
+const SectorVisualizer: React.FC<{ isScanning: boolean; hasAnalysis: boolean; riskLevel: 'LOW'|'MEDIUM'|'HIGH'; isPurging: boolean; isClean: boolean; }> = ({ isScanning, hasAnalysis, riskLevel, isPurging, isClean }) => {
+    const cells = 64; const gridCells = useMemo(() => Array.from({length: cells}), []);
     return (
-        <div className="relative w-full aspect-square max-w-[280px] mx-auto bg-black/80 border-2 border-white/10 rounded-2xl p-2 grid grid-cols-8 gap-1 shadow-[inset_0_0_30px_rgba(0,0,0,1)] overflow-hidden group">
-            <div className={`absolute top-0 left-0 w-full h-1 bg-cyber-blue shadow-[0_0_15px_cyan] opacity-0 transition-all duration-[1500ms] linear z-20 ${isScanning ? 'opacity-100 top-[120%]' : '-top-2'}`}></div>
+        <div className="relative w-full aspect-square max-w-[280px] mx-auto bg-[#050508] border-2 border-white/10 rounded-2xl p-2 grid grid-cols-8 gap-1 shadow-[inset_0_0_30px_rgba(0,0,0,1)] overflow-hidden group">
+            {/* Scanner Line */}
+            <div className={`absolute top-0 left-0 w-full h-2 bg-cyber-blue shadow-[0_0_20px_#00f0ff] opacity-0 transition-all duration-[1500ms] linear z-20 ${isScanning ? 'opacity-100 top-[120%]' : '-top-2'}`}></div>
+            
             {gridCells.map((_, i) => {
-                let colorClass = "bg-[#1a1a20]";
+                let colorClass = "bg-[#111116] border border-white/5"; 
                 let animClass = "";
-                let glowClass = "";
-                if (isClean) {
-                    colorClass = "bg-emerald-500/20 border border-emerald-500/30";
+                
+                if (isClean) { 
+                    // NEON EMERALD CLEAN STATE
+                    colorClass = "bg-emerald-500/30 border-emerald-400 shadow-[0_0_5px_rgba(16,185,129,0.3)]"; 
                     if (Math.random() > 0.8) animClass = "animate-pulse"; 
-                } else if (isPurging) {
-                    if (i % 3 === 0 || i % 7 === 0) { colorClass = "bg-white"; animClass = "animate-ping"; }
-                    else if (i % 2 === 0) { colorClass = "bg-red-600"; animClass = "animate-pulse"; }
-                    else { colorClass = "bg-black"; }
-                } else if (hasAnalysis) {
-                    if (riskLevel === 'HIGH' && (i % 2 === 0 || i > 40)) { colorClass = "bg-red-500/80 border border-red-500"; glowClass = "shadow-[0_0_5px_red]"; }
-                    else if (riskLevel === 'MEDIUM' && i % 3 === 0) { colorClass = "bg-yellow-500/80 border border-yellow-500"; }
-                    else if (i % 5 === 0) { colorClass = "bg-slate-700"; }
-                } else if (isScanning) {
-                    colorClass = "bg-cyber-blue/10";
-                    if (Math.random() > 0.7) animClass = "animate-pulse";
                 }
-                return (
-                    <div key={i} className={`rounded-[2px] transition-all duration-500 ${colorClass} ${animClass} ${glowClass}`} style={{ transitionDelay: `${i * 5}ms` }} />
-                )
+                else if (isPurging) { 
+                    // DESTRUCTIVE RED
+                    if (i % 3 === 0) { colorClass = "bg-white border-white shadow-[0_0_15px_white]"; animClass = "animate-ping"; } 
+                    else if (i % 2 === 0) { colorClass = "bg-[#ff003c] border-red-500 shadow-[0_0_10px_#ff003c]"; animClass = "animate-pulse"; } 
+                    else { colorClass = "bg-black border-red-900"; } 
+                }
+                else if (hasAnalysis) { 
+                    if (riskLevel === 'HIGH' && i % 2 === 0) { 
+                        colorClass = "bg-red-600/80 border-red-400 shadow-[inset_0_0_10px_rgba(255,0,0,0.5)]"; 
+                    } else if (riskLevel === 'MEDIUM' && i % 3 === 0) { 
+                        colorClass = "bg-yellow-500/80 border-yellow-300 shadow-[inset_0_0_10px_rgba(234,179,8,0.5)]"; 
+                    } else if (i % 5 === 0) { 
+                        colorClass = "bg-slate-700/50 border-slate-600"; 
+                    } 
+                }
+                else if (isScanning) { 
+                    // ELECTRIC BLUE SCAN
+                    colorClass = "bg-cyber-blue/20 border-cyber-blue/40"; 
+                    if (Math.random() > 0.7) animClass = "animate-pulse"; 
+                }
+                
+                return <div key={i} className={`rounded-[2px] transition-all duration-500 ${colorClass} ${animClass}`} style={{ transitionDelay: `${i * 5}ms` }} />
             })}
+            
             <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
-                {isClean && (
-                    <div className="bg-black/80 backdrop-blur-sm p-4 rounded-full border border-emerald-500 shadow-[0_0_30px_lime] animate-in zoom-in duration-300">
-                        <i className="fas fa-check text-4xl text-emerald-500"></i>
-                    </div>
-                )}
-                {isPurging && (
-                    <i className="fas fa-radiation text-6xl text-red-600 animate-[spin_3s_linear_infinite] drop-shadow-[0_0_20px_red]"></i>
-                )}
+                {isClean && <div className="bg-black/80 backdrop-blur-md p-6 rounded-full border-2 border-emerald-500 shadow-[0_0_50px_#10b981] animate-in zoom-in duration-300"><i className="fas fa-check text-5xl text-emerald-400 drop-shadow-[0_0_10px_#10b981]"></i></div>}
+                {isPurging && <i className="fas fa-biohazard text-7xl text-[#ff003c] animate-[spin_2s_linear_infinite] drop-shadow-[0_0_30px_#ff003c]"></i>}
             </div>
         </div>
     );
 };
 
-const CatalogEditorModal: React.FC<{ 
-    item: Partial<MasterCatalogItem> | null, 
-    isOpen: boolean, 
-    onClose: () => void, 
-    onSave: (item: Partial<MasterCatalogItem>) => void,
-    onDelete: (id: string) => void
-}> = ({ item, isOpen, onClose, onSave, onDelete }) => {
-    const [formData, setFormData] = useState<Partial<MasterCatalogItem>>({
-        code: '', label: '', category: 'GENERAL', status: 'ACTIVE', order_index: 0, metadata: {}
-    });
-    
+const CatalogEditorModal: React.FC<{ item: Partial<MasterCatalogItem> | null, isOpen: boolean, onClose: () => void, onSave: (item: Partial<MasterCatalogItem>) => void, onDelete: (id: string) => void }> = ({ item, isOpen, onClose, onSave, onDelete }) => {
     useBodyScrollLock(isOpen);
-
-    useEffect(() => {
-        if (item) setFormData(item);
-        else setFormData({ code: '', label: '', category: 'GENERAL', status: 'ACTIVE', order_index: 0, metadata: {} });
-    }, [item, isOpen]);
-
+    const [formData, setFormData] = useState<Partial<MasterCatalogItem>>({ code: '', label: '', category: 'GENERAL', status: 'ACTIVE', order_index: 0, metadata: {} });
+    useEffect(() => { if (item) setFormData(item); else setFormData({ code: '', label: '', category: 'GENERAL', status: 'ACTIVE', order_index: 0, metadata: {} }); }, [item, isOpen]);
     if (!isOpen) return null;
-
     return (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="bg-[#0a0a0f] border border-cyber-purple/50 w-full max-w-lg rounded-2xl shadow-[0_0_50px_rgba(188,19,254,0.15)] relative overflow-hidden flex flex-col max-h-[90%]">
                 <div className="p-6 border-b border-white/10 bg-cyber-purple/5 flex justify-between items-center">
-                    <h3 className="text-lg font-display font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                        <i className="fas fa-database text-cyber-purple"></i> 
-                        {item?.id ? 'Editar Registro' : 'Nuevo Registro'}
-                    </h3>
+                    <h3 className="text-lg font-display font-bold text-white uppercase tracking-wider flex items-center gap-2"><i className="fas fa-database text-cyber-purple"></i> {item?.id ? 'Editar Registro' : 'Nuevo Registro'}</h3>
                     <button onClick={onClose} className="text-slate-500 hover:text-white"><i className="fas fa-times"></i></button>
                 </div>
                 <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Código Único</label>
-                            <input value={formData.code} onChange={e => setFormData({...formData, code: e.target.value.toUpperCase()})} className="w-full bg-black border border-white/10 rounded-lg p-3 text-white font-mono text-xs focus:border-cyber-purple focus:outline-none" placeholder="COD-001" />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Categoría</label>
-                            <input value={formData.category} onChange={e => setFormData({...formData, category: e.target.value.toUpperCase()})} className="w-full bg-black border border-white/10 rounded-lg p-3 text-white font-mono text-xs focus:border-cyber-purple focus:outline-none" placeholder="GENERAL" />
-                        </div>
+                        <div className="space-y-1"><label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Código Único</label><input value={formData.code} onChange={e => setFormData({...formData, code: e.target.value.toUpperCase()})} className="w-full bg-black border border-white/10 rounded-lg p-3 text-white font-mono text-xs focus:border-cyber-purple focus:outline-none" placeholder="COD-001" /></div>
+                        <div className="space-y-1"><label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Categoría</label><input value={formData.category} onChange={e => setFormData({...formData, category: e.target.value.toUpperCase()})} className="w-full bg-black border border-white/10 rounded-lg p-3 text-white font-mono text-xs focus:border-cyber-purple focus:outline-none" placeholder="GENERAL" /></div>
                     </div>
-                    <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Etiqueta / Nombre</label>
-                        <input value={formData.label} onChange={e => setFormData({...formData, label: e.target.value})} className="w-full bg-black border border-white/10 rounded-lg p-3 text-white font-mono text-xs focus:border-cyber-purple focus:outline-none" placeholder="Descripción del item..." />
-                    </div>
+                    <div className="space-y-1"><label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Etiqueta / Nombre</label><input value={formData.label} onChange={e => setFormData({...formData, label: e.target.value})} className="w-full bg-black border border-white/10 rounded-lg p-3 text-white font-mono text-xs focus:border-cyber-purple focus:outline-none" placeholder="Descripción del item..." /></div>
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Estado</label>
-                            <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as any})} className="w-full bg-black border border-white/10 rounded-lg p-3 text-white font-mono text-xs focus:border-cyber-purple focus:outline-none">
-                                <option value="ACTIVE">ACTIVO</option>
-                                <option value="ARCHIVED">ARCHIVADO</option>
-                                <option value="DELETED">ELIMINADO</option>
-                            </select>
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Orden</label>
-                            <input type="number" value={formData.order_index} onChange={e => setFormData({...formData, order_index: Number(e.target.value)})} className="w-full bg-black border border-white/10 rounded-lg p-3 text-white font-mono text-xs focus:border-cyber-purple focus:outline-none" />
-                        </div>
+                        <div className="space-y-1"><label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Estado</label><select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as any})} className="w-full bg-black border border-white/10 rounded-lg p-3 text-white font-mono text-xs focus:border-cyber-purple focus:outline-none"><option value="ACTIVE">ACTIVO</option><option value="ARCHIVED">ARCHIVADO</option><option value="DELETED">ELIMINADO</option></select></div>
+                        <div className="space-y-1"><label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Orden</label><input type="number" value={formData.order_index} onChange={e => setFormData({...formData, order_index: Number(e.target.value)})} className="w-full bg-black border border-white/10 rounded-lg p-3 text-white font-mono text-xs focus:border-cyber-purple focus:outline-none" /></div>
                     </div>
-                    <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Metadata (JSON)</label>
-                        <textarea value={JSON.stringify(formData.metadata || {}, null, 2)} onChange={e => { try { const parsed = JSON.parse(e.target.value); setFormData({...formData, metadata: parsed}); } catch(err) {} }} className="w-full bg-black border border-white/10 rounded-lg p-3 text-green-500 font-mono text-[10px] focus:border-cyber-purple focus:outline-none h-24" />
-                    </div>
+                    <div className="space-y-1"><label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Metadata (JSON)</label><textarea value={JSON.stringify(formData.metadata || {}, null, 2)} onChange={e => { try { const parsed = JSON.parse(e.target.value); setFormData({...formData, metadata: parsed}); } catch(err) {} }} className="w-full bg-black border border-white/10 rounded-lg p-3 text-green-500 font-mono text-[10px] focus:border-cyber-purple focus:outline-none h-24" /></div>
                 </div>
                 <div className="p-6 border-t border-white/10 bg-black/40 flex justify-between">
                     {item?.id ? <button onClick={() => onDelete(item.id!)} className="text-red-500 hover:text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2 border border-red-900/30 rounded hover:bg-red-600 hover:border-red-600 transition-all">Eliminar</button> : <div></div>}
-                    <div className="flex gap-3">
-                        <button onClick={onClose} className="px-6 py-2 rounded-lg border border-white/10 text-slate-400 hover:text-white text-xs font-bold uppercase tracking-wide transition-all">Cancelar</button>
-                        <button onClick={() => onSave(formData)} className="px-6 py-2 rounded-lg bg-cyber-purple text-white hover:bg-white hover:text-cyber-purple text-xs font-bold uppercase tracking-wide transition-all shadow-[0_0_15px_rgba(188,19,254,0.3)]">Guardar Cambios</button>
-                    </div>
+                    <div className="flex gap-3"><button onClick={onClose} className="px-6 py-2 rounded-lg border border-white/10 text-slate-400 hover:text-white text-xs font-bold uppercase tracking-wide transition-all">Cancelar</button><button onClick={() => onSave(formData)} className="px-6 py-2 rounded-lg bg-cyber-purple text-white hover:bg-white hover:text-cyber-purple text-xs font-bold uppercase tracking-wide transition-all shadow-[0_0_15px_rgba(188,19,254,0.3)]">Guardar Cambios</button></div>
                 </div>
             </div>
         </div>
@@ -200,12 +126,11 @@ const CatalogEditorModal: React.FC<{
 
 export default function DataPurgeCard({ theme }: { theme?: any }) {
   const [isOpen, setIsOpen] = useState(false);
+  useBodyScrollLock(isOpen); // LOCK BODY SCROLL
+
   const [activeTab, setActiveTab] = useState<'SETTINGS' | 'CATALOGS' | 'BACKUPS' | 'LIFECYCLE' | 'LOGS'>('SETTINGS');
   const user = useAuthStore(s => s.user);
   
-  // LOCK SCROLL
-  useBodyScrollLock(isOpen);
-
   const { 
       settings, fetchSettings, updateSetting, 
       catalogs, fetchCatalogs, upsertCatalogItem, deleteCatalogItem,
@@ -239,81 +164,15 @@ export default function DataPurgeCard({ theme }: { theme?: any }) {
 
   useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [terminalLogs]);
 
-  const startHold = () => {
-      if (!analysis || (analysis.riskLevel === 'HIGH' && confirmPhrase !== 'CONFIRM PURGE')) return;
-      setHolding(true);
-      setHoldProgress(0);
-      holdInterval.current = setInterval(() => {
-          setHoldProgress(prev => {
-              if (prev >= 100) {
-                  clearInterval(holdInterval.current);
-                  handlePurge();
-                  return 100;
-              }
-              return prev + 4;
-          });
-      }, 30);
-  };
-
-  const endHold = () => {
-      setHolding(false);
-      if (holdProgress < 100) setHoldProgress(0);
-      if (holdInterval.current) clearInterval(holdInterval.current);
-  };
-
-  const addLog = (msg: string) => {
-      const time = new Date().toLocaleTimeString('es-CR', { hour12: false }) + '.' + new Date().getMilliseconds();
-      setTerminalLogs(prev => [...prev, `[${time}] ${msg}`]);
-  };
-
-  const handleBackup = () => {
-      if(backupStatus === 'RUNNING') return;
-      setBackupStatus('RUNNING');
-      setBackupProgress(0);
-      setTerminalLogs([]);
-      addLog("INITIATING_SYSTEM_DUMP_PROTOCOL_V4...");
-      addLog("LOCKING_WRITE_ACCESS...");
-      let p = 0;
-      const interval = setInterval(() => {
-          p += Math.random() * 8;
-          if (p > 30 && p < 35) addLog("COMPRESSING_TABLE: APP_USERS...");
-          if (p > 60 && p < 65) addLog("COMPRESSING_TABLE: LEDGER_TRANSACTIONS...");
-          if (p > 90 && p < 95) addLog("VERIFYING_CHECKSUM_SHA256...");
-          if (p >= 100) {
-              p = 100;
-              clearInterval(interval);
-              setBackupStatus('COMPLETED');
-              addLog("BACKUP_SUCCESSFUL: SNAPSHOT_" + Date.now());
-              addLog("RELEASE_WRITE_LOCK: OK");
-          }
-          setBackupProgress(p);
-      }, 200);
-  };
-
-  const handleAnalyze = () => {
-      clearAnalysis();
-      analyzePurge(purgeTarget, purgeRange);
-  };
-
-  const handlePurge = async () => {
-      if (!user) return;
-      await executePurge(purgeTarget, purgeRange, user.id);
-      setPurgeSuccess(true);
-      setTimeout(() => {
-          setPurgeSuccess(false);
-          clearAnalysis();
-          setConfirmPhrase('');
-          setHoldProgress(0);
-      }, 4000);
-  };
+  const startHold = () => { if (!analysis || (analysis.riskLevel === 'HIGH' && confirmPhrase !== 'CONFIRM PURGE')) return; setHolding(true); setHoldProgress(0); holdInterval.current = setInterval(() => { setHoldProgress(prev => { if (prev >= 100) { clearInterval(holdInterval.current); handlePurge(); return 100; } return prev + 4; }); }, 30); };
+  const endHold = () => { setHolding(false); if (holdProgress < 100) setHoldProgress(0); if (holdInterval.current) clearInterval(holdInterval.current); };
+  const addLog = (msg: string) => { const time = new Date().toLocaleTimeString('es-CR', { hour12: false }) + '.' + new Date().getMilliseconds(); setTerminalLogs(prev => [...prev, `[${time}] ${msg}`]); };
+  const handleBackup = () => { if(backupStatus === 'RUNNING') return; setBackupStatus('RUNNING'); setBackupProgress(0); setTerminalLogs([]); addLog("INITIATING_SYSTEM_DUMP_PROTOCOL_V4..."); addLog("LOCKING_WRITE_ACCESS..."); let p = 0; const interval = setInterval(() => { p += Math.random() * 8; if (p > 30 && p < 35) addLog("COMPRESSING_TABLE: APP_USERS..."); if (p > 60 && p < 65) addLog("COMPRESSING_TABLE: LEDGER_TRANSACTIONS..."); if (p > 90 && p < 95) addLog("VERIFYING_CHECKSUM_SHA256..."); if (p >= 100) { p = 100; clearInterval(interval); setBackupStatus('COMPLETED'); addLog("BACKUP_SUCCESSFUL: SNAPSHOT_" + Date.now()); addLog("RELEASE_WRITE_LOCK: OK"); } setBackupProgress(p); }, 200); };
+  const handleAnalyze = () => { clearAnalysis(); analyzePurge(purgeTarget, purgeRange); };
+  const handlePurge = async () => { if (!user) return; await executePurge(purgeTarget, purgeRange, user.id); setPurgeSuccess(true); setTimeout(() => { setPurgeSuccess(false); clearAnalysis(); setConfirmPhrase(''); setHoldProgress(0); }, 4000); };
 
   const uniqueCategories = useMemo<string[]>(() => ['ALL', ...Array.from(new Set(catalogs.map(c => c.category)))], [catalogs]);
-  const filteredCatalogs = useMemo(() => {
-      return catalogs.filter(c => 
-          (catalogCategoryFilter === 'ALL' || c.category === catalogCategoryFilter) &&
-          (c.label.toLowerCase().includes(catalogSearch.toLowerCase()) || c.code.toLowerCase().includes(catalogSearch.toLowerCase()))
-      );
-  }, [catalogs, catalogSearch, catalogCategoryFilter]);
+  const filteredCatalogs = useMemo(() => { return catalogs.filter(c => (catalogCategoryFilter === 'ALL' || c.category === catalogCategoryFilter) && (c.label.toLowerCase().includes(catalogSearch.toLowerCase()) || c.code.toLowerCase().includes(catalogSearch.toLowerCase()))); }, [catalogs, catalogSearch, catalogCategoryFilter]);
 
   if (!isOpen) {
       return (
@@ -461,7 +320,7 @@ export default function DataPurgeCard({ theme }: { theme?: any }) {
                         </div>
                     )}
 
-                    {/* BACKUPS & LOGS TABS remain visually consistent */}
+                    {/* BACKUPS & LOGS TABS */}
                     {activeTab === 'BACKUPS' && (
                         <div className="p-8 h-full flex flex-col justify-center items-center overflow-y-auto custom-scrollbar">
                             <div className="relative w-48 h-48 sm:w-64 sm:h-64 mb-8 shrink-0">

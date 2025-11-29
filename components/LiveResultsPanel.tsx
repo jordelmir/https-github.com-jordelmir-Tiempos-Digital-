@@ -9,7 +9,7 @@ import AdminResultControl from './AdminResultControl';
 export default function LiveResultsPanel() {
     const { user } = useAuthStore();
     const { getResultByDraw, loading, isOffline } = useLiveResults();
-    const [editOpen, setEditOpen] = useState(false);
+    const [editDraw, setEditDraw] = useState<DrawTime | null>(null);
 
     // --- THEME ENGINE FOR ROLE BADGE ---
     const getRoleTheme = () => {
@@ -27,7 +27,11 @@ export default function LiveResultsPanel() {
 
     return (
         <div className="relative w-full group">
-            <AdminResultControl isOpen={editOpen} onClose={() => setEditOpen(false)} />
+            <AdminResultControl 
+                isOpen={!!editDraw} 
+                onClose={() => setEditDraw(null)} 
+                initialDraw={editDraw}
+            />
 
             {/* --- CORE BACKLIGHT (Adaptive to Role) --- */}
             <div className={`absolute -inset-1 rounded-[2.5rem] opacity-30 blur-2xl animate-pulse transition-all duration-1000 group-hover:opacity-50 group-hover:blur-3xl ${
@@ -82,19 +86,19 @@ export default function LiveResultsPanel() {
                             drawTime={DrawTime.MEDIODIA} 
                             result={getResultByDraw(DrawTime.MEDIODIA)} 
                             role={user?.role || UserRole.Cliente}
-                            onEdit={() => setEditOpen(true)}
+                            onEdit={() => setEditDraw(DrawTime.MEDIODIA)}
                         />
                         <WinningNumberCard 
                             drawTime={DrawTime.TARDE} 
                             result={getResultByDraw(DrawTime.TARDE)} 
                             role={user?.role || UserRole.Cliente}
-                            onEdit={() => setEditOpen(true)}
+                            onEdit={() => setEditDraw(DrawTime.TARDE)}
                         />
                         <WinningNumberCard 
                             drawTime={DrawTime.NOCHE} 
                             result={getResultByDraw(DrawTime.NOCHE)} 
                             role={user?.role || UserRole.Cliente}
-                            onEdit={() => setEditOpen(true)}
+                            onEdit={() => setEditDraw(DrawTime.NOCHE)}
                         />
                     </div>
                 )}

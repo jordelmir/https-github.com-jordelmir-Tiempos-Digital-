@@ -3,18 +3,20 @@ import { useEffect } from 'react';
 
 export function useBodyScrollLock(isLocked: boolean) {
   useEffect(() => {
+    // Save original overflow style
     const originalStyle = window.getComputedStyle(document.body).overflow;
     
     if (isLocked) {
+      // Lock scroll
       document.body.style.overflow = 'hidden';
-      // Prevent layout shift by adding padding equivalent to scrollbar width if needed
-      // document.body.style.paddingRight = 'var(--scrollbar-width)'; 
-    } else {
-      document.body.style.overflow = 'unset';
+      // Optional: Add padding-right to prevent layout shift if scrollbar disappears
+      // document.body.style.paddingRight = 'var(--scrollbar-width, 0px)'; 
     }
 
     return () => {
-      document.body.style.overflow = 'unset';
+      // Restore scroll on unmount or unlock
+      document.body.style.overflow = originalStyle;
+      // document.body.style.paddingRight = '0px';
     };
   }, [isLocked]);
 }

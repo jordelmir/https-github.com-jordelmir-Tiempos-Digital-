@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { formatCurrency } from '../constants';
 import AnimatedIconUltra from './ui/AnimatedIconUltra';
 
@@ -39,8 +40,8 @@ export default function WinnerOverlay({ isOpen, onClose, data }: WinnerOverlayPr
   const glowColor = isReventado ? 'rgba(255, 0, 60, 0.6)' : 'rgba(16, 185, 129, 0.6)';
   const secondaryColor = isReventado ? '#fbbf24' : '#00f0ff'; // Amber or Cyan accents
 
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center overflow-hidden">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden">
       
       {/* 1. REALITY DIMMER (Background) */}
       <div 
@@ -216,6 +217,7 @@ export default function WinnerOverlay({ isOpen, onClose, data }: WinnerOverlayPr
             100% { transform: translateX(200%) skewX(-15deg); }
         }
       `}</style>
-    </div>
+    </div>,
+    document.body
   );
 }

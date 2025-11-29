@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -59,7 +60,7 @@
             },
             animation: {
               'spin-slow': 'spin 3s linear infinite',
-              'breathe': 'breathe 6s ease-in-out infinite',
+              'breathe': 'breathe 8s ease-in-out infinite',
               'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
               'scanline': 'scanline 8s linear infinite',
               'float': 'float 20s linear infinite',
@@ -71,8 +72,8 @@
             },
             keyframes: {
               breathe: {
-                '0%, 100%': { opacity: '0.4', transform: 'scale(1)' },
-                '50%': { opacity: '0.8', transform: 'scale(1.1)' },
+                '0%, 100%': { opacity: '0.3', transform: 'translate(-50%, -50%) scale(1)' },
+                '50%': { opacity: '0.6', transform: 'translate(-50%, -50%) scale(1.1)' },
               },
               float: {
                 '0%': { backgroundPosition: '0% 0%' },
@@ -112,7 +113,6 @@
       body {
         background-color: #02040a;
         color: #e2e8f0;
-        /* Removed overflow-x hidden to allow natural sticky behavior if needed, but keeping for horizontal safety */
         overflow-x: hidden; 
         min-height: 100vh;
       }
@@ -126,8 +126,8 @@
         height: 100vh;
         z-index: -1;
         background-color: #02040a;
-        /* Deep Space Gradient Base */
-        background-image: radial-gradient(circle at 50% 50%, #050a14 0%, #000000 100%);
+        /* Deep Space Gradient Base - Living Void */
+        background-image: radial-gradient(circle at 50% 50%, #0a1124 0%, #000000 100%);
         transition: background-image 1s ease-in-out;
       }
 
@@ -139,9 +139,9 @@
         width: 200%;
         height: 200%;
         background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%2300f0ff' stroke-width='0.5' stroke-opacity='0.15'%3E%3Cpath d='M10 10 L30 30 M30 30 L60 10 M60 10 L90 30 M30 30 L10 60 M10 60 L40 80 M40 80 L30 30 M60 10 L80 50 M80 50 L40 80 M80 50 L90 90 M90 90 L40 80'/%3E%3Ccircle cx='10' cy='10' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='30' cy='30' r='1.5' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='60' cy='10' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='90' cy='30' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='10' cy='60' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='40' cy='80' r='1.5' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='80' cy='50' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='90' cy='90' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3C/g%3E%3C/svg%3E");
-        opacity: 0.6;
-        animation: float 60s linear infinite;
-        mask-image: radial-gradient(circle at 50% 50%, black 40%, transparent 80%);
+        opacity: 0.4;
+        animation: float 120s linear infinite;
+        mask-image: radial-gradient(circle at 50% 50%, black 30%, transparent 80%);
       }
 
       /* The Breathing Light (The Soul) */
@@ -150,12 +150,36 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        width: 60vw;
-        height: 60vw;
-        background: radial-gradient(circle, rgba(0, 240, 255, 0.15) 0%, rgba(188, 19, 254, 0.05) 40%, transparent 70%);
+        width: 80vw;
+        height: 80vw;
+        background: radial-gradient(circle, rgba(0, 240, 255, 0.08) 0%, rgba(188, 19, 254, 0.03) 40%, transparent 70%);
         border-radius: 50%;
-        filter: blur(60px);
+        filter: blur(80px);
         animation: breathe 8s ease-in-out infinite;
+      }
+
+      /* Star Dust Particles - Life Element */
+      .star-dust {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: 
+          radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 3px),
+          radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 2px),
+          radial-gradient(white, rgba(255,255,255,.1) 2px, transparent 3px);
+        background-size: 550px 550px, 350px 350px, 250px 250px;
+        background-position: 0 0, 40px 60px, 130px 270px;
+        animation: twinkle 20s linear infinite;
+        opacity: 0.3;
+        z-index: -1;
+      }
+
+      @keyframes twinkle {
+        0% { transform: translateY(0); opacity: 0.3; }
+        50% { opacity: 0.5; }
+        100% { transform: translateY(-100px); opacity: 0.3; }
       }
       
       ::-webkit-scrollbar {
@@ -176,7 +200,6 @@
       .text-glow { text-shadow: 0 0 10px currentColor; }
       .text-glow-sm { text-shadow: 0 0 5px currentColor; }
       
-      /* Efecto cristal ultra */
       .glass-panel {
         background: rgba(5, 10, 20, 0.85);
         backdrop-filter: blur(20px);
@@ -184,7 +207,6 @@
         border: 1px solid rgba(255, 255, 255, 0.05);
       }
 
-      /* Clases de utilidad para transiciones suaves de tema */
       .theme-transition {
         transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform, filter;
         transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
@@ -208,7 +230,6 @@
         filter: drop-shadow(0 0 6px rgba(0,0,0,0.08));
       }
 
-      /* Trail effect for SVG path */
       .icon-trail path {
         stroke-linecap: round;
         stroke-linejoin: round;
@@ -220,7 +241,6 @@
         stroke-dashoffset: 0;
       }
 
-      /* Fallback for FontAwesome Icons inside Animated Container */
       .icon-ultra i {
         display: inline-block;
       }
@@ -253,6 +273,7 @@
 </head>
   <body>
     <div class="neural-bg">
+      <div class="star-dust"></div>
       <div class="neural-web"></div>
       <div class="neural-breath"></div>
     </div>
