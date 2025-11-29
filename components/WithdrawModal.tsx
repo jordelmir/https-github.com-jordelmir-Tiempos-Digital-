@@ -4,6 +4,7 @@ import { api } from '../services/edgeApi';
 import { AppUser, UserRole } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
 import { formatCurrency } from '../constants';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 interface WithdrawModalProps {
   isOpen: boolean;
@@ -15,6 +16,8 @@ interface WithdrawModalProps {
 type WithdrawalStatus = 'IDLE' | 'SCANNING' | 'PROCESSING' | 'PRINTING' | 'CUTTING' | 'DROPPING' | 'FINISHED' | 'ERROR' | 'INSUFFICIENT_FUNDS';
 
 export default function WithdrawModal({ isOpen, onClose, targetUser, onSuccess }: WithdrawModalProps) {
+  useBodyScrollLock(isOpen);
+
   const currentUser = useAuthStore(s => s.user);
   const [amount, setAmount] = useState<number | ''>('');
   const [loading, setLoading] = useState(false);

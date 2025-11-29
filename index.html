@@ -55,6 +55,7 @@
               'neon-abyss': '0 0 15px #1e3a8a, 0 0 60px rgba(30, 58, 138, 0.6), inset 0 0 30px rgba(30, 58, 138, 0.3)',
               
               'panel-glow': '0 0 50px rgba(0, 0, 0, 0.9), inset 0 0 30px rgba(255,255,255,0.02)',
+              'futuristic': '0 6px 18px rgba(99,102,241,0.18)',
             },
             animation: {
               'spin-slow': 'spin 3s linear infinite',
@@ -64,6 +65,9 @@
               'float': 'float 20s linear infinite',
               'network-pulse': 'networkPulse 4s ease-in-out infinite',
               'plasma-pulse': 'plasma 4s ease-in-out infinite',
+              'infiniteSpin': 'rotate360 2s linear infinite',
+              'pulseIcon': 'pulseIcon 2.2s ease-in-out infinite',
+              'hover3d': 'hover3d 0.7s ease-in-out',
             },
             keyframes: {
               breathe: {
@@ -85,7 +89,20 @@
               plasma: {
                 '0%, 100%': { opacity: '0.5', transform: 'scale(0.98)', filter: 'blur(20px)' },
                 '50%': { opacity: '0.8', transform: 'scale(1.01)', filter: 'blur(30px)' }
-              }
+              },
+              rotate360: { 
+                '0%': { transform: 'rotate(0deg)' }, 
+                '100%': { transform: 'rotate(360deg)' } 
+              },
+              pulseIcon: { 
+                '0%,100%': { transform: 'scale(1)' }, 
+                '50%': { transform: 'scale(1.12)' } 
+              },
+              hover3d: { 
+                '0%': { transform: 'perspective(600px) rotateX(0) rotateY(0) translateY(0)' }, 
+                '50%': { transform: 'perspective(600px) rotateX(6deg) rotateY(6deg) translateY(-4px)' }, 
+                '100%': { transform: 'perspective(600px) rotateX(0) rotateY(0) translateY(0)' } 
+              },
             }
           }
         }
@@ -173,23 +190,63 @@
         transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
         transition-duration: 700ms;
       }
+
+      /* --- ICON ULTRA STYLES --- */
+      .icon-ultra {
+        display: inline-block;
+        transform-origin: center center;
+        will-change: transform, filter, opacity;
+      }
+
+      .icon-glow-neon {
+        filter: drop-shadow(0 0 8px rgba(99,102,241,0.8)) drop-shadow(0 0 18px rgba(99,102,241,0.25));
+      }
+      .icon-glow-cyber {
+        filter: drop-shadow(0 0 12px rgba(0,255,200,0.85));
+      }
+      .icon-glow-minimal {
+        filter: drop-shadow(0 0 6px rgba(0,0,0,0.08));
+      }
+
+      /* Trail effect for SVG path */
+      .icon-trail path {
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        stroke-dasharray: 1000;
+        stroke-dashoffset: 1000;
+        transition: stroke-dashoffset 1.6s linear, opacity 0.4s;
+      }
+      .icon-trail.trail-on path {
+        stroke-dashoffset: 0;
+      }
+
+      /* Fallback for FontAwesome Icons inside Animated Container */
+      .icon-ultra i {
+        display: inline-block;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .icon-ultra { transition: none !important; animation: none !important; }
+        .icon-trail path { transition: none !important; }
+      }
     </style>
     <!-- CRITICAL: Entry Point for Vite App -->
     <script type="module" src="/index.tsx"></script>
-  <script type="importmap">
+<script type="importmap">
 {
   "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "zustand/": "https://aistudiocdn.com/zustand@^5.0.8/",
-    "zustand": "https://aistudiocdn.com/zustand@^5.0.8",
-    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
-    "vite": "https://aistudiocdn.com/vite@^7.2.4",
     "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.86.0",
-    "std/": "https://aistudiocdn.com/std@^0.1.40/"
+    "zustand": "https://aistudiocdn.com/zustand@^5.0.8",
+    "zustand/": "https://aistudiocdn.com/zustand@^5.0.8/",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.24",
+    "react-intersection-observer": "https://aistudiocdn.com/react-intersection-observer@^10.0.0",
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0"
   }
 }
 </script>

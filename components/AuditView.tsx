@@ -13,6 +13,8 @@ export default function AuditView() {
 
   useEffect(() => {
     fetchLogs();
+    const interval = setInterval(fetchLogs, 5000); // Live refresh
+    return () => clearInterval(interval);
   }, []);
 
   async function fetchLogs() {
@@ -32,9 +34,9 @@ export default function AuditView() {
   const filteredLogs = useMemo(() => {
       return logs.filter(log => {
           const matchesSearch = 
-            log.actor_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            log.event_id?.toLowerCase().includes(searchTerm.toLowerCase());
+            (log.actor_name && log.actor_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (log.action && log.action.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (log.event_id && log.event_id.toLowerCase().includes(searchTerm.toLowerCase()));
           
           const matchesFilter = filterSeverity === 'ALL' || log.severity === filterSeverity;
           
@@ -47,12 +49,60 @@ export default function AuditView() {
           alert("No hay registros para exportar.");
           return;
       }
-      const dataStr = JSON.stringify(filteredLogs, null, 2);
-      const blob = new Blob([dataStr], { type: "application/json" });
+
+      // Define CSV Headers
+      const headers = [
+          'ID_EVENTO',
+          'FECHA',
+          'HORA',
+          'ACTOR',
+          'ROL',
+          'IP_ORIGEN',
+          'ACCIÓN',
+          'TIPO',
+          'SEVERIDAD',
+          'OBJETIVO',
+          'METADATA (JSON)'
+      ];
+
+      // Map Rows
+      const csvContent = [
+          headers.join(','),
+          ...filteredLogs.map(log => {
+              const dateObj = new Date(log.timestamp);
+              const dateStr = dateObj.toLocaleDateString('es-CR');
+              const timeStr = dateObj.toLocaleTimeString('es-CR');
+              
+              // Escape quotes for CSV format (replace " with "")
+              const safeMeta = JSON.stringify(log.metadata || {}).replace(/"/g, '""');
+              const safeAction = (log.action || '').replace(/"/g, '""');
+              const safeActor = (log.actor_name || 'System').replace(/"/g, '""');
+
+              return [
+                  `"${log.event_id || log.id}"`,
+                  `"${dateStr}"`,
+                  `"${timeStr}"`,
+                  `"${safeActor}"`,
+                  `"${log.actor_role}"`,
+                  `"${log.ip_address}"`,
+                  `"${safeAction}"`,
+                  `"${log.type}"`,
+                  `"${log.severity}"`,
+                  `"${log.target_resource || '-'}"`,
+                  `"${safeMeta}"`
+              ].join(',');
+          })
+      ].join('\n');
+
+      // Create Blob with BOM for Excel UTF-8 compatibility
+      const blob = new Blob(["\ufeff"+csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
+      
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       link.href = url;
-      link.download = `PHRONT_AUDIT_LOG_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+      link.download = `PHRONT_AUDITORIA_${timestamp}.csv`;
+      
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -120,7 +170,7 @@ export default function AuditView() {
                 onClick={exportLogs}
                 className="bg-[#050a14] border-2 border-cyber-purple/50 hover:border-cyber-purple text-cyber-purple hover:text-white px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(188,19,254,0.1)] hover:shadow-neon-purple group"
             >
-                <i className="fas fa-download mr-2 group-hover:animate-bounce"></i> Exportar
+                <i className="fas fa-file-csv mr-2 group-hover:animate-bounce"></i> Exportar CSV
             </button>
             <button 
                 onClick={fetchLogs} 
@@ -179,7 +229,7 @@ export default function AuditView() {
           <div className="absolute left-4 md:left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-cyber-purple via-cyber-blue to-transparent shadow-[0_0_10px_#bc13fe]"></div>
 
           <div className="space-y-6">
-              {loading ? (
+              {loading && logs.length === 0 ? (
                   <div className="p-12 text-center text-cyber-purple animate-pulse font-mono flex flex-col items-center justify-center gap-4 border-2 border-dashed border-cyber-purple/30 rounded-2xl bg-black/40">
                       <i className="fas fa-circle-notch fa-spin text-3xl"></i>
                       <span className="tracking-[0.2em] font-bold">DESCIFRANDO LOGS...</span>
@@ -219,7 +269,7 @@ export default function AuditView() {
                                               {log.type}
                                           </div>
                                           <div className={`font-bold font-display text-sm md:text-lg text-white group-hover:text-glow transition-all uppercase tracking-wide ${log.severity === AuditSeverity.CRITICAL ? 'text-red-400' : ''}`}>
-                                              {log.action.replace(/_/g, ' ')}
+                                              {log.action?.replace(/_/g, ' ')}
                                           </div>
                                       </div>
                                   </div>

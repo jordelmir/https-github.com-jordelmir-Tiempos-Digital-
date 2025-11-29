@@ -85,7 +85,7 @@ export default function RiskLimitManager() {
       }
       // Priority 2: Server Data
       return normalizeLimit(serverGlobalLimitRaw);
-  }, [serverGlobalLimitRaw, limits]); // removed pendingWrites.current dependency (ref) - managed by forced re-render on write
+  }, [serverGlobalLimitRaw, limits]);
 
   useEffect(() => {
       if (effectiveGlobalLimit !== Infinity && effectiveGlobalLimit !== 0) {
@@ -143,7 +143,7 @@ export default function RiskLimitManager() {
               trend
           };
       });
-  }, [limits, stats, isBlindajeActive, effectiveGlobalLimit, autoShieldThreshold]); // Added autoShieldThreshold dependency
+  }, [limits, stats, isBlindajeActive, effectiveGlobalLimit, autoShieldThreshold]); 
 
   // --- DATA FETCHING ---
   const fetchData = async () => {
@@ -217,7 +217,6 @@ export default function RiskLimitManager() {
           setSaveStatus('SUCCESS');
       } catch(e) {
           console.error("Save failed", e);
-          // If fail, maybe keep lock or warn user? For now, keep lock to prevent UI reversion.
       }
       
       setTimeout(() => setSaveStatus('IDLE'), 1500);
@@ -320,26 +319,26 @@ export default function RiskLimitManager() {
             <div className="xl:w-3/5 flex flex-col border-r border-white/5 relative z-10">
                 
                 {/* 1. HUD HEADER */}
-                <div className="p-6 border-b border-white/5 bg-[#05070a]/95 backdrop-blur-md relative overflow-hidden transition-colors duration-500">
+                <div className="p-4 md:p-6 border-b border-white/5 bg-[#05070a]/95 backdrop-blur-md relative overflow-hidden transition-colors duration-500">
                     <div className={`absolute top-0 left-0 w-full h-[2px] ${theme.bg} shadow-[0_0_20px_currentColor] z-20`}></div>
                     <div className={`absolute top-0 left-0 w-full h-16 bg-gradient-to-b from-${theme.name === 'solar' ? 'orange' : theme.name === 'vapor' ? 'purple' : 'blue'}-500/10 to-transparent transition-all duration-700`}></div>
 
-                    <div className="flex justify-between items-start mb-6 relative z-10">
+                    <div className="flex flex-col md:flex-row justify-between items-start mb-6 relative z-10 gap-4">
                         <div>
                             <div className="flex items-center gap-2 mb-2">
                                 <div className={`w-2 h-2 rounded-full ${theme.bg} shadow-[0_0_10px_currentColor] animate-ping`}></div>
                                 <span className="text-[9px] font-mono text-slate-400 uppercase tracking-[0.3em] font-bold">Defensa Activa</span>
                             </div>
-                            <h2 className="text-3xl font-display font-black text-white uppercase tracking-tighter flex items-center gap-3 drop-shadow-md">
+                            <h2 className="text-2xl md:text-3xl font-display font-black text-white uppercase tracking-tighter flex items-center gap-3 drop-shadow-md">
                                 Matriz <span className={`text-transparent bg-clip-text bg-gradient-to-r ${theme.gradient} filter drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]`}>Riesgo</span>
                             </h2>
                         </div>
                         
                         <div className="text-right">
                             <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-1">Límite de Contención</div>
-                            <div className={`text-3xl font-mono font-black ${effectiveGlobalLimit === Infinity ? 'text-cyber-neon' : 'text-white'} drop-shadow-[0_0_15px_rgba(255,255,255,0.4)] transition-all duration-500`}>
+                            <div className={`text-2xl md:text-3xl font-mono font-black ${effectiveGlobalLimit === Infinity ? 'text-cyber-neon' : 'text-white'} drop-shadow-[0_0_15px_rgba(255,255,255,0.4)] transition-all duration-500`}>
                                 {effectiveGlobalLimit === Infinity ? (
-                                    <span className="flex items-center justify-end gap-2 animate-pulse text-cyber-neon"><i className="fas fa-infinity text-2xl"></i> LIBRE</span>
+                                    <span className="flex items-center justify-end gap-2 animate-pulse text-cyber-neon"><i className="fas fa-infinity text-xl md:text-2xl"></i> LIBRE</span>
                                 ) : formatCurrency(effectiveGlobalLimit)}
                             </div>
                             <div className="text-[10px] font-mono text-slate-500 mt-1 flex items-center justify-end gap-1">
@@ -349,8 +348,8 @@ export default function RiskLimitManager() {
                     </div>
 
                     {/* CONTROLS BRIDGE */}
-                    <div className="flex flex-col md:flex-row justify-between items-end gap-4">
-                        <div className="flex gap-3">
+                    <div className="flex flex-col md:flex-row justify-between items-end gap-4 overflow-x-auto pb-2">
+                        <div className="flex gap-2 md:gap-3">
                             {Object.values(DrawTime).map(d => {
                                 const isActive = activeDraw === d;
                                 return (
@@ -358,7 +357,7 @@ export default function RiskLimitManager() {
                                         key={d}
                                         onClick={() => handleDrawChange(d)}
                                         disabled={isSwitching}
-                                        className={`relative px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 overflow-hidden group border
+                                        className={`relative px-4 md:px-6 py-2 md:py-2.5 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-wider transition-all duration-300 overflow-hidden group border whitespace-nowrap
                                             ${isActive 
                                                 ? `text-white ${theme.border} ${theme.bg.replace('bg-', 'bg-opacity-20 ')} shadow-[0_0_20px_rgba(0,0,0,0.5)]` 
                                                 : 'text-slate-500 border-white/5 bg-white/5 hover:text-white hover:border-white/20'
@@ -402,12 +401,13 @@ export default function RiskLimitManager() {
                     </div>
                 </div>
 
-                {/* 2. THE GRID (LIVING MATRIX) */}
-                <div className="flex-1 p-6 relative bg-[#020305] overflow-hidden group/grid custom-scrollbar overflow-y-auto">
+                {/* 2. THE GRID (LIVING MATRIX) - ADAPTIVE */}
+                <div className="flex-1 p-4 md:p-6 relative bg-[#020305] overflow-hidden group/grid custom-scrollbar overflow-y-auto">
                     <div className={`absolute inset-0 bg-gradient-to-b from-transparent via-${theme.name === 'solar' ? 'orange' : theme.name === 'vapor' ? 'purple' : 'blue'}-500/10 to-transparent w-full h-[30%] pointer-events-none z-0 animate-[scan_6s_linear_infinite] opacity-30`}></div>
                     
                     <div className={`transition-all duration-500 ease-out transform ${isSwitching ? 'scale-95 opacity-0 blur-sm' : 'scale-100 opacity-100 blur-0'}`}>
-                        <div className="grid grid-cols-10 gap-1.5 h-full content-start relative z-10">
+                        {/* ADAPTIVE GRID: 5 cols on mobile, 10 cols on sm+ */}
+                        <div className="grid grid-cols-5 sm:grid-cols-10 gap-1 sm:gap-1.5 h-full content-start relative z-10">
                             {gridData.map((cell, idx) => {
                                 const isSelected = cell.number === selectedNumber;
                                 const isHighRisk = cell.percent >= 90;
@@ -459,17 +459,17 @@ export default function RiskLimitManager() {
                                         `}
                                         style={{ transitionDelay: `${idx * 5}ms` }}
                                     >
-                                        <span className={`text-xs md:text-sm font-mono z-10 transition-colors ${textClass} ${isHighRisk || isLocked ? 'animate-pulse' : ''}`}>
-                                            {isLocked ? <i className="fas fa-lock text-[10px] mb-1"></i> : cell.number}
+                                        <span className={`text-[10px] sm:text-xs md:text-sm font-mono z-10 transition-colors ${textClass} ${isHighRisk || isLocked ? 'animate-pulse' : ''}`}>
+                                            {isLocked ? <i className="fas fa-lock text-[8px] sm:text-[10px] mb-1"></i> : cell.number}
                                         </span>
-                                        {isLocked && <span className="text-[8px] text-red-500 font-bold">BLOCK</span>}
+                                        {isLocked && <span className="text-[6px] sm:text-[8px] text-red-500 font-bold">BLOCK</span>}
 
                                         {cell.percent > 0 && !isLocked && (
                                             <div className={`absolute inset-0 bg-white opacity-0 animate-[pulse_3s_ease-in-out_infinite]`} style={{ animationDelay: pulseDelay, animationDuration: isHighRisk ? '1s' : '3s' }}></div>
                                         )}
 
                                         {cell.isManual && !isLocked && (
-                                            <div className="absolute top-0.5 right-0.5 w-1.5 h-1.5 bg-cyan-400 rounded-full shadow-[0_0_5px_cyan] animate-[ping_3s_infinite]"></div>
+                                            <div className="absolute top-0.5 right-0.5 w-1 h-1 sm:w-1.5 sm:h-1.5 bg-cyan-400 rounded-full shadow-[0_0_5px_cyan] animate-[ping_3s_infinite]"></div>
                                         )}
 
                                         {cell.percent > 0 && !isLocked && (
@@ -503,12 +503,12 @@ export default function RiskLimitManager() {
             {/* ====================================================================================
                 RIGHT PANEL: DUAL MODE
                ==================================================================================== */}
-            <div className="xl:w-2/5 bg-[#05070a] flex flex-col relative overflow-hidden transition-all duration-500 z-10">
+            <div className="xl:w-2/5 bg-[#05070a] flex flex-col relative overflow-hidden transition-all duration-500 z-10 border-t xl:border-t-0 xl:border-l border-white/5">
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[length:30px_30px] pointer-events-none"></div>
 
                 {selectedNumber ? (
                     // --- MODE A: NUMBER INSPECTOR ---
-                    <div className="flex-1 flex flex-col p-8 relative z-10 animate-in slide-in-from-right-8 duration-300">
+                    <div className="flex-1 flex flex-col p-6 md:p-8 relative z-10 animate-in slide-in-from-right-8 duration-300">
                         
                         {/* BLOCK CONFIRMATION OVERLAY */}
                         {blockSuccess && (
@@ -520,7 +520,6 @@ export default function RiskLimitManager() {
                                     </div>
                                     <h3 className="text-3xl font-black text-white uppercase tracking-tighter mb-2">VECTOR {selectedNumber}</h3>
                                     <div className="text-red-500 font-display font-bold text-xl uppercase tracking-[0.5em] animate-pulse">LOCKED DOWN</div>
-                                    <p className="text-[9px] font-mono text-white mt-4 bg-black/50 py-1 rounded border border-red-500/30">PROTOCOL EXECUTED SUCCESSFULLY</p>
                                 </div>
                             </div>
                         )}
@@ -535,7 +534,6 @@ export default function RiskLimitManager() {
                                     </div>
                                     <h3 className="text-3xl font-black text-white uppercase tracking-tighter mb-2">VECTOR {selectedNumber}</h3>
                                     <div className="text-cyan-400 font-display font-bold text-xl uppercase tracking-[0.5em] animate-pulse">RESTORED</div>
-                                    <p className="text-[9px] font-mono text-white mt-4 bg-black/50 py-1 rounded border border-cyan-500/30">ACCESS PROTOCOL RESET</p>
                                 </div>
                             </div>
                         )}
@@ -547,13 +545,13 @@ export default function RiskLimitManager() {
                             <div className={`absolute -inset-4 ${theme.bg} opacity-20 blur-3xl rounded-full animate-pulse`}></div>
                             <div>
                                 <div className="text-[10px] text-slate-500 uppercase tracking-widest font-mono mb-1">Análisis de Vector</div>
-                                <div className="text-8xl font-mono font-black text-white tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+                                <div className="text-6xl md:text-8xl font-mono font-black text-white tracking-tighter drop-shadow-[0_0_20px_rgba(255,255,255,0.3)]">
                                     {selectedNumber}
                                 </div>
                             </div>
                             <div className="text-right self-center">
-                                <div className={`text-6xl font-mono font-bold ${activeCell?.percent && activeCell.percent >= 90 ? 'text-red-500 drop-shadow-[0_0_15px_red]' : 'text-white'}`}>
-                                    {activeCell?.percent.toFixed(0)}<span className="text-2xl opacity-50">%</span>
+                                <div className={`text-4xl md:text-6xl font-mono font-bold ${activeCell?.percent && activeCell.percent >= 90 ? 'text-red-500 drop-shadow-[0_0_15px_red]' : 'text-white'}`}>
+                                    {activeCell?.percent.toFixed(0)}<span className="text-xl md:text-2xl opacity-50">%</span>
                                 </div>
                                 <div className="text-[9px] text-slate-500 uppercase tracking-widest mt-1">Saturación</div>
                             </div>
@@ -562,21 +560,21 @@ export default function RiskLimitManager() {
                         {activeCell && (
                             <>
                                 <div className="grid grid-cols-2 gap-4 mb-8">
-                                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-colors relative overflow-hidden group/card">
+                                    <div className="bg-white/5 border border-white/5 rounded-2xl p-4 md:p-5 hover:border-white/10 transition-colors relative overflow-hidden group/card">
                                         <div className="text-[9px] text-slate-400 uppercase mb-2 font-bold tracking-wider">Volumen (CRC)</div>
-                                        <div className="text-2xl font-mono font-bold text-white">{formatCurrency(activeCell.amount)}</div>
+                                        <div className="text-lg md:text-2xl font-mono font-bold text-white">{formatCurrency(activeCell.amount)}</div>
                                         <div className="w-full bg-black h-1.5 mt-3 rounded-full overflow-hidden border border-white/10">
                                             <div className={`h-full ${theme.bg} shadow-[0_0_10px_currentColor]`} style={{ width: `${activeCell.percent}%` }}></div>
                                         </div>
                                     </div>
-                                    <div className="bg-white/5 border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-colors relative overflow-hidden group/card">
+                                    <div className="bg-white/5 border border-white/5 rounded-2xl p-4 md:p-5 hover:border-white/10 transition-colors relative overflow-hidden group/card">
                                         <div className="text-[9px] text-slate-400 uppercase mb-2 font-bold tracking-wider">Límite Actual</div>
-                                        <div className="text-2xl font-mono font-bold text-slate-300">
+                                        <div className="text-lg md:text-2xl font-mono font-bold text-slate-300">
                                             {activeCell.limit === Infinity ? '∞' : formatCurrency(activeCell.limit)}
                                         </div>
                                         <div className={`text-[9px] mt-2 flex items-center gap-1 font-bold ${activeCell.isManual ? 'text-cyan-400' : 'text-slate-500'}`}>
                                             <i className={`fas ${activeCell.isManual ? 'fa-lock' : 'fa-link'}`}></i>
-                                            {activeCell.isManual ? 'MANUAL OVERRIDE' : 'HERENCIA GLOBAL'}
+                                            {activeCell.isManual ? 'MANUAL' : 'GLOBAL'}
                                         </div>
                                     </div>
                                 </div>
@@ -590,7 +588,7 @@ export default function RiskLimitManager() {
                                                 type="number"
                                                 value={manualInputValue}
                                                 onChange={e => setManualInputValue(e.target.value)}
-                                                className="relative bg-black border border-slate-700 rounded-xl px-4 py-4 text-white font-mono text-xl w-full focus:border-white focus:outline-none transition-colors z-10 shadow-inner"
+                                                className="relative bg-black border border-slate-700 rounded-xl px-4 py-4 text-white font-mono text-lg md:text-xl w-full focus:border-white focus:outline-none transition-colors z-10 shadow-inner"
                                                 placeholder="Nuevo Límite"
                                             />
                                         </div>
@@ -636,7 +634,7 @@ export default function RiskLimitManager() {
                                         )}
 
                                         <button onClick={() => handleResetSelected(true)} className="py-4 bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10 hover:text-white rounded-xl text-[10px] font-bold uppercase transition-all flex items-center justify-center gap-2">
-                                            <i className="fas fa-undo text-lg"></i> RESET A GLOBAL
+                                            <i className="fas fa-undo text-lg"></i> RESET
                                         </button>
                                     </div>
                                 </div>
@@ -646,7 +644,7 @@ export default function RiskLimitManager() {
                 ) : (
                     // --- MODE B: GLOBAL CONTROL CENTER ---
                     <div className="flex-1 flex flex-col relative z-10 animate-in fade-in zoom-in duration-500 bg-[#05070a]">
-                        <div className="p-8 border-b border-white/5 bg-black/20">
+                        <div className="p-6 md:p-8 border-b border-white/5 bg-black/20">
                             <h2 className="text-2xl font-display font-black text-white uppercase tracking-widest flex items-center gap-3">
                                 <div className={`w-10 h-10 rounded-full border-2 ${theme.border} flex items-center justify-center animate-spin-slow shadow-[0_0_20px_currentColor]`}>
                                     <i className={`fas fa-atom ${theme.text} text-xl`}></i>
@@ -667,9 +665,9 @@ export default function RiskLimitManager() {
                                 <div className={`text-[10px] font-bold uppercase tracking-[0.4em] mb-4 ${effectiveGlobalLimit === Infinity ? 'text-cyber-neon' : 'text-red-500'}`}>
                                     {effectiveGlobalLimit === Infinity ? 'ESTADO: FLUJO LIBRE' : 'ESTADO: CONTENCIÓN'}
                                 </div>
-                                <div className={`text-6xl font-mono font-black ${effectiveGlobalLimit === Infinity ? 'text-white' : 'text-red-500 drop-shadow-[0_0_30px_red]'}`}>
+                                <div className={`text-4xl md:text-6xl font-mono font-black ${effectiveGlobalLimit === Infinity ? 'text-white' : 'text-red-500 drop-shadow-[0_0_30px_red]'}`}>
                                     {effectiveGlobalLimit === Infinity ? (
-                                        <i className="fas fa-infinity text-7xl"></i>
+                                        <i className="fas fa-infinity text-5xl md:text-7xl"></i>
                                     ) : (
                                         formatCurrency(effectiveGlobalLimit).replace('CRC', '').trim()
                                     )}
@@ -680,7 +678,7 @@ export default function RiskLimitManager() {
                             </div>
                         </div>
 
-                        <div className="p-8 border-t border-white/10 bg-[#020305]">
+                        <div className="p-6 md:p-8 border-t border-white/10 bg-[#020305]">
                             <div className="relative bg-black border border-white/10 rounded-2xl p-1.5 flex mb-6 shadow-inner overflow-hidden h-16">
                                 <div 
                                     className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] rounded-xl transition-all duration-500 ease-out z-0 

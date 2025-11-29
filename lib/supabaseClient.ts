@@ -1,7 +1,7 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../constants';
-import { AuditSeverity, AuditEventType } from '../types';
+import { AuditSeverity, AuditEventType, SystemSetting, PurgeTarget, PurgeAnalysis } from '../types';
 
 // FORCE DEMO MODE for Client Presentation
 const isDemo = true; 
@@ -16,17 +16,19 @@ const STORAGE_KEYS = {
     RESULTS: 'tiempospro_db_results',
     LIMITS: 'tiempospro_db_limits',
     LEDGER: 'tiempospro_db_ledger',
-    AUDIT: 'tiempospro_db_audit'
+    AUDIT: 'tiempospro_db_audit',
+    SETTINGS: 'tiempospro_db_settings',
+    SYSTEM_SETTINGS_LIST: 'tiempospro_db_sys_settings_list' // New for maintenance module
 };
 
 // Helper to load/save
-const loadDB = (key: string, defaultData: any[]) => {
+const loadDB = (key: string, defaultData: any) => {
     if (typeof window === 'undefined') return defaultData;
     const stored = localStorage.getItem(key);
     return stored ? JSON.parse(stored) : defaultData;
 };
 
-const saveDB = (key: string, data: any[]) => {
+const saveDB = (key: string, data: any) => {
     if (typeof window === 'undefined') return;
     localStorage.setItem(key, JSON.stringify(data));
 };
@@ -48,6 +50,51 @@ const generateUsers = (role: string, count: number) => {
       created_at: new Date(Date.now() - Math.random() * 1000000000).toISOString(),
       updated_at: new Date().toISOString()
   }));
+};
+
+// --- HISTORICAL LEDGER GENERATOR (2024 SALES DEMO) ---
+const generateHistoricalLedger = () => {
+    const txs: any[] = [];
+    const startDate = new Date('2024-01-01T00:00:00Z');
+    const now = new Date();
+    let currentBalance = 150000000; // Starting capital 1.5M
+
+    // Iterate month by month
+    for (let d = new Date(startDate); d <= now; d.setMonth(d.getMonth() + 1)) {
+        const monthName = d.toLocaleString('es-CR', { month: 'long' });
+        
+        // Generate 5-8 transactions per month
+        const numTxs = 5 + Math.floor(Math.random() * 4);
+        
+        for (let i = 0; i < numTxs; i++) {
+            const isIncome = Math.random() > 0.4; // 60% Income, 40% Expense
+            const baseAmount = 500000 + Math.floor(Math.random() * 2000000);
+            const amount = isIncome ? baseAmount : -(baseAmount * 0.8); // Expenses slightly lower
+            
+            // Random day in month
+            const txDate = new Date(d);
+            txDate.setDate(Math.floor(Math.random() * 28) + 1);
+            txDate.setHours(Math.floor(Math.random() * 23), Math.floor(Math.random() * 59));
+
+            currentBalance += amount;
+
+            txs.push({
+                id: `tx-hist-${txDate.getTime()}-${i}`,
+                ticket_code: `TX-${txDate.getFullYear()}${(txDate.getMonth()+1).toString().padStart(2,'0')}-${Math.floor(Math.random()*9999)}`,
+                user_id: 'app-user-001',
+                amount_bigint: amount,
+                balance_before: currentBalance - amount,
+                balance_after: currentBalance,
+                type: isIncome ? 'CREDIT' : 'DEBIT',
+                reference_id: `REF-${Math.random().toString(36).substring(7).toUpperCase()}`,
+                created_at: txDate.toISOString(),
+                meta: { description: isIncome ? 'Ingresos Operativos' : 'Pago de Premios / Comisiones' }
+            });
+        }
+    }
+    
+    // Sort descending
+    return txs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 };
 
 const MOCK_ADMIN_PROFILE = {
@@ -99,7 +146,6 @@ const TEST_PLAYER = {
 };
 
 // --- DATABASE IN MEMORY (LINKED TO LOCALSTORAGE) ---
-// We initialize these lazily or immediately
 let DB_USERS = loadDB(STORAGE_KEYS.USERS, [MOCK_ADMIN_PROFILE, TEST_VENDOR, TEST_PLAYER, ...generateUsers('Cliente', 35), ...generateUsers('Vendedor', 15)]);
 let DB_BETS = loadDB(STORAGE_KEYS.BETS, []);
 let DB_RESULTS = loadDB(STORAGE_KEYS.RESULTS, [
@@ -108,7 +154,15 @@ let DB_RESULTS = loadDB(STORAGE_KEYS.RESULTS, [
     { id: 'res-3', date: new Date().toISOString().split('T')[0], draw_time: 'Noche (19:30)', winning_number: '--', is_reventado: false, status: 'OPEN', created_at: new Date().toISOString() }
 ]);
 let DB_LIMITS = loadDB(STORAGE_KEYS.LIMITS, []);
-let DB_LEDGER = loadDB(STORAGE_KEYS.LEDGER, []);
+
+// Use generated history if empty
+let loadedLedger = loadDB(STORAGE_KEYS.LEDGER, []);
+if (loadedLedger.length === 0) {
+    loadedLedger = generateHistoricalLedger();
+    saveDB(STORAGE_KEYS.LEDGER, loadedLedger);
+}
+let DB_LEDGER = loadedLedger;
+
 let DB_AUDIT = loadDB(STORAGE_KEYS.AUDIT, [{
     id: 1001,
     event_id: 'evt-init-001',
@@ -125,6 +179,20 @@ let DB_AUDIT = loadDB(STORAGE_KEYS.AUDIT, [{
     metadata: { version: '3.3.0' },
     hash: 'sha256-init'
 }]);
+// Legacy Settings
+let DB_SETTINGS = loadDB(STORAGE_KEYS.SETTINGS, {
+    multiplier_tiempos: 90,
+    multiplier_reventados: 200
+});
+
+// New System Settings List (Array for Maintenance Module)
+let DB_SYS_SETTINGS_LIST = loadDB(STORAGE_KEYS.SYSTEM_SETTINGS_LIST, [
+    { key: 'GLOBAL_LIMIT', value: 50000, description: 'Límite de exposición por defecto', group: 'RISK', updated_at: new Date().toISOString(), updated_by: 'system' },
+    { key: 'MARKET_STATUS', value: 'OPEN', description: 'Estado global del mercado', group: 'CORE', updated_at: new Date().toISOString(), updated_by: 'system' },
+    { key: 'RISK_THRESHOLD', value: 95, description: 'Porcentaje para auto-blindaje', group: 'RISK', updated_at: new Date().toISOString(), updated_by: 'system' },
+    { key: 'UI_THEME_DEFAULT', value: 'CYBER', description: 'Tema por defecto', group: 'UI', updated_at: new Date().toISOString(), updated_by: 'system' },
+    { key: 'FEE_PERCENT', value: 0.05, description: 'Comisión de pasarela', group: 'FINANCE', updated_at: new Date().toISOString(), updated_by: 'system' }
+]);
 
 // --- EXPOSED HELPERS FOR EDGE API SIMULATION ---
 export const MockDB = {
@@ -133,6 +201,10 @@ export const MockDB = {
         const idx = DB_USERS.findIndex((u: any) => u.id === user.id);
         if (idx >= 0) DB_USERS[idx] = user;
         else DB_USERS.unshift(user);
+        saveDB(STORAGE_KEYS.USERS, DB_USERS);
+    },
+    deleteUser: (userId: string) => {
+        DB_USERS = DB_USERS.filter((u: any) => u.id !== userId);
         saveDB(STORAGE_KEYS.USERS, DB_USERS);
     },
     getBets: () => DB_BETS,
@@ -155,21 +227,99 @@ export const MockDB = {
     getResults: () => DB_RESULTS,
     saveResult: (res: any) => {
         const idx = DB_RESULTS.findIndex((r: any) => r.draw_time === res.draw_time && r.date === res.date);
-        if (idx >= 0) DB_RESULTS[idx] = res;
+        if (idx >= 0) DB_RESULTS[idx] = { ...DB_RESULTS[idx], ...res };
         else DB_RESULTS.push(res);
         saveDB(STORAGE_KEYS.RESULTS, DB_RESULTS);
     },
     getAudit: () => DB_AUDIT,
     addAudit: (log: any) => {
-        DB_AUDIT.unshift(log);
+        const newLog = {
+            id: Date.now() + Math.random(),
+            timestamp: new Date().toISOString(),
+            ...log
+        };
+        DB_AUDIT.unshift(newLog);
         saveDB(STORAGE_KEYS.AUDIT, DB_AUDIT);
-    }
+    },
+    // Legacy Settings
+    getSettings: () => DB_SETTINGS,
+    saveSettings: (newSettings: any) => {
+        DB_SETTINGS = { ...DB_SETTINGS, ...newSettings };
+        saveDB(STORAGE_KEYS.SETTINGS, DB_SETTINGS);
+    },
+    // New Maintenance Settings
+    getSettingsList: () => DB_SYS_SETTINGS_LIST,
+    updateSetting: (key: string, value: any) => {
+        const idx = DB_SYS_SETTINGS_LIST.findIndex((s: any) => s.key === key);
+        if (idx >= 0) {
+            DB_SYS_SETTINGS_LIST[idx] = { ...DB_SYS_SETTINGS_LIST[idx], value, updated_at: new Date().toISOString() };
+            saveDB(STORAGE_KEYS.SYSTEM_SETTINGS_LIST, DB_SYS_SETTINGS_LIST);
+        }
+    },
+    
+    // --- ATOMIC PURGE LOGIC ---
+    analyzePurge: (target: PurgeTarget, days: number): PurgeAnalysis => {
+        const now = Date.now();
+        const cutoff = now - (days * 24 * 60 * 60 * 1000);
+        let list: any[] = [];
+        
+        switch(target) {
+            case 'BETS': list = DB_BETS; break;
+            case 'AUDIT': list = DB_AUDIT; break;
+            case 'LEDGER_HISTORY': list = DB_LEDGER; break;
+            case 'RESULTS': list = DB_RESULTS; break;
+        }
+        
+        const count = list.filter(item => new Date(item.created_at || item.timestamp).getTime() < cutoff).length;
+        
+        return {
+            target,
+            cutoffDate: new Date(cutoff).toISOString(),
+            recordCount: count,
+            estimatedSizeKB: Math.round(count * 0.5), // Approx 0.5KB per record
+            riskLevel: target === 'LEDGER_HISTORY' ? 'HIGH' : target === 'BETS' ? 'MEDIUM' : 'LOW',
+            canProceed: true
+        };
+    },
+    
+    executePurge: (target: PurgeTarget, days: number): number => {
+        const now = Date.now();
+        const cutoff = now - (days * 24 * 60 * 60 * 1000);
+        let initialCount = 0;
+        
+        if (target === 'BETS') {
+            initialCount = DB_BETS.length;
+            DB_BETS = DB_BETS.filter(item => new Date(item.created_at).getTime() >= cutoff);
+            saveDB(STORAGE_KEYS.BETS, DB_BETS);
+            return initialCount - DB_BETS.length;
+        }
+        if (target === 'AUDIT') {
+            initialCount = DB_AUDIT.length;
+            DB_AUDIT = DB_AUDIT.filter(item => new Date(item.timestamp).getTime() >= cutoff);
+            saveDB(STORAGE_KEYS.AUDIT, DB_AUDIT);
+            return initialCount - DB_AUDIT.length;
+        }
+        if (target === 'LEDGER_HISTORY') {
+            initialCount = DB_LEDGER.length;
+            DB_LEDGER = DB_LEDGER.filter(item => new Date(item.created_at).getTime() >= cutoff);
+            saveDB(STORAGE_KEYS.LEDGER, DB_LEDGER);
+            return initialCount - DB_LEDGER.length;
+        }
+        if (target === 'RESULTS') {
+            initialCount = DB_RESULTS.length;
+            DB_RESULTS = DB_RESULTS.filter(item => new Date(item.created_at).getTime() >= cutoff);
+            saveDB(STORAGE_KEYS.RESULTS, DB_RESULTS);
+            return initialCount - DB_RESULTS.length;
+        }
+        return 0;
+    },
+
+    // --- UTILITIES ---
+    saveDB: saveDB
 };
 
 
 if (isDemo) {
-  console.log('%c TIEMPOSPRO PERSISTENT MOCK DB ACTIVATED ', 'background: #00f0ff; color: #000; font-weight: bold; padding: 4px;');
-  
   // Mock Implementation
   client = {
     supabaseUrl: 'https://demo.local',
@@ -178,9 +328,7 @@ if (isDemo) {
         const hasSession = localStorage.getItem(STORAGE_KEYS.SESSION);
         if (hasSession) {
             const stored = JSON.parse(hasSession);
-            // Refresh user data from DB to get latest balance
-            const freshUser = DB_USERS.find((u: any) => u.id === stored.user.id);
-            return { data: { user: freshUser || stored.user }, error: null };
+            return { data: { user: stored.user }, error: null };
         }
         return { data: { user: null }, error: null };
       },
@@ -195,19 +343,25 @@ if (isDemo) {
       signInWithPassword: async ({ email }: any) => {
         await new Promise(resolve => setTimeout(resolve, 800));
         
-        // Find in real DB
-        let targetUser = DB_USERS.find((u: any) => u.email === email);
+        let targetProfile = DB_USERS.find((u: any) => u.email === email);
         
-        // Fallback for hardcoded test emails if they were deleted from DB
-        if (!targetUser) {
-             if (email === TEST_VENDOR.email) targetUser = TEST_VENDOR;
-             else if (email === TEST_PLAYER.email) targetUser = TEST_PLAYER;
-             else targetUser = MOCK_ADMIN_PROFILE;
+        if (!targetProfile) {
+             if (email === TEST_VENDOR.email) targetProfile = TEST_VENDOR;
+             else if (email === TEST_PLAYER.email) targetProfile = TEST_PLAYER;
+             else targetProfile = MOCK_ADMIN_PROFILE;
         }
 
-        const sessionData = { access_token: 'mock-jwt-token', user: targetUser };
+        const authUser = {
+            id: targetProfile.auth_uid,
+            email: targetProfile.email,
+            aud: 'authenticated',
+            role: 'authenticated',
+            created_at: new Date().toISOString()
+        };
+
+        const sessionData = { access_token: 'mock-jwt-token', user: authUser };
         localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(sessionData));
-        return { data: { user: targetUser, session: sessionData }, error: null };
+        return { data: { user: authUser, session: sessionData }, error: null };
       },
       signOut: async () => {
         localStorage.removeItem(STORAGE_KEYS.SESSION);
@@ -215,7 +369,6 @@ if (isDemo) {
       },
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } })
     },
-    // Mock Database Query Builder
     from: (table: string) => {
       let currentFilterField: string | null = null;
       let currentFilterValue: string | null = null;
@@ -241,8 +394,6 @@ if (isDemo) {
         },
         single: async () => {
             await new Promise(resolve => setTimeout(resolve, 50));
-            
-            // Generic Single Finder
             let dataList: any[] = [];
             if (table === 'app_users') dataList = DB_USERS;
             else if (table === 'draw_results') dataList = DB_RESULTS;
@@ -251,81 +402,31 @@ if (isDemo) {
             const item = dataList.find((i: any) => i[currentFilterField!] === currentFilterValue);
             return { data: item || null, error: item ? null : { message: 'Not found' } };
         },
-        upsert: async (payload: any) => {
-             await new Promise(resolve => setTimeout(resolve, 200));
-             if (table === 'draw_results') {
-                 MockDB.saveResult({ ...payload, created_at: new Date().toISOString() });
-                 return { data: payload, error: null };
-             }
-             return { data: null, error: null };
-        },
-        insert: (payload: any) => ({
-            select: () => ({
-                single: async () => {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    const newItem = { ...payload[0] };
-                    newItem.id = newItem.id || `mock-id-${Date.now()}-${Math.random()}`;
-                    if (!newItem.created_at) newItem.created_at = new Date().toISOString();
-
-                    if (table === 'bets') MockDB.addBet(newItem);
-                    if (table === 'ledger_transactions') MockDB.addTransaction(newItem);
-                    if (table === 'app_users') MockDB.saveUser(newItem);
-                    if (table === 'limits_per_number') MockDB.saveLimit(newItem);
-                    if (table === 'audit_trail') MockDB.addAudit(newItem);
-
-                    return { data: newItem, error: null };
-                }
-            })
-        }),
-        update: (payload: any) => ({
-            eq: (field: string, value: string) => {
-                const execute = async () => {
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                    if (table === 'limits_per_number') {
-                        const limit = DB_LIMITS.find((l: any) => l[field] === value);
-                        if (limit) {
-                            const updated = { ...limit, ...payload };
-                            MockDB.saveLimit(updated);
-                            return { data: updated, error: null };
-                        }
-                    }
-                    if (table === 'app_users') {
-                        const user = DB_USERS.find((u: any) => u[field] === value);
-                        if (user) {
-                            const updated = { ...user, ...payload };
-                            MockDB.saveUser(updated);
-                            return { data: updated, error: null };
-                        }
-                    }
-                    return { data: { ...payload }, error: null };
-                };
-                return { then: (cb: any) => execute().then(cb), select: () => ({ single: execute }) };
-            }
-        }),
-        delete: () => ({
-            eq: (field: string, value: string) => ({
-                then: (cb: any) => {
-                    if (table === 'limits_per_number') {
-                        const newData = DB_LIMITS.filter((l: any) => l[field] !== value);
-                        DB_LIMITS = newData;
-                        saveDB(STORAGE_KEYS.LIMITS, DB_LIMITS);
-                    }
-                    if (table === 'app_users') {
-                        const newData = DB_USERS.filter((u: any) => u[field] !== value);
-                        DB_USERS = newData;
-                        saveDB(STORAGE_KEYS.USERS, DB_USERS);
-                    }
-                    cb({ data: true, error: null });
-                }
-            })
-        }),
         then: (callback: (res: any) => void) => {
             setTimeout(() => {
                 let data: any[] = [];
                 
+                // Get Active User Context from Storage for RLS Simulation
+                const sessionStr = localStorage.getItem(STORAGE_KEYS.SESSION);
+                const session = sessionStr ? JSON.parse(sessionStr) : null;
+                const authUid = session?.user?.id;
+                
+                // Find Profile based on Auth ID
+                const currentUser = DB_USERS.find((u: any) => u.auth_uid === authUid);
+                const isAdmin = currentUser?.role === 'SuperAdmin';
+                const isVendor = currentUser?.role === 'Vendedor';
+
                 if (table === 'app_users') {
-                    if (currentFilterValue === 'Cliente') data = DB_USERS.filter((u: any) => u.role === 'Cliente');
+                    if (currentFilterValue === 'Cliente') {
+                        // RLS LOGIC FOR VENDORS
+                        if (isVendor) {
+                            data = DB_USERS.filter((u: any) => u.role === 'Cliente' && u.issuer_id === currentUser.id);
+                        } else {
+                            data = DB_USERS.filter((u: any) => u.role === 'Cliente');
+                        }
+                    }
                     else if (currentFilterValue === 'Vendedor') data = DB_USERS.filter((u: any) => u.role === 'Vendedor');
+                    else if (currentFilterField === 'auth_uid') data = [DB_USERS.find((u:any) => u.auth_uid === currentFilterValue) || null];
                     else data = DB_USERS;
                 } 
                 else if (table === 'ledger_transactions') data = DB_LEDGER;
@@ -342,21 +443,20 @@ if (isDemo) {
                         : DB_LIMITS;
                 }
 
-                // Simple Sort
                 data.sort((a, b) => {
+                    if(!a || !b) return 0;
                     const dateA = new Date(a.created_at || 0).getTime();
                     const dateB = new Date(b.created_at || 0).getTime();
                     return orderAsc ? dateA - dateB : dateB - dateA;
                 });
 
                 callback({ data: data.slice(0, limitCount), error: null });
-            }, 150);
+            }, 100);
         }
       };
       return chain;
     },
     rpc: async (fn: string, args: any) => {
-        // Mock RPC calls
         return { data: { success: true, message: 'RPC Mock Success' }, error: null };
     }
   } as any;

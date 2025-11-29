@@ -1,6 +1,8 @@
+
 import React from 'react';
 import { Bet } from '../types';
 import { formatCurrency, formatDate } from '../constants';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 interface TicketViewModalProps {
   isOpen: boolean;
@@ -9,6 +11,8 @@ interface TicketViewModalProps {
 }
 
 export default function TicketViewModal({ isOpen, onClose, bet }: TicketViewModalProps) {
+  useBodyScrollLock(isOpen);
+
   if (!isOpen || !bet) return null;
 
   return (

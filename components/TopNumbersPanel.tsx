@@ -1,41 +1,66 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useLiveResults } from '../hooks/useLiveResults';
+import { api } from '../services/edgeApi';
+import { useAuthStore } from '../store/useAuthStore';
 
 export default function TopNumbersPanel() {
     const { history } = useLiveResults();
+    const user = useAuthStore(s => s.user);
+    const [globalBets, setGlobalBets] = useState<any[]>([]);
 
-    // Logic to calculate top numbers
-    // In a real scenario, this aggregates real history.
-    // For this demo, we ensure we have data by merging real history with a "simulation" of past events
-    // to ensure the UI looks populated and "World Class" immediately.
+    useEffect(() => {
+        if(!user) return;
+        const fetchBets = async () => {
+            const res = await api.getGlobalBets({ role: user.role, userId: user.id, timeFilter: 'ALL', statusFilter: 'ALL' });
+            if (res.data) setGlobalBets(res.data.bets);
+        };
+        fetchBets();
+        const i = setInterval(fetchBets, 10000);
+        return () => clearInterval(i);
+    }, [user]);
+
+    // Logic to calculate top numbers based on REAL DATA
     const topStats = useMemo(() => {
         const counts: Record<string, number> = {};
         
-        // 1. Seed with some random "historical" data for the demo effect
-        // (This simulates a database of last 1000 draws)
-        for(let i=0; i<100; i++) {
-            const num = Math.floor(Math.random() * 100).toString().padStart(2, '0');
-            counts[num] = (counts[num] || 0) + Math.floor(Math.random() * 5); 
-        }
-
-        // 2. Add Real History from Hook
+        // 1. Weight: Recent Wins (Historical) - Heavy Weight
         history.forEach(h => {
-            if (h.winningNumber) {
-                counts[h.winningNumber] = (counts[h.winningNumber] || 0) + 10; // Real recent wins have more weight
+            if (h.winningNumber && h.winningNumber !== '--') {
+                counts[h.winningNumber] = (counts[h.winningNumber] || 0) + 15; 
+            }
+        });
+
+        // 2. Weight: Popular Bets (Volume) - Moderate Weight
+        globalBets.forEach(b => {
+            if (b.numbers) {
+                // Higher amount = Higher heat
+                const weight = b.amount_bigint > 500000 ? 5 : b.amount_bigint > 100000 ? 3 : 1;
+                counts[b.numbers] = (counts[b.numbers] || 0) + weight;
             }
         });
 
         // 3. Sort and Slice
-        return Object.entries(counts)
+        const sorted = Object.entries(counts)
             .sort((a, b) => b[1] - a[1])
             .slice(0, 10)
             .map(([number, frequency], index) => ({
                 number,
-                frequency,
+                frequency, // "Heat Score"
                 rank: index + 1
             }));
-    }, [history]);
+            
+        // If empty (new system), seed with a few place holders
+        if (sorted.length === 0) {
+            return Array.from({length: 5}).map((_, i) => ({
+                number: (i*11).toString().padStart(2, '0'),
+                frequency: 10 - i,
+                rank: i+1
+            }));
+        }
+        
+        return sorted;
+    }, [history, globalBets]);
 
     // Helper for Rank Styles
     const getRankStyle = (rank: number) => {
@@ -106,7 +131,7 @@ export default function TopNumbersPanel() {
                                 Inteligencia <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyber-neon to-cyber-purple">Predictiva</span>
                             </h3>
                             <p className="text-[9px] font-mono text-slate-500 uppercase tracking-[0.3em] mt-1">
-                                Top 10 Frecuencia Global
+                                Top 10 Frecuencia Global (Volumen + Histórico)
                             </p>
                         </div>
                     </div>
@@ -170,12 +195,12 @@ export default function TopNumbersPanel() {
                                         <div className="h-1.5 w-14 mx-auto bg-white/10 rounded-full overflow-hidden mb-1">
                                             <div 
                                                 className={`h-full rounded-full ${stat.rank === 1 ? 'bg-emerald-500' : stat.rank <= 3 ? 'bg-cyber-neon' : 'bg-cyber-blue'}`} 
-                                                style={{ width: `${Math.min(stat.frequency * 2, 100)}%` }} // Visual approximation
+                                                style={{ width: `${Math.min(stat.frequency * 5, 100)}%` }} // Visual scale
                                             ></div>
                                         </div>
                                         <div className="text-[9px] font-mono text-slate-500 group-hover:text-white transition-colors">
                                             <i className={`fas ${style.icon} mr-1 opacity-50`}></i>
-                                            {stat.frequency} Hits
+                                            {stat.frequency} Heat
                                         </div>
                                     </div>
 

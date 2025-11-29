@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { AppUser, UserRole } from '../types';
 import { formatCurrency } from '../constants';
@@ -18,6 +19,8 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
   
   // LOGIC: If Vendor, force tab to CLIENTES and lock it.
   const isVendor = currentUser?.role === UserRole.Vendedor;
+  const isAdmin = currentUser?.role === UserRole.SuperAdmin;
+
   const [activeTab, setActiveTab] = useState<'CLIENTES' | 'VENDEDORES'>('CLIENTES');
   
   useEffect(() => {
@@ -53,18 +56,33 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
         glowHex: 'rgba(188,19,254,0.5)'
       };
 
-  // SEGREGATION LOGIC: Vendors only see players assigned to them (Mock Logic in edgeApi already handles this, but safety here too)
+  // SEGREGATION LOGIC
   // SuperAdmin sees all.
-  let sourceList = activeTab === 'CLIENTES' ? players : vendors;
-  
-  if (isVendor && activeTab === 'VENDEDORES') {
-      sourceList = []; // Vendor should never see this, but safety net
+  // Vendor sees only their clients (Logic enforced in MockDB/API simulation + here)
+  let sourceList: AppUser[] = [];
+
+  if (activeTab === 'CLIENTES') {
+      if (isAdmin) {
+          sourceList = players;
+      } else if (isVendor) {
+          // Double safety: Filter mainly happens in API, but ensure here
+          sourceList = players.filter(p => p.issuer_id === currentUser?.id);
+      }
+  } else if (activeTab === 'VENDEDORES') {
+      if (isAdmin) {
+          sourceList = vendors;
+      } else {
+          sourceList = []; // Vendors cannot see other vendors
+      }
   }
   
   // --- ADVANCED SEARCH ENGINE ---
   const filteredUsers = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
     return sourceList.filter(u => {
+      // 1. HARD FILTER: Exclude deleted users (Safety Check)
+      if (u.status === 'Deleted') return false;
+
       // Search Priority: 1. Cedula, 2. Phone, 3. Name, 4. Email
       const matchesSearch = 
         (u.cedula && u.cedula.toLowerCase().includes(query)) ||
@@ -106,23 +124,24 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
                     <div className={`w-12 h-12 rounded-xl bg-black border-2 ${theme.border} flex items-center justify-center ${theme.shadow} transition-all duration-500`}>
                         <i className={`fas ${theme.icon} ${theme.text} text-xl`}></i>
                     </div>
-                    <span>Directorio <span className={`${theme.text} text-glow-sm transition-colors duration-500`}>Global</span></span>
+                    <span>Directorio <span className={`${theme.text} text-glow-sm transition-colors duration-500`}>
+                        {isVendor ? 'Personal' : 'Global'}
+                    </span></span>
                 </h3>
 
-                {/* TAB CONTROLS - PERMANENT PHOSPHORESCENT BORDERS */}
-                {/* HIDE VENDOR TAB IF CURRENT USER IS VENDOR */}
-                <div className={`flex bg-black/60 p-1.5 rounded-2xl border-2 ${theme.border} shadow-lg transition-all duration-500`}>
-                    <button 
-                        onClick={() => setActiveTab('CLIENTES')} 
-                        className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 border-2 border-cyber-blue ${
-                            activeTab === 'CLIENTES' 
-                            ? 'bg-cyber-blue text-white shadow-[0_0_15px_#2463eb]' 
-                            : 'bg-transparent text-slate-500 shadow-[0_0_10px_rgba(36,99,235,0.2)] hover:text-cyber-blue hover:shadow-[0_0_15px_#2463eb]'
-                        }`}
-                    >
-                        Jugadores
-                    </button>
-                    {!isVendor && (
+                {/* TAB CONTROLS - ONLY FOR ADMIN */}
+                {isAdmin && (
+                    <div className={`flex bg-black/60 p-1.5 rounded-2xl border-2 ${theme.border} shadow-lg transition-all duration-500`}>
+                        <button 
+                            onClick={() => setActiveTab('CLIENTES')} 
+                            className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 border-2 border-cyber-blue ${
+                                activeTab === 'CLIENTES' 
+                                ? 'bg-cyber-blue text-white shadow-[0_0_15px_#2463eb]' 
+                                : 'bg-transparent text-slate-500 shadow-[0_0_10px_rgba(36,99,235,0.2)] hover:text-cyber-blue hover:shadow-[0_0_15px_#2463eb]'
+                            }`}
+                        >
+                            Jugadores
+                        </button>
                         <button 
                             onClick={() => setActiveTab('VENDEDORES')} 
                             className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 border-2 border-cyber-purple ${
@@ -133,8 +152,8 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
                         >
                             Vendedores
                         </button>
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
 
             <div className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-end relative z-10">

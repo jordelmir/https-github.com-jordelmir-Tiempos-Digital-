@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/edgeApi';
 import { AppUser } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 interface UserControlModalProps {
   isOpen: boolean;
@@ -13,6 +15,8 @@ interface UserControlModalProps {
 type ActionType = 'BLOCK' | 'UNBLOCK' | 'DELETE' | null;
 
 export default function UserControlModal({ isOpen, onClose, targetUser, onSuccess }: UserControlModalProps) {
+  useBodyScrollLock(isOpen);
+
   const currentUser = useAuthStore(s => s.user);
   
   const [action, setAction] = useState<ActionType>(null);

@@ -1,11 +1,10 @@
 
 import { supabase, MockDB } from '../lib/supabaseClient';
-import { ApiResponse, AppUser, TransactionResponse, DrawResultPayload, GameMode, DrawResult, Bet, AuditEventType, AuditSeverity, WeeklyDataStats, RiskAnalysisReport } from '../types';
+import { ApiResponse, AppUser, TransactionResponse, DrawResultPayload, GameMode, DrawResult, Bet, AuditEventType, AuditSeverity, WeeklyDataStats, RiskAnalysisReport, SystemSetting, MasterCatalogItem, PurgeTarget, PurgeAnalysis, LedgerTransaction } from '../types';
+import { formatCurrency } from '../constants';
 
-// In a real deployment, these would point to your deployed Edge Functions
 const FUNCTION_BASE_URL = '/functions/v1'; 
 
-// Helper to generate Cyberpunk Ticket IDs
 const generateTicketCode = (prefix: string) => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let result = '';
@@ -19,15 +18,13 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
   try {
     const { data: { session } } = await supabase.auth.getSession();
     
-    // --- DEMO MODE INTERCEPTOR ---
-    // Use true persistent data instead of random mocks
+    // --- DEMO MODE INTERCEPTOR (THE GAME ENGINE) ---
+    // This logic simulates the Edge Functions locally for a full "Real Data" experience without backend.
     if ((supabase as any).supabaseUrl === 'https://demo.local' || !session?.access_token.startsWith('ey')) { 
         
-        await new Promise(r => setTimeout(r, 600)); // Cinematic latency
+        await new Promise(r => setTimeout(r, 300)); // Optimized Network latency simulation
 
-        console.log(`[Mock Edge] Invoking ${functionName}`, body);
-
-        // 1. CLOCK
+        // 1. CLOCK & CONFIG
         if (functionName === 'getServerTime') {
              return { data: { 
                  server_time: new Date().toISOString(),
@@ -35,310 +32,485 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
              } as any };
         }
 
-        // 2. LIVE RESULTS (Reading from persistent DB)
-        if (functionName === 'getLiveResults') {
-            const results = MockDB.getResults();
-            const mapped = results.map((r: any) => ({
-                ...r,
-                drawTime: r.draw_time,
-                winningNumber: r.winning_number,
-                isReventado: r.is_reventado,
-                reventadoNumber: r.reventado_number
-            }));
-            return { data: { results: mapped, history: mapped } as any };
+        if (functionName === 'getGlobalSettings') {
+            const settings = MockDB.getSettings();
+            return { data: settings as any };
         }
 
-        // 3. CREATE USER (Writing to persistent DB)
-        if (functionName === 'createUser') {
-             const { name, email, role, balance_bigint, issuer_id } = body;
-             const newUser = {
-                 name, email, role, balance_bigint: balance_bigint ?? 0, issuer_id,
-                 id: `user-${Date.now()}`,
-                 created_at: new Date().toISOString(),
-                 status: 'Active',
-                 currency: 'CRC'
-             };
-             
-             // Audit & Save
-             MockDB.saveUser(newUser);
-             MockDB.addAudit({
-                 action: 'CREATE_USER',
-                 actor_id: issuer_id,
-                 target_resource: newUser.id,
-                 severity: 'WARNING',
-                 metadata: { role }
-             });
-
-             return { data: { user: newUser } as any };
-        }
-
-        // 4. PLACE BET (REAL LOGIC)
-        if (functionName === 'placeBet') {
-             const { numbers, amount, draw_id } = body;
-             const user = MockDB.getUsers().find((u: any) => u.id === session?.user?.id);
-             
-             if (!user) return { error: 'Usuario no encontrado' };
-             if (user.balance_bigint < amount) return { error: 'Saldo insuficiente' };
-
-             // Check Risk Limits (Mock Calculation)
-             const drawType = draw_id; // e.g. "Noche (19:30)"
-             const limits = MockDB.getLimits();
-             const specificLimit = limits.find((l: any) => l.draw_type === drawType && l.number === numbers);
-             const globalLimit = limits.find((l: any) => l.draw_type === drawType && l.number === 'ALL');
-             
-             // Calculate current exposure
-             const currentBets = MockDB.getBets().filter((b: any) => b.draw_id === drawType && b.numbers === numbers);
-             const currentExposure = currentBets.reduce((acc: number, b: any) => acc + b.amount_bigint, 0);
-             
-             const limit = specificLimit?.max_amount ?? globalLimit?.max_amount ?? Infinity;
-             if (limit !== -1 && (currentExposure + amount) > limit) {
-                 return { error: `LIMIT_REACHED: Límite de riesgo excedido para ${numbers}.` };
-             }
-
-             // Execute Transaction
-             user.balance_bigint -= amount;
-             MockDB.saveUser(user);
-
-             const newBet = {
-                 id: `bet-${Date.now()}`,
-                 ticket_code: generateTicketCode('BT'),
-                 user_id: user.id,
-                 draw_id: drawType,
-                 amount_bigint: amount,
-                 numbers,
-                 status: 'PENDING',
-                 created_at: new Date().toISOString()
-             };
-             
-             MockDB.addBet(newBet);
-             MockDB.addTransaction({
-                 id: `tx-${Date.now()}`,
-                 user_id: user.id,
-                 amount_bigint: -amount,
-                 balance_after: user.balance_bigint,
-                 type: 'BET',
-                 created_at: new Date().toISOString()
-             });
-
-             return { data: { bet_id: newBet.id, ticket_code: newBet.ticket_code } as any };
-        }
-
-        // 5. TRANSACTIONS (REAL BALANCE UPDATE)
-        if (functionName === 'rechargeUser' || functionName === 'withdrawUser') {
-             const { target_user_id, amount, actor_id } = body;
-             const targetUser = MockDB.getUsers().find((u: any) => u.id === target_user_id);
-             
-             if (!targetUser) return { error: 'Usuario destino no encontrado' };
-
-             if (functionName === 'withdrawUser' && targetUser.balance_bigint < amount) {
-                 return { error: 'Fondos insuficientes en la cuenta destino' };
-             }
-
-             const realAmount = functionName === 'rechargeUser' ? amount : -amount;
-             targetUser.balance_bigint += realAmount;
-             MockDB.saveUser(targetUser);
-
-             const tx = {
-                 id: `tx-${Date.now()}`,
-                 ticket_code: generateTicketCode('TX'),
-                 user_id: targetUser.id,
-                 amount_bigint: realAmount,
-                 balance_after: targetUser.balance_bigint,
-                 type: realAmount > 0 ? 'CREDIT' : 'DEBIT',
-                 created_at: new Date().toISOString(),
-                 meta: { actor: actor_id }
-             };
-             MockDB.addTransaction(tx);
-
-             return { data: { 
-                 tx_id: tx.id, 
-                 ticket_code: tx.ticket_code, 
-                 new_balance: targetUser.balance_bigint 
-             } as any };
-        }
-
-        // 6. GLOBAL BETS (READ REAL MOCK DATA)
-        if (functionName === 'getGlobalBets') {
-            const allBets = MockDB.getBets();
-            // Augment with user names
-            const augmented = allBets.map((b: any) => {
-                const u = MockDB.getUsers().find((user: any) => user.id === b.user_id);
-                return {
-                    ...b,
-                    user_name: u ? u.name : 'Desconocido',
-                    origin: u?.role === 'Vendedor' ? 'Vendedor' : 'Jugador'
-                };
-            }).reverse(); // Newest first
-            return { data: { bets: augmented } as any };
-        }
-
-        // 7. RISK STATS (CALCULATE REAL EXPOSURE)
-        if (functionName === 'getRiskStats') {
-            const bets = MockDB.getBets().filter((b: any) => b.draw_id === body.draw);
-            
-            // Aggregate
-            const map: Record<string, number> = {};
-            bets.forEach((b: any) => {
-                map[b.numbers] = (map[b.numbers] || 0) + b.amount_bigint;
+        if (functionName === 'updateGlobalMultiplier') {
+            MockDB.saveSettings({ 
+                multiplier_tiempos: body.baseValue, 
+                multiplier_reventados: body.reventadosValue 
             });
-
-            const stats = Object.keys(map).map(num => ({
-                number: num,
-                total_sold: map[num],
-                risk_percentage: 0 // Will be calc'd by frontend against limit
-            }));
-
-            // Fill holes for 00-99 if needed or just send active
-            // Let's send top active
-            return { data: { stats } as any };
-        }
-
-        // 8. RISK LIMITS
-        if (functionName === 'getRiskLimits') {
-            const limits = MockDB.getLimits().filter((l: any) => l.draw_type === body.draw);
-            return { data: { limits } as any };
-        }
-
-        if (functionName === 'updateRiskLimit') {
-            const { draw, number, max_amount } = body;
-            MockDB.saveLimit({
-                id: `lim-${Date.now()}`,
-                draw_type: draw,
-                number,
-                max_amount,
-                created_at: new Date().toISOString()
+            MockDB.addAudit({
+                actor_id: body.actor_id,
+                action: 'UPDATE_GLOBAL_MULTIPLIER',
+                type: AuditEventType.ADMIN_SETTINGS,
+                severity: AuditSeverity.WARNING,
+                metadata: { base: body.baseValue, rev: body.reventadosValue }
             });
             return { data: { success: true } as any };
         }
 
-        if (functionName === 'payVendor') {
-            const { target_user_id, amount, concept } = body;
-            const user = MockDB.getUsers().find((u: any) => u.id === target_user_id);
-            if(user) {
-                user.balance_bigint += amount; // Assuming payment adds to balance
-                MockDB.saveUser(user);
+        // 2. USER MANAGEMENT & TRANSACTIONS
+        if (functionName === 'createUser') {
+            const newUser = {
+                ...body,
+                id: `user-${Date.now()}`,
+                auth_uid: `auth-${Date.now()}`,
+                status: 'Active',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                balance_bigint: body.balance_bigint || 0
+            };
+            MockDB.saveUser(newUser);
+            
+            // Initial Balance Transaction
+            if (newUser.balance_bigint > 0) {
                 MockDB.addTransaction({
-                    id: `pay-${Date.now()}`,
-                    user_id: user.id,
-                    amount_bigint: amount,
-                    balance_after: user.balance_bigint,
-                    type: 'COMMISSION_PAYOUT',
-                    meta: { concept }
+                    id: `tx-init-${newUser.id}`,
+                    user_id: newUser.id,
+                    amount_bigint: newUser.balance_bigint,
+                    balance_before: 0,
+                    balance_after: newUser.balance_bigint,
+                    type: 'CREDIT',
+                    meta: { description: 'Saldo Inicial' },
+                    created_at: new Date().toISOString()
                 });
             }
-            return { data: { ticket_code: generateTicketCode('PY') } as any };
+
+            MockDB.addAudit({
+                actor_id: body.issuer_id || 'system',
+                action: 'CREATE_USER',
+                type: AuditEventType.IDENTITY_REGISTER,
+                severity: AuditSeverity.INFO,
+                target_resource: newUser.id,
+                metadata: { role: newUser.role, name: newUser.name }
+            });
+            return { data: { user: newUser } as any };
         }
 
         if (functionName === 'checkIdentity') {
-            const user = MockDB.getUsers().find((u: any) => u.cedula === body.cedula);
-            return { data: user || null } as any;
+            const users = MockDB.getUsers();
+            const exists = users.find((u: any) => u.cedula === body.cedula);
+            return { data: exists || null };
         }
 
-        if (functionName === 'deleteUser') {
-            const user = MockDB.getUsers().find((u: any) => u.id === body.target_user_id);
-            if (user) {
-                user.status = 'Deleted'; // Soft delete or handle real delete in supabaseClient
-                MockDB.saveUser(user);
-            }
-            return { data: { success: true } as any };
+        if (functionName === 'rechargeUser') {
+            const users = MockDB.getUsers();
+            const user = users.find((u: any) => u.id === body.target_user_id);
+            if (!user) return { error: 'Usuario no encontrado' };
+
+            const oldBalance = user.balance_bigint;
+            const newBalance = oldBalance + body.amount;
+            
+            user.balance_bigint = newBalance;
+            user.updated_at = new Date().toISOString();
+            MockDB.saveUser(user);
+
+            MockDB.addTransaction({
+                id: `tx-rech-${Date.now()}`,
+                user_id: user.id,
+                amount_bigint: body.amount,
+                balance_before: oldBalance,
+                balance_after: newBalance,
+                type: 'CREDIT',
+                reference_id: `DEP-${Date.now().toString().slice(-6)}`,
+                meta: { description: 'Recarga de Saldo', actor: body.actor_id },
+                created_at: new Date().toISOString()
+            });
+
+            MockDB.addAudit({
+                actor_id: body.actor_id,
+                action: 'USER_RECHARGE',
+                type: AuditEventType.TX_DEPOSIT,
+                severity: AuditSeverity.INFO,
+                target_resource: user.id,
+                metadata: { amount: body.amount, new_balance: newBalance }
+            });
+
+            return { data: { new_balance: newBalance, tx_id: `TX-${Date.now()}` } as any };
+        }
+
+        if (functionName === 'withdrawUser') {
+            const users = MockDB.getUsers();
+            const user = users.find((u: any) => u.id === body.target_user_id);
+            if (!user) return { error: 'Usuario no encontrado' };
+            
+            if (user.balance_bigint < body.amount) return { error: 'Fondos insuficientes' };
+
+            const oldBalance = user.balance_bigint;
+            const newBalance = oldBalance - body.amount;
+            
+            user.balance_bigint = newBalance;
+            user.updated_at = new Date().toISOString();
+            MockDB.saveUser(user);
+
+            const txId = `TX-WD-${Date.now().toString().slice(-6)}`;
+
+            MockDB.addTransaction({
+                id: `tx-with-${Date.now()}`,
+                user_id: user.id,
+                amount_bigint: -body.amount,
+                balance_before: oldBalance,
+                balance_after: newBalance,
+                type: 'DEBIT',
+                reference_id: txId,
+                meta: { description: 'Retiro de Fondos', actor: body.actor_id },
+                created_at: new Date().toISOString()
+            });
+
+            MockDB.addAudit({
+                actor_id: body.actor_id,
+                action: 'USER_WITHDRAWAL',
+                type: AuditEventType.TX_WITHDRAWAL,
+                severity: AuditSeverity.WARNING,
+                target_resource: user.id,
+                metadata: { amount: body.amount, new_balance: newBalance }
+            });
+
+            return { data: { new_balance: newBalance, tx_id: txId } as any };
+        }
+
+        if (functionName === 'payVendor') {
+            const users = MockDB.getUsers();
+            const user = users.find((u: any) => u.id === body.target_user_id);
+            if (!user) return { error: 'Vendedor no encontrado' };
+
+            // Logic: Pays vendor FROM system funds into their wallet? 
+            // Usually commissions are added to wallet.
+            const oldBalance = user.balance_bigint;
+            const newBalance = oldBalance + body.amount;
+            
+            user.balance_bigint = newBalance;
+            MockDB.saveUser(user);
+            
+            const txCode = `PAY-${Date.now().toString().slice(-6)}`;
+            
+            MockDB.addTransaction({
+                id: `tx-pay-${Date.now()}`,
+                user_id: user.id,
+                amount_bigint: body.amount, // Credit to Vendor
+                balance_before: oldBalance,
+                balance_after: newBalance,
+                type: 'COMMISSION_PAYOUT',
+                reference_id: txCode,
+                meta: { description: body.concept, notes: body.notes },
+                created_at: new Date().toISOString()
+            });
+
+            MockDB.addAudit({
+                actor_id: body.actor_id,
+                action: 'VENDOR_PAYMENT',
+                type: AuditEventType.FINANCIAL_OP,
+                severity: AuditSeverity.CRITICAL,
+                target_resource: user.id,
+                metadata: { amount: body.amount, concept: body.concept }
+            });
+
+            return { data: { ticket_code: txCode } as any };
         }
 
         if (functionName === 'updateUserStatus') {
-            const user = MockDB.getUsers().find((u: any) => u.id === body.target_user_id);
+            const users = MockDB.getUsers();
+            const user = users.find((u: any) => u.id === body.target_user_id);
             if (user) {
                 user.status = body.status;
                 MockDB.saveUser(user);
+                MockDB.addAudit({
+                    actor_id: body.actor_id,
+                    action: body.status === 'Active' ? 'USER_UNBLOCK' : 'USER_BLOCK',
+                    type: AuditEventType.ADMIN_BLOCK,
+                    severity: AuditSeverity.WARNING,
+                    target_resource: user.id
+                });
+                return { data: { success: true } as any };
             }
+            return { error: 'Usuario no encontrado' };
+        }
+
+        if (functionName === 'deleteUser') {
+            if (body.confirmation !== 'ELIMINAR NODO') return { error: 'Frase de confirmación incorrecta' };
+            MockDB.deleteUser(body.target_user_id);
+            MockDB.addAudit({
+                actor_id: body.actor_id,
+                action: 'USER_DELETE',
+                type: AuditEventType.ADMIN_PURGE,
+                severity: AuditSeverity.CRITICAL,
+                target_resource: body.target_user_id
+            });
             return { data: { success: true } as any };
         }
 
+        // 3. BETTING ENGINE (CORE)
+        if (functionName === 'placeBet') {
+            // { numbers, amount, draw_id, mode }
+            const { data: authData } = await supabase.auth.getUser();
+            const users = MockDB.getUsers();
+            const user = users.find((u: any) => u.auth_uid === authData.user?.id);
+            
+            if (!user) return { error: 'Usuario no autenticado' };
+            if (user.balance_bigint < body.amount) return { error: 'Saldo insuficiente' };
+
+            // 2. Risk Check
+            const limits = MockDB.getLimits();
+            const limitObj = limits.find((l: any) => l.number === body.numbers && l.draw_type === body.draw_id);
+            
+            // Fetch Global Limit from Settings
+            const settingsList = MockDB.getSettingsList();
+            const globalLimitSetting = settingsList.find((s:any) => s.key === 'GLOBAL_LIMIT');
+            // If setting exists use it, else Infinity. If limitObj exists and is not -2 (reset), use it.
+            // If limitObj is 0 (blocked), it takes precedence.
+            
+            let limit = Infinity;
+            if (limitObj && limitObj.max_amount !== -2) {
+                limit = limitObj.max_amount;
+            } else if (globalLimitSetting) {
+                const val = Number(globalLimitSetting.value);
+                if (val > 0) limit = val * 100; // Convert to cents if stored as units, assumes stored as units
+                // If stored as raw, check logic. Assuming UI saves raw units, here we need cents.
+            }
+
+            // Calculate Exposure
+            const bets = MockDB.getBets();
+            const currentExposure = bets
+                .filter((b: any) => b.numbers === body.numbers && b.draw_id === body.draw_id && b.status === 'PENDING')
+                .reduce((acc: number, b: any) => acc + b.amount_bigint, 0);
+
+            if (limit !== -1 && (currentExposure + body.amount) > limit) {
+                return { error: `LIMIT_REACHED: Límite de riesgo excedido para el ${body.numbers}. Disp: ${formatCurrency(limit - currentExposure)}` };
+            }
+
+            // 3. Execution
+            const oldBalance = user.balance_bigint;
+            const newBalance = oldBalance - body.amount;
+            user.balance_bigint = newBalance;
+            MockDB.saveUser(user);
+
+            const ticketCode = generateTicketCode('BT');
+            const newBet = {
+                id: `bet-${Date.now()}-${Math.random()}`,
+                ticket_code: ticketCode,
+                user_id: user.id,
+                draw_id: body.draw_id,
+                amount_bigint: body.amount,
+                numbers: body.numbers,
+                mode: body.mode,
+                status: 'PENDING',
+                created_at: new Date().toISOString()
+            };
+            MockDB.addBet(newBet);
+
+            MockDB.addTransaction({
+                id: `tx-bet-${Date.now()}`,
+                ticket_code: ticketCode,
+                user_id: user.id,
+                amount_bigint: -body.amount,
+                balance_before: oldBalance,
+                balance_after: newBalance,
+                type: 'DEBIT',
+                reference_id: ticketCode,
+                meta: { description: `Apuesta: ${body.numbers}`, draw: body.draw_id, mode: body.mode },
+                created_at: new Date().toISOString()
+            });
+
+            return { data: { bet_id: newBet.id, ticket_code: ticketCode } as any };
+        }
+
+        if (functionName === 'getGlobalBets') {
+            const bets = MockDB.getBets();
+            const users = MockDB.getUsers();
+            
+            const enrichedBets = bets.map((b: any) => {
+                const u = users.find((us: any) => us.id === b.user_id);
+                return {
+                    ...b,
+                    user_name: u ? u.name : 'Unknown',
+                    user_role: u ? u.role : 'Unknown',
+                    origin: u && u.role === 'Vendedor' ? 'Vendedor' : 'Jugador'
+                };
+            });
+
+            let filtered = enrichedBets;
+            if (body.userId && body.role !== 'SuperAdmin') {
+                if (body.role === 'Vendedor') {
+                    // Vendors see their own bets OR bets of their clients
+                    const myClients = users.filter((u:any) => u.issuer_id === body.userId).map((u:any) => u.id);
+                    filtered = enrichedBets.filter((b: any) => b.user_id === body.userId || myClients.includes(b.user_id));
+                } else {
+                    filtered = enrichedBets.filter((b: any) => b.user_id === body.userId);
+                }
+            }
+
+            if (body.statusFilter && body.statusFilter !== 'ALL') {
+                filtered = filtered.filter((b: any) => b.status === body.statusFilter);
+            }
+            
+            // TIME FILTER IMPLEMENTATION
+            if (body.timeFilter && body.timeFilter !== 'ALL') {
+                 filtered = filtered.filter((b: any) => b.draw_id && b.draw_id.includes(body.timeFilter));
+            }
+
+            return { data: { bets: filtered } as any };
+        }
+
+        // 4. RESULTS & PAYOUT ENGINE (PAYMASTER)
         if (functionName === 'publishDrawResult') {
-            const { drawTime, winningNumber, isReventado, reventadoNumber, date } = body;
+            // 1. Save Result
             MockDB.saveResult({
-                date,
-                draw_time: drawTime,
-                winning_number: winningNumber,
-                is_reventado: isReventado,
-                reventado_number: reventadoNumber,
+                draw_time: body.drawTime,
+                date: body.date,
+                winning_number: body.winningNumber,
+                is_reventado: body.isReventado,
+                reventado_number: body.reventadoNumber,
                 status: 'CLOSED',
                 created_at: new Date().toISOString()
             });
+
+            // 2. Payout Logic
+            const bets = MockDB.getBets();
+            const users = MockDB.getUsers();
+            const settings = MockDB.getSettings();
             
-            // Process Payouts (Mock Logic)
-            const winningBets = MockDB.getBets().filter((b: any) => 
-                b.draw_id === drawTime && 
-                b.numbers === winningNumber && 
-                b.status === 'PENDING'
-            );
-            
-            winningBets.forEach((bet: any) => {
-                bet.status = 'WON';
-                const user = MockDB.getUsers().find((u: any) => u.id === bet.user_id);
-                if (user) {
-                    const prize = bet.amount_bigint * 90; // Standard multiplier
-                    user.balance_bigint += prize;
-                    MockDB.saveUser(user);
+            let processedCount = 0;
+            const updatedBets = [...bets]; // Copy to mutate
+
+            updatedBets.forEach((bet: any) => {
+                if (bet.status === 'PENDING' && bet.draw_id === body.drawTime) { 
+                    let won = false;
+                    let payoutMultiplier = 0;
+
+                    // Standard Win
+                    if (bet.numbers === body.winningNumber) {
+                        won = true;
+                        payoutMultiplier = settings.multiplier_tiempos || 90;
+                        
+                        // Reventado Win Logic
+                        if (bet.mode === 'Reventados (200x)') {
+                            if (body.isReventado) {
+                                payoutMultiplier = settings.multiplier_reventados || 200;
+                            } else {
+                                payoutMultiplier = settings.multiplier_tiempos || 90;
+                            }
+                        }
+                    }
+
+                    if (won) {
+                        bet.status = 'WON';
+                        const prize = bet.amount_bigint * payoutMultiplier;
+                        
+                        // Pay User
+                        const user = users.find((u: any) => u.id === bet.user_id);
+                        if (user) {
+                            user.balance_bigint += prize;
+                            MockDB.saveUser(user);
+
+                            // Ledger Payout
+                            MockDB.addTransaction({
+                                id: `tx-win-${bet.id}`,
+                                ticket_code: bet.ticket_code,
+                                user_id: user.id,
+                                amount_bigint: prize,
+                                balance_before: user.balance_bigint - prize,
+                                balance_after: user.balance_bigint,
+                                type: 'CREDIT', 
+                                reference_id: `WIN-${bet.ticket_code}`,
+                                meta: { description: `Premio: ${bet.numbers}`, multiplier: payoutMultiplier, mode: bet.mode },
+                                created_at: new Date().toISOString()
+                            });
+                        }
+                        processedCount++;
+                    } else {
+                        bet.status = 'LOST';
+                    }
                 }
             });
             
-            return { data: { success: true, processed: winningBets.length } as any };
+            MockDB.saveDB('tiempospro_db_bets', updatedBets);
+
+            MockDB.addAudit({
+                actor_id: body.actor_id,
+                action: 'PUBLISH_RESULT',
+                type: AuditEventType.GAME_BET,
+                severity: AuditSeverity.SUCCESS,
+                metadata: { draw: body.drawTime, number: body.winningNumber, winners: processedCount }
+            });
+
+            return { data: { success: true, processed: processedCount } as any };
         }
 
-        // Default fallback for any other function
-        return { message: 'Función simulada correctamente' } as any;
-    }
-
-    // --- REAL PRODUCTION CALLS ---
-    // Direct DB Calls (RLS)
-    if (functionName === 'getLiveResults') {
-        const { data, error } = await supabase.from('draw_results').select('*').order('created_at', { ascending: false }).limit(10);
-        if (error) throw error;
-        // Map snake_case to camelCase
-        const mapped = data.map((r: any) => ({
-            ...r,
-            drawTime: r.draw_time,
-            winningNumber: r.winning_number,
-            isReventado: r.is_reventado,
-            reventadoNumber: r.reventado_number
-        }));
-        return { data: { results: mapped, history: mapped } as any };
-    }
-
-    if (functionName === 'getRiskLimits') {
-        const { data, error } = await supabase.from('limits_per_number').select('*').eq('draw_type', body.draw);
-        if (error) throw error;
-        return { data: { limits: data } as any };
-    }
-
-    if (functionName === 'updateRiskLimit') {
-        const { draw, number, max_amount } = body;
-        const { data: existing } = await supabase.from('limits_per_number').select('id').eq('draw_type', draw).eq('number', number).single();
-        if (existing) {
-             const { error } = await supabase.from('limits_per_number').update({ max_amount }).eq('id', existing.id);
-             if (error) throw error;
-        } else {
-             const { error } = await supabase.from('limits_per_number').insert([{ draw_type: draw, number, max_amount }]);
-             if (error) throw error;
+        if (functionName === 'getLiveResults') {
+            const results = MockDB.getResults();
+            const mapped = results.map((r: any) => ({
+                id: r.id,
+                date: r.date,
+                drawTime: r.draw_time,
+                winningNumber: r.winning_number,
+                isReventado: r.is_reventado,
+                reventadoNumber: r.reventado_number,
+                status: r.status,
+                created_at: r.created_at
+            }));
+            
+            return { data: { results: mapped, history: mapped } as any };
         }
-        return { data: { success: true } as any };
+
+        // 5. RISK & MAINTENANCE
+        if (functionName === 'getRiskLimits') {
+            return { data: { limits: MockDB.getLimits() } as any };
+        }
+        if (functionName === 'getRiskStats') {
+            const bets = MockDB.getBets();
+            const statsMap = new Map<string, number>();
+            
+            bets.forEach((b: any) => {
+                if (b.status === 'PENDING' && b.draw_id === body.draw) {
+                    const current = statsMap.get(b.numbers) || 0;
+                    statsMap.set(b.numbers, current + b.amount_bigint);
+                }
+            });
+
+            const stats = Array.from(statsMap.entries()).map(([number, total]) => ({
+                number,
+                total_sold: total,
+                risk_percentage: 0 
+            }));
+
+            return { data: { stats } as any };
+        }
+        
+        if (functionName === 'updateRiskLimit') {
+            MockDB.saveLimit({
+                draw_type: body.draw,
+                number: body.number,
+                max_amount: body.max_amount
+            });
+            return { data: { success: true } as any };
+        }
+
+        // Maintenance Module Endpoints
+        if (functionName === 'getMaintenanceSettings') {
+            return { data: MockDB.getSettingsList() as any };
+        }
+        if (functionName === 'updateMaintenanceSetting') {
+            MockDB.updateSetting(body.key, body.value);
+            return { data: { success: true } as any };
+        }
+        if (functionName === 'getCatalogs') {
+            return { data: [] as any }; // Placeholder for catalogs
+        }
+        if (functionName === 'analyzePurge') {
+            return { data: MockDB.analyzePurge(body.target, body.days) as any };
+        }
+        if (functionName === 'executePurge') {
+            const count = MockDB.executePurge(body.target, body.days);
+            return { data: { success: true, count } as any };
+        }
+
+        return { message: 'Simulación exitosa' } as any;
     }
 
-    if (functionName === 'publishDrawResult') {
-        const { drawTime, winningNumber, isReventado, reventadoNumber, date } = body;
-        const { error } = await supabase.from('draw_results').upsert({
-            date,
-            draw_time: drawTime,
-            winning_number: winningNumber,
-            is_reventado: isReventado,
-            reventado_number: reventadoNumber,
-            status: 'CLOSED'
-        }, { onConflict: 'date,draw_time' });
-
-        if (error) throw error;
-        return { data: { success: true, processed: 0 } as any }; 
-    }
-
-    // Edge Functions (via Relay)
+    // Fallback to Real Supabase Function call (if configured)
     const response = await fetch(`${(supabase as any).supabaseUrl}${FUNCTION_BASE_URL}/${functionName}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
@@ -353,25 +525,50 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
 }
 
 export const api = {
+  // User & Identity
   createUser: async (payload: any) => invokeEdgeFunction<{ user: AppUser }>('createUser', payload),
   checkIdentityAvailability: async (cedula: string) => invokeEdgeFunction<AppUser | null>('checkIdentity', { cedula }),
-  purgeSystem: async (payload: { confirm_phrase: string; actor_id?: string }) => invokeEdgeFunction<{ ok: boolean; message: string }>('purgeSystem', payload),
-  getWeeklyDataStats: async (payload: { year: number }) => invokeEdgeFunction<{ stats: WeeklyDataStats[] }>('getWeeklyDataStats', payload),
-  purgeWeeklyData: async (payload: { year: number; weekNumber: number; confirmation: string; actor_id: string }) => invokeEdgeFunction<{ success: boolean; message: string }>('purgeWeeklyData', payload),
-  placeBet: async (payload: any) => invokeEdgeFunction<{ bet_id: string; ticket_code: string }>('placeBet', payload),
+  updateUserStatus: async (payload: any) => invokeEdgeFunction<any>('updateUserStatus', payload),
+  deleteUser: async (payload: any) => invokeEdgeFunction<any>('deleteUser', payload),
+  
+  // Finance
   rechargeUser: async (payload: any) => invokeEdgeFunction<TransactionResponse>('rechargeUser', payload),
   withdrawUser: async (payload: any) => invokeEdgeFunction<TransactionResponse>('withdrawUser', payload),
   payVendor: async (payload: any) => invokeEdgeFunction<{ ticket_code: string }>('payVendor', payload),
-  updateGlobalMultiplier: async (payload: any) => invokeEdgeFunction<any>('updateGlobalMultiplier', payload),
-  publishDrawResult: async (payload: DrawResultPayload) => invokeEdgeFunction<any>('publishDrawResult', payload),
-  updateUserStatus: async (payload: any) => invokeEdgeFunction<any>('updateUserStatus', payload),
-  deleteUser: async (payload: any) => invokeEdgeFunction<any>('deleteUser', payload),
+  
+  // Game & Core
   getServerTime: async () => invokeEdgeFunction<{ server_time: string; draw_config: any }>('getServerTime', {}),
-  getLiveResults: async () => invokeEdgeFunction<{ results: DrawResult[]; history: DrawResult[] }>('getLiveResults', {}),
+  getGlobalSettings: async () => invokeEdgeFunction<{ multiplier_tiempos: number; multiplier_reventados: number }>('getGlobalSettings', {}),
+  updateGlobalMultiplier: async (payload: any) => invokeEdgeFunction<any>('updateGlobalMultiplier', payload),
+  
+  // Betting
+  placeBet: async (payload: any) => invokeEdgeFunction<{ bet_id: string; ticket_code: string }>('placeBet', payload),
   getGlobalBets: async (payload: any) => invokeEdgeFunction<{ bets: Bet[] }>('getGlobalBets', payload),
-  generateAIAnalysis: async (payload: { drawTime: string }) => invokeEdgeFunction<any>('generateAIAnalysis', payload),
+  
+  // Results
+  getLiveResults: async () => invokeEdgeFunction<{ results: DrawResult[]; history: DrawResult[] }>('getLiveResults', {}),
+  publishDrawResult: async (payload: DrawResultPayload) => invokeEdgeFunction<any>('publishDrawResult', payload),
+  
+  // Risk
   getRiskLimits: async (payload: any) => invokeEdgeFunction<any>('getRiskLimits', payload),
   getRiskStats: async (payload: any) => invokeEdgeFunction<any>('getRiskStats', payload),
   updateRiskLimit: async (payload: any) => invokeEdgeFunction<any>('updateRiskLimit', payload),
-  generateRiskAnalysis: async (payload: { draw: string }) => invokeEdgeFunction<RiskAnalysisReport>('generateRiskAnalysis', payload)
+  generateRiskAnalysis: async (payload: { draw: string }) => invokeEdgeFunction<RiskAnalysisReport>('generateRiskAnalysis', payload),
+
+  // Maintenance
+  maintenance: {
+      getSettings: async () => invokeEdgeFunction<SystemSetting[]>('getMaintenanceSettings', {}),
+      updateSetting: async (payload: { key: string; value: any; actor_id: string }) => invokeEdgeFunction<void>('updateMaintenanceSetting', payload),
+      getCatalogs: async (payload: { category?: string }) => invokeEdgeFunction<MasterCatalogItem[]>('getCatalogs', payload),
+      upsertCatalog: async (payload: any) => invokeEdgeFunction<MasterCatalogItem>('upsertCatalog', payload),
+      softDeleteCatalog: async (payload: { id: string; actor_id: string }) => invokeEdgeFunction<void>('softDeleteCatalog', payload),
+      analyzePurge: async (payload: { target: PurgeTarget; days: number }) => invokeEdgeFunction<PurgeAnalysis>('analyzePurge', payload),
+      executePurge: async (payload: { target: PurgeTarget; days: number; actor_id: string }) => invokeEdgeFunction<{ success: boolean; count: number }>('executePurge', payload)
+  },
+  
+  // System
+  purgeSystem: async (payload: { confirm_phrase: string; actor_id?: string }) => invokeEdgeFunction<{ ok: boolean; message: string }>('purgeSystem', payload),
+  getWeeklyDataStats: async (payload: { year: number }) => invokeEdgeFunction<{ stats: WeeklyDataStats[] }>('getWeeklyDataStats', payload),
+  purgeWeeklyData: async (payload: { year: number; weekNumber: number; confirmation: string; actor_id: string }) => invokeEdgeFunction<{ success: boolean; message: string }>('purgeWeeklyData', payload),
+  generateAIAnalysis: async (payload: { drawTime: string }) => invokeEdgeFunction<any>('generateAIAnalysis', payload),
 };

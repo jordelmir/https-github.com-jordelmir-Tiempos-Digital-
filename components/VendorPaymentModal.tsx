@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/edgeApi';
 import { AppUser } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
 import { formatCurrency } from '../constants';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 interface VendorPaymentModalProps {
   isOpen: boolean;
@@ -14,6 +16,8 @@ interface VendorPaymentModalProps {
 type PaymentConcept = 'COMISION_VENTAS' | 'BONO_RENDIMIENTO' | 'AJUSTE_OPERATIVO' | 'SALARIO_BASE';
 
 export default function VendorPaymentModal({ isOpen, onClose, targetUser, onSuccess }: VendorPaymentModalProps) {
+  useBodyScrollLock(isOpen);
+
   const currentUser = useAuthStore(s => s.user);
   const [amount, setAmount] = useState<number | ''>('');
   const [concept, setConcept] = useState<PaymentConcept>('COMISION_VENTAS');

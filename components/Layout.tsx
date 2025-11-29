@@ -38,6 +38,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   if (!user) return <>{children}</>;
 
+  // Role Helper
+  const isAdmin = user.role === UserRole.SuperAdmin;
+  const isVendor = user.role === UserRole.Vendedor;
+
   return (
     <div className={`min-h-screen flex flex-col text-slate-200 font-sans selection:bg-cyber-neon selection:text-black transition-opacity duration-300 ${isShuttingDown ? 'opacity-0 scale-95 filter blur-lg' : 'opacity-100'}`}>
       
@@ -94,7 +98,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <NavItem icon="fa-chart-pie" label="Panel" active={isActive(ROUTES.DASHBOARD)} onClick={() => navigate(ROUTES.DASHBOARD)} color="cyber-neon" />
                 
                 {/* ADMIN ONLY MODULES */}
-                {user.role === UserRole.SuperAdmin && (
+                {isAdmin && (
                     <>
                         <NavItem icon="fa-dna" label="Auditoría" active={isActive(ROUTES.AUDIT)} onClick={() => navigate(ROUTES.AUDIT)} color="cyber-purple" />
                         <NavItem icon="fa-server" label="Libro" active={isActive(ROUTES.LEDGER)} onClick={() => navigate(ROUTES.LEDGER)} color="cyber-success" />
@@ -106,7 +110,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="flex items-center gap-4">
                 <div className="relative group/capsule hidden md:flex">
                     {/* Living Backlight */}
-                    <div className="absolute -inset-1 bg-[#1e3a8a] rounded-full opacity-20 blur-md animate-pulse group-hover/capsule:opacity-40 transition-opacity duration-500"></div>
+                    <div className={`absolute -inset-1 rounded-full opacity-20 blur-md animate-pulse group-hover/capsule:opacity-40 transition-opacity duration-500 ${
+                        isAdmin ? 'bg-cyber-emerald' : isVendor ? 'bg-cyber-purple' : 'bg-cyber-neon'
+                    }`}></div>
                     
                     <div className="relative flex items-center bg-[#050a14] border border-white/10 rounded-full pl-1 pr-1 py-1 gap-3 shadow-inner transition-all duration-500">
                         
@@ -117,11 +123,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
                         {/* Role Badge */}
                         <div className={`flex items-center justify-center px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border ${
-                            user.role === UserRole.SuperAdmin ? 'bg-cyber-emerald/10 border-cyber-emerald/50 text-cyber-emerald' :
-                            user.role === UserRole.Vendedor ? 'bg-cyber-purple/10 border-cyber-purple/50 text-cyber-purple' :
+                            isAdmin ? 'bg-cyber-emerald/10 border-cyber-emerald/50 text-cyber-emerald' :
+                            isVendor ? 'bg-cyber-purple/10 border-cyber-purple/50 text-cyber-purple' :
                             'bg-cyber-blue/10 border-cyber-blue/50 text-cyber-blue'
                         }`}>
-                            {user.role === UserRole.SuperAdmin ? 'ADMIN' : user.role.substring(0,4)}
+                            {isAdmin ? 'ADMIN' : user.role}
                         </div>
 
                         <div className="flex flex-col items-end leading-none mr-2">
@@ -155,7 +161,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   <MobileNavItem label="Panel Principal" icon="fa-chart-pie" color="neon" onClick={() => { navigate(ROUTES.DASHBOARD); setIsMobileMenuOpen(false); }} active={isActive(ROUTES.DASHBOARD)} />
                   
                   {/* ADMIN ONLY MOBILE MODULES */}
-                  {user.role === UserRole.SuperAdmin && (
+                  {isAdmin && (
                     <>
                         <MobileNavItem label="Auditoría Forense" icon="fa-dna" color="purple" onClick={() => { navigate(ROUTES.AUDIT); setIsMobileMenuOpen(false); }} active={isActive(ROUTES.AUDIT)} />
                         <MobileNavItem label="Libro Mayor" icon="fa-server" color="success" onClick={() => { navigate(ROUTES.LEDGER); setIsMobileMenuOpen(false); }} active={isActive(ROUTES.LEDGER)} />
@@ -172,7 +178,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                       </div>
                       <div className="flex flex-col items-end">
                           <span className="text-[9px] text-slate-500 font-mono">ROL</span>
-                          <span className="text-white font-bold">{user.role === UserRole.SuperAdmin ? 'ADMIN' : user.role}</span>
+                          <span className="text-white font-bold">{isAdmin ? 'ADMIN' : user.role}</span>
                       </div>
                   </div>
                   <button onClick={requestSignOut} className="w-full mt-2 py-3 bg-cyber-danger/10 border border-cyber-danger text-cyber-danger rounded-xl font-bold uppercase text-xs tracking-wider flex items-center justify-center gap-2 shadow-neon-red">

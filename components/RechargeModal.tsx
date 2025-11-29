@@ -4,6 +4,7 @@ import { api } from '../services/edgeApi';
 import { AppUser, UserRole } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
 import { formatCurrency } from '../constants';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 interface RechargeModalProps {
   isOpen: boolean;
@@ -15,6 +16,8 @@ interface RechargeModalProps {
 type ChargeStatus = 'IDLE' | 'CONNECTING' | 'CHARGING' | 'INJECTING' | 'COMPLETED' | 'ERROR';
 
 export default function RechargeModal({ isOpen, onClose, targetUser, onSuccess }: RechargeModalProps) {
+  useBodyScrollLock(isOpen);
+
   const currentUser = useAuthStore(s => s.user);
   const [amount, setAmount] = useState<number | ''>('');
   const [loading, setLoading] = useState(false);

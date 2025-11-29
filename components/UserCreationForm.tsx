@@ -35,8 +35,9 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   const isVendedor = current?.role === UserRole.Vendedor;
+  const isAdmin = current?.role === UserRole.SuperAdmin;
 
-  // Reset Role if Vendedor logs in
+  // Reset Role if Vendedor logs in (Force Cliente)
   useEffect(() => {
     if (isVendedor) setRole(UserRole.Cliente);
   }, [isVendedor]);
@@ -170,15 +171,14 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
         )}
 
         {/* --- STABLE FLUID BACKLIGHT SYSTEM (EMERALD OVERRIDE) --- */}
-        {/* The outer glow is now strictly Dark Emerald with HIGHER OPACITY as requested */}
         <div 
             className="absolute -inset-2 rounded-[2rem] opacity-50 blur-2xl transition-colors duration-700 ease-in-out"
-            style={{ backgroundColor: '#065f46' }} // Emerald 800 (Brighter than 900)
+            style={{ backgroundColor: '#065f46' }} // Emerald 800
         ></div>
         
         <div 
             className="absolute -inset-1 rounded-2xl opacity-80 blur-lg transition-colors duration-700 ease-in-out"
-            style={{ backgroundColor: '#10b981' }} // Emerald 500 (Solid)
+            style={{ backgroundColor: '#10b981' }} // Emerald 500
         ></div>
 
         <div 
@@ -231,7 +231,7 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
                                 boxShadow: `0 0 25px ${activeTheme.shadow.replace('0.5', '0.2')}`
                             }}
                         >
-                            {/* PLAYER TOGGLE - PERMANENT CYAN BORDER */}
+                            {/* PLAYER TOGGLE */}
                             <button
                                 type="button"
                                 onClick={() => setRole(UserRole.Cliente)}
@@ -244,19 +244,20 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
                                 Jugador
                             </button>
                             
-                            {/* VENDOR TOGGLE - PERMANENT PURPLE BORDER */}
-                            <button
-                                type="button"
-                                disabled={isVendedor}
-                                onClick={() => setRole(UserRole.Vendedor)}
-                                className={`px-6 py-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 border-2 border-cyber-purple ${
-                                    role === UserRole.Vendedor 
-                                    ? 'bg-cyber-purple text-black shadow-[0_0_20px_#bc13fe]' 
-                                    : 'bg-transparent text-slate-400 shadow-[0_0_10px_rgba(188,19,254,0.2)] hover:text-cyber-purple hover:shadow-[0_0_15px_#bc13fe] hover:bg-cyber-purple/5'
-                                } ${isVendedor ? 'opacity-50 cursor-not-allowed' : ''}`}
-                            >
-                                Vendedor
-                            </button>
+                            {/* VENDOR TOGGLE (DISABLED FOR VENDORS) */}
+                            {isAdmin && (
+                                <button
+                                    type="button"
+                                    onClick={() => setRole(UserRole.Vendedor)}
+                                    className={`px-6 py-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 border-2 border-cyber-purple ${
+                                        role === UserRole.Vendedor 
+                                        ? 'bg-cyber-purple text-black shadow-[0_0_20px_#bc13fe]' 
+                                        : 'bg-transparent text-slate-400 shadow-[0_0_10px_rgba(188,19,254,0.2)] hover:text-cyber-purple hover:shadow-[0_0_15px_#bc13fe] hover:bg-cyber-purple/5'
+                                    }`}
+                                >
+                                    Vendedor
+                                </button>
+                            )}
                         </div>
                     </div>
 

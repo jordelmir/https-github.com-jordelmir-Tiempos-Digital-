@@ -1,20 +1,27 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { api } from '../services/edgeApi';
-import { Bet, UserRole, DrawTime } from '../types';
+import { Bet, UserRole, DrawTime, GameMode } from '../types';
 import { formatCurrency, formatDate } from '../constants';
 import TicketViewModal from './TicketViewModal';
+import WinnerOverlay from './WinnerOverlay';
 
 interface GlobalBetsTableProps {
     onRefresh?: () => void;
+    refreshTrigger?: number;
 }
 
-export default function GlobalBetsTable({ onRefresh }: GlobalBetsTableProps) {
+export default function GlobalBetsTable({ onRefresh, refreshTrigger }: GlobalBetsTableProps) {
     const user = useAuthStore(s => s.user);
+    const fetchUser = useAuthStore(s => s.fetchUser);
     const [bets, setBets] = useState<(Bet & { user_name?: string, user_role?: string, origin?: string })[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedBet, setSelectedBet] = useState<Bet | null>(null);
+
+    // WINNER ANIMATION STATE
+    const [winnerData, setWinnerData] = useState<any>(null);
+    const prevBetsRef = useRef<Map<string, string>>(new Map()); // Track ID -> Status
 
     // FILTERS
     const [timeFilter, setTimeFilter] = useState<string>('ALL');
@@ -23,7 +30,9 @@ export default function GlobalBetsTable({ onRefresh }: GlobalBetsTableProps) {
 
     const fetchBets = async () => {
         if (!user) return;
-        setLoading(true);
+        // Don't set loading true on background refreshes to avoid flickering
+        if (bets.length === 0) setLoading(true);
+        
         try {
             const res = await api.getGlobalBets({
                 role: user.role,
@@ -41,12 +50,46 @@ export default function GlobalBetsTable({ onRefresh }: GlobalBetsTableProps) {
         }
     };
 
-    // Auto-refresh every 10 seconds
+    // Auto-refresh every 10 seconds AND when triggered manually by parent
     useEffect(() => {
         fetchBets();
         const interval = setInterval(fetchBets, 10000);
         return () => clearInterval(interval);
-    }, [user, timeFilter, statusFilter]); // Re-fetch on filter change
+    }, [user, timeFilter, statusFilter, refreshTrigger]); 
+
+    // --- REAL-TIME WIN DETECTION ---
+    useEffect(() => {
+        // Only trigger for Clients (Players) to create the excitement
+        if (!user || user.role !== UserRole.Cliente) return;
+
+        bets.forEach(bet => {
+            const oldStatus = prevBetsRef.current.get(bet.id);
+            
+            // Detect transition from PENDING -> WON
+            if (bet.status === 'WON' && oldStatus === 'PENDING') {
+                
+                // Calculate Prize based on Mode (Approximate for UI)
+                const multiplier = bet.amount_bigint > 0 ? (bet.mode === GameMode.REVENTADOS ? 200 : 90) : 0;
+                const prize = bet.amount_bigint * multiplier;
+
+                // Trigger Intrusive Animation
+                setWinnerData({
+                    amount: prize,
+                    number: bet.numbers,
+                    draw: bet.draw_id || 'Sorteo',
+                    type: bet.mode === GameMode.REVENTADOS ? 'REVENTADOS' : 'TIEMPOS',
+                    newBalance: user.balance_bigint + prize // Projected
+                });
+
+                // Refresh User Balance
+                fetchUser(true); 
+            }
+            
+            // Update ref
+            prevBetsRef.current.set(bet.id, bet.status);
+        });
+    }, [bets, user]);
+
 
     // Client-side Origin Filter (since fetch gets all allowed for role)
     const filteredBets = useMemo(() => {
@@ -75,6 +118,7 @@ export default function GlobalBetsTable({ onRefresh }: GlobalBetsTableProps) {
         if (type === 'STATUS') {
             if (value === 'WON') return `border-green-500 text-green-400 bg-green-900/30 ${base} shadow-[0_0_20px_#22c55e]`;
             if (value === 'PENDING') return `border-blue-500 text-blue-400 bg-blue-900/30 ${base} shadow-[0_0_20px_#3b82f6]`;
+            if (value === 'LOST') return `border-red-500 text-red-400 bg-red-900/30 ${base} shadow-[0_0_20px_#ef4444]`;
             return `border-white text-white bg-white/10 ${base}`; // All
         }
 
@@ -92,6 +136,7 @@ export default function GlobalBetsTable({ onRefresh }: GlobalBetsTableProps) {
     return (
         <div className="relative group animate-in fade-in duration-500 w-full">
             <TicketViewModal isOpen={!!selectedBet} onClose={() => setSelectedBet(null)} bet={selectedBet} />
+            <WinnerOverlay isOpen={!!winnerData} onClose={() => setWinnerData(null)} data={winnerData} />
 
             {/* BACKLIGHT - NEON VAPOR/BLUE MIX */}
             <div className="absolute -inset-1 bg-cyber-blue rounded-[2rem] opacity-20 blur-2xl animate-pulse transition-all duration-1000"></div>
@@ -145,7 +190,8 @@ export default function GlobalBetsTable({ onRefresh }: GlobalBetsTableProps) {
                                     {[
                                         { id: 'ALL', label: 'Todo' },
                                         { id: 'WON', label: 'Ganes' },
-                                        { id: 'PENDING', label: 'En Juego' }
+                                        { id: 'PENDING', label: 'En Juego' },
+                                        { id: 'LOST', label: 'Perdidas' }
                                     ].map((opt) => (
                                         <button 
                                             key={opt.id}
@@ -222,21 +268,26 @@ export default function GlobalBetsTable({ onRefresh }: GlobalBetsTableProps) {
                                 <th className="p-4 text-center">Número</th>
                                 <th className="p-4 text-center">Sorteo</th>
                                 <th className="p-4 text-right">Inversión</th>
+                                <th className="p-4 text-right text-cyber-neon">Premio</th>
                                 <th className="p-4 text-center">Estado</th>
                                 <th className="p-4 text-right pr-6">Detalle</th>
                             </tr>
                         </thead>
                         <tbody className="font-mono text-xs">
                             {loading ? (
-                                <tr><td colSpan={7} className="p-20 text-center text-cyber-blue animate-pulse tracking-widest">CARGANDO REGISTROS...</td></tr>
+                                <tr><td colSpan={8} className="p-20 text-center text-cyber-blue animate-pulse tracking-widest">CARGANDO REGISTROS...</td></tr>
                             ) : filteredBets.length === 0 ? (
-                                <tr><td colSpan={7} className="p-20 text-center text-slate-600 tracking-widest">NO HAY APUESTAS ACTIVAS</td></tr>
+                                <tr><td colSpan={8} className="p-20 text-center text-slate-600 tracking-widest">NO HAY APUESTAS ACTIVAS</td></tr>
                             ) : (
                                 filteredBets.map(bet => {
                                     const isWin = bet.status === 'WON';
                                     const isPending = bet.status === 'PENDING';
                                     const isPlayer = bet.origin === 'Jugador';
                                     
+                                    // Calc Prize for Display
+                                    const multiplier = bet.mode === GameMode.REVENTADOS ? 200 : 90;
+                                    const winAmount = isWin ? bet.amount_bigint * multiplier : 0;
+
                                     return (
                                         <tr key={bet.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
                                             <td className="p-4 pl-6">
@@ -266,6 +317,15 @@ export default function GlobalBetsTable({ onRefresh }: GlobalBetsTableProps) {
                                             </td>
                                             <td className="p-4 text-right font-bold text-white">
                                                 {formatCurrency(bet.amount_bigint)}
+                                            </td>
+                                            <td className="p-4 text-right font-bold">
+                                                {isWin ? (
+                                                    <span className="text-cyber-neon drop-shadow-[0_0_5px_cyan] text-sm">
+                                                        +{formatCurrency(winAmount)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-slate-700">-</span>
+                                                )}
                                             </td>
                                             <td className="p-4 text-center">
                                                 {isWin ? (

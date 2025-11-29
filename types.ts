@@ -19,28 +19,20 @@ export enum GameMode {
 export interface AppUser {
   id: string;
   auth_uid: string;
-  
-  // Identidad Básica
-  name: string; // Nombre Completo
-  cedula: string; // CI / ID (UNIQUE)
-  email?: string; // Opcional para Cliente, Obligatorio para Vendedor
-  phone: string; // UNIQUE
-  
+  name: string;
+  cedula: string;
+  email?: string;
+  phone: string;
   role: UserRole;
   balance_bigint: number;
   currency: string;
-  status: 'Active' | 'Suspended';
-  
-  // Metadatos de Seguridad
-  pin_hash?: string; // Only on backend, keeping here for type shape in mock
+  status: 'Active' | 'Suspended' | 'Deleted';
+  pin_hash?: string;
   failed_attempts?: number;
   locked_until?: string;
-  
   issuer_id?: string;
   created_at: string;
   updated_at: string;
-  
-  // Dynamic fields for UI logic
   active_numbers?: string[]; 
   recent_sale?: {
     target: string;
@@ -76,63 +68,46 @@ export interface LedgerTransaction {
 // --- PROFESSIONAL AUDIT SYSTEM ---
 
 export enum AuditSeverity {
-  INFO = 'INFO',       // Login, Page View
-  SUCCESS = 'SUCCESS', // Transaction Complete
-  WARNING = 'WARNING', // Failed Login, Role Collision Attempt
-  CRITICAL = 'CRITICAL', // Admin Action, Money Movement
-  FORENSIC = 'FORENSIC' // System Integrity, Purge
+  INFO = 'INFO',
+  SUCCESS = 'SUCCESS',
+  WARNING = 'WARNING',
+  CRITICAL = 'CRITICAL',
+  FORENSIC = 'FORENSIC'
 }
 
 export enum AuditEventType {
-  // IDENTITY
   IDENTITY_REGISTER = 'IDENTITY_REGISTER',
-  IDENTITY_COLLISION = 'IDENTITY_COLLISION', // Role Violation
+  IDENTITY_COLLISION = 'IDENTITY_COLLISION',
   IDENTITY_VERIFICATION = 'IDENTITY_VERIFICATION',
-  
-  // SESSION
   SESSION_LOGIN = 'SESSION_LOGIN',
   SESSION_FAILED = 'SESSION_FAILED',
-  
-  // FINANCIAL / GAME
   TX_DEPOSIT = 'TX_DEPOSIT',
   TX_WITHDRAWAL = 'TX_WITHDRAWAL',
   GAME_BET = 'GAME_BET',
-  
-  // ADMIN
   ADMIN_PURGE = 'ADMIN_PURGE',
   ADMIN_BLOCK = 'ADMIN_BLOCK',
   ADMIN_SETTINGS = 'ADMIN_SETTINGS',
-  
-  // SYSTEM & AI
   SYSTEM_INTEGRITY = 'SYSTEM_INTEGRITY',
-  AI_OPERATION = 'AI_OPERATION'
+  AI_OPERATION = 'AI_OPERATION',
+  MAINTENANCE_OP = 'MAINTENANCE_OP',
+  FINANCIAL_OP = 'FINANCIAL_OP'
 }
 
 export interface AuditLog {
   id: number;
-  event_id: string; // UUID
+  event_id: string;
   timestamp: string;
-  
-  // Actor
   actor_id: string;
   actor_role: string;
   actor_name: string;
-  
-  // Network
   ip_address: string;
-  device_fingerprint: string; // User Agent short
-  
-  // Event
+  device_fingerprint: string;
   type: AuditEventType;
-  action: string; // Human readable
+  action: string;
   severity: AuditSeverity;
-  
-  // Data
-  target_resource?: string; // ID of object affected
-  metadata: any; // JSON Diff or Details
-  
-  // Security
-  hash: string; // Integrity Hash
+  target_resource?: string;
+  metadata: any;
+  hash: string;
   previous_hash?: string;
 }
 
@@ -150,11 +125,11 @@ export interface TransactionResponse {
 }
 
 export interface DrawResultPayload {
-  date: string; // YYYY-MM-DD
+  date: string;
   drawTime: DrawTime;
   winningNumber: string;
   isReventado: boolean;
-  reventadoNumber?: string; // If applicable
+  reventadoNumber?: string;
   actor_id: string;
 }
 
@@ -172,9 +147,9 @@ export interface DrawResult {
 // --- RISK MANAGEMENT ---
 export interface RiskLimit {
     id: string;
-    draw_type: string; // DrawTime
-    number: string; // '00'-'99' or 'ALL'
-    max_amount: number; // Cents
+    draw_type: string;
+    number: string;
+    max_amount: number;
     created_at: string;
 }
 
@@ -192,12 +167,44 @@ export interface RiskAnalysisReport {
     anomaliesDetected: string[];
 }
 
-// --- DATA MAINTENANCE ---
+// --- DATA MAINTENANCE & SYSTEM SETTINGS ---
 export interface WeeklyDataStats {
     year: number;
     weekNumber: number;
     recordCount: number;
     startDate: string;
     endDate: string;
-    sizeEstimate: string; // e.g., "1.2 MB"
+    sizeEstimate: string;
+}
+
+export interface SystemSetting {
+    key: string;
+    value: any;
+    description: string;
+    group: 'CORE' | 'FINANCE' | 'RISK' | 'UI';
+    updated_at: string;
+    updated_by: string;
+    is_locked?: boolean;
+}
+
+export interface MasterCatalogItem {
+    id: string;
+    category: string;
+    code: string;
+    label: string;
+    status: 'ACTIVE' | 'ARCHIVED' | 'DELETED';
+    metadata?: any;
+    order_index: number;
+}
+
+// --- ATOMIC LIFECYCLE MANAGEMENT ---
+export type PurgeTarget = 'BETS' | 'AUDIT' | 'RESULTS' | 'LEDGER_HISTORY';
+
+export interface PurgeAnalysis {
+    target: PurgeTarget;
+    cutoffDate: string;
+    recordCount: number;
+    estimatedSizeKB: number;
+    riskLevel: 'LOW' | 'MEDIUM' | 'HIGH';
+    canProceed: boolean;
 }

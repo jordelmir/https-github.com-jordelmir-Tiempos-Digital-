@@ -34,13 +34,13 @@ export const useAuthStore = create<AuthState>()(persist((set) => ({
         .single();
 
       if (dbError || !appUser) {
-        console.error("Profile not found for auth user", dbError);
+        console.error("Profile not found for auth user:", JSON.stringify(dbError || { message: "No profile found" }, null, 2));
         set({ user: null, loading: false });
       } else {
         set({ user: appUser as AppUser, loading: false });
       }
     } catch (e) {
-      console.error(e);
+      console.error("Auth Exception:", e);
       set({ user: null, loading: false });
     }
   },

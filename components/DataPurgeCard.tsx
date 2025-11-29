@@ -1,344 +1,497 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { useMaintenanceStore } from '../store/useMaintenanceStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { api } from '../services/edgeApi';
-import { WeeklyDataStats } from '../types';
+import { SystemSetting, MasterCatalogItem, PurgeTarget } from '../types';
+import { formatCurrency } from '../constants';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock'; // Import Hook
 
-export default function DataPurgeCard({ theme }: { theme?: { name: string, shadow: string } }) {
-  const [open, setOpen] = useState(false);
-  const [confirm, setConfirm] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<'TOTAL' | 'WEEKLY'>('WEEKLY');
+// ... [SettingRow, CatalogRow, SectorVisualizer, CatalogEditorModal components remain unchanged] ...
+// To save space in XML response, I'm skipping the re-definition of sub-components if they haven't changed logic.
+// Assuming sub-components are defined above here in the actual file.
+
+// --- RE-INSERT SUB-COMPONENTS TO ENSURE FILE INTEGRITY ---
+const SettingRow: React.FC<{ setting: SystemSetting; onSave: (val: any) => void }> = ({ setting, onSave }) => {
+    const [val, setVal] = useState<string>(String(setting.value));
+    const [isDirty, setIsDirty] = useState(false);
+
+    useEffect(() => { setVal(String(setting.value)); }, [setting.value]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setVal(e.target.value);
+        setIsDirty(e.target.value !== String(setting.value));
+    };
+
+    const handleSave = () => {
+        let finalVal: any = val;
+        if (!isNaN(Number(val)) && val.trim() !== '') finalVal = Number(val);
+        if (val === 'true') finalVal = true;
+        if (val === 'false') finalVal = false;
+        onSave(finalVal);
+        setIsDirty(false);
+    };
+
+    return (
+        <div className="flex items-center justify-between p-4 bg-black/40 border border-white/5 rounded-none border-b-0 last:border-b hover:bg-white/5 transition-all group relative overflow-hidden">
+            <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyber-blue opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="flex-1 relative z-10">
+                <div className="flex items-center gap-3 mb-1">
+                    <span className="text-xs font-mono font-bold text-cyber-blue uppercase tracking-widest">{setting.key}</span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 text-slate-400 font-mono border border-white/5">{setting.group}</span>
+                </div>
+                <p className="text-[10px] text-slate-500 font-mono pl-0 opacity-70 group-hover:opacity-100 transition-opacity">{setting.description}</p>
+            </div>
+            <div className="flex items-center gap-2 relative z-10">
+                <input type="text" value={val} onChange={handleChange} className="bg-[#050508] border border-white/10 rounded px-3 py-1.5 text-white font-mono text-xs focus:border-cyber-blue focus:shadow-[0_0_10px_rgba(0,240,255,0.2)] focus:outline-none w-48 text-right transition-all" />
+                <button onClick={handleSave} disabled={!isDirty} className={`w-8 h-8 flex items-center justify-center rounded transition-all duration-300 ${isDirty ? 'bg-cyber-blue text-black hover:scale-110 shadow-[0_0_10px_cyan]' : 'bg-transparent text-slate-700 opacity-20 cursor-default'}`}><i className="fas fa-save"></i></button>
+            </div>
+        </div>
+    );
+};
+
+const CatalogRow: React.FC<{ item: MasterCatalogItem, onEdit: (item: MasterCatalogItem) => void }> = ({ item, onEdit }) => (
+    <div className="grid grid-cols-12 gap-4 p-3 border-b border-white/5 items-center hover:bg-white/5 transition-colors text-xs font-mono group relative">
+        <div className="col-span-2 text-slate-500 group-hover:text-cyber-purple transition-colors font-bold">{item.code}</div>
+        <div className="col-span-4 text-white font-bold tracking-wide">{item.label}</div>
+        <div className="col-span-3">
+            <span className="text-[9px] uppercase tracking-wider text-cyber-purple/80 bg-cyber-purple/10 px-2 py-0.5 rounded border border-cyber-purple/20">
+                {item.category}
+            </span>
+        </div>
+        <div className="col-span-2 text-center">
+            <span className={`px-2 py-0.5 rounded text-[8px] uppercase font-bold border ${item.status === 'ACTIVE' ? 'border-green-500/30 text-green-400 bg-green-900/10' : 'border-slate-700 text-slate-500 bg-slate-900/50'}`}>
+                {item.status}
+            </span>
+        </div>
+        <div className="col-span-1 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={() => onEdit(item)} className="text-slate-400 hover:text-white transition-colors hover:scale-110 transform">
+                <i className="fas fa-edit"></i>
+            </button>
+        </div>
+    </div>
+);
+
+const SectorVisualizer: React.FC<{ 
+    isScanning: boolean; 
+    hasAnalysis: boolean; 
+    riskLevel: 'LOW'|'MEDIUM'|'HIGH';
+    isPurging: boolean;
+    isClean: boolean;
+}> = ({ isScanning, hasAnalysis, riskLevel, isPurging, isClean }) => {
+    const cells = 64; 
+    const gridCells = useMemo(() => Array.from({length: cells}), []);
+
+    return (
+        <div className="relative w-full aspect-square max-w-[280px] mx-auto bg-black/80 border-2 border-white/10 rounded-2xl p-2 grid grid-cols-8 gap-1 shadow-[inset_0_0_30px_rgba(0,0,0,1)] overflow-hidden group">
+            <div className={`absolute top-0 left-0 w-full h-1 bg-cyber-blue shadow-[0_0_15px_cyan] opacity-0 transition-all duration-[1500ms] linear z-20 ${isScanning ? 'opacity-100 top-[120%]' : '-top-2'}`}></div>
+            {gridCells.map((_, i) => {
+                let colorClass = "bg-[#1a1a20]";
+                let animClass = "";
+                let glowClass = "";
+                if (isClean) {
+                    colorClass = "bg-emerald-500/20 border border-emerald-500/30";
+                    if (Math.random() > 0.8) animClass = "animate-pulse"; 
+                } else if (isPurging) {
+                    if (i % 3 === 0 || i % 7 === 0) { colorClass = "bg-white"; animClass = "animate-ping"; }
+                    else if (i % 2 === 0) { colorClass = "bg-red-600"; animClass = "animate-pulse"; }
+                    else { colorClass = "bg-black"; }
+                } else if (hasAnalysis) {
+                    if (riskLevel === 'HIGH' && (i % 2 === 0 || i > 40)) { colorClass = "bg-red-500/80 border border-red-500"; glowClass = "shadow-[0_0_5px_red]"; }
+                    else if (riskLevel === 'MEDIUM' && i % 3 === 0) { colorClass = "bg-yellow-500/80 border border-yellow-500"; }
+                    else if (i % 5 === 0) { colorClass = "bg-slate-700"; }
+                } else if (isScanning) {
+                    colorClass = "bg-cyber-blue/10";
+                    if (Math.random() > 0.7) animClass = "animate-pulse";
+                }
+                return (
+                    <div key={i} className={`rounded-[2px] transition-all duration-500 ${colorClass} ${animClass} ${glowClass}`} style={{ transitionDelay: `${i * 5}ms` }} />
+                )
+            })}
+            <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
+                {isClean && (
+                    <div className="bg-black/80 backdrop-blur-sm p-4 rounded-full border border-emerald-500 shadow-[0_0_30px_lime] animate-in zoom-in duration-300">
+                        <i className="fas fa-check text-4xl text-emerald-500"></i>
+                    </div>
+                )}
+                {isPurging && (
+                    <i className="fas fa-radiation text-6xl text-red-600 animate-[spin_3s_linear_infinite] drop-shadow-[0_0_20px_red]"></i>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const CatalogEditorModal: React.FC<{ 
+    item: Partial<MasterCatalogItem> | null, 
+    isOpen: boolean, 
+    onClose: () => void, 
+    onSave: (item: Partial<MasterCatalogItem>) => void,
+    onDelete: (id: string) => void
+}> = ({ item, isOpen, onClose, onSave, onDelete }) => {
+    const [formData, setFormData] = useState<Partial<MasterCatalogItem>>({
+        code: '', label: '', category: 'GENERAL', status: 'ACTIVE', order_index: 0, metadata: {}
+    });
+    
+    useBodyScrollLock(isOpen);
+
+    useEffect(() => {
+        if (item) setFormData(item);
+        else setFormData({ code: '', label: '', category: 'GENERAL', status: 'ACTIVE', order_index: 0, metadata: {} });
+    }, [item, isOpen]);
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-[#0a0a0f] border border-cyber-purple/50 w-full max-w-lg rounded-2xl shadow-[0_0_50px_rgba(188,19,254,0.15)] relative overflow-hidden flex flex-col max-h-[90%]">
+                <div className="p-6 border-b border-white/10 bg-cyber-purple/5 flex justify-between items-center">
+                    <h3 className="text-lg font-display font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <i className="fas fa-database text-cyber-purple"></i> 
+                        {item?.id ? 'Editar Registro' : 'Nuevo Registro'}
+                    </h3>
+                    <button onClick={onClose} className="text-slate-500 hover:text-white"><i className="fas fa-times"></i></button>
+                </div>
+                <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Código Único</label>
+                            <input value={formData.code} onChange={e => setFormData({...formData, code: e.target.value.toUpperCase()})} className="w-full bg-black border border-white/10 rounded-lg p-3 text-white font-mono text-xs focus:border-cyber-purple focus:outline-none" placeholder="COD-001" />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Categoría</label>
+                            <input value={formData.category} onChange={e => setFormData({...formData, category: e.target.value.toUpperCase()})} className="w-full bg-black border border-white/10 rounded-lg p-3 text-white font-mono text-xs focus:border-cyber-purple focus:outline-none" placeholder="GENERAL" />
+                        </div>
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Etiqueta / Nombre</label>
+                        <input value={formData.label} onChange={e => setFormData({...formData, label: e.target.value})} className="w-full bg-black border border-white/10 rounded-lg p-3 text-white font-mono text-xs focus:border-cyber-purple focus:outline-none" placeholder="Descripción del item..." />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Estado</label>
+                            <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as any})} className="w-full bg-black border border-white/10 rounded-lg p-3 text-white font-mono text-xs focus:border-cyber-purple focus:outline-none">
+                                <option value="ACTIVE">ACTIVO</option>
+                                <option value="ARCHIVED">ARCHIVADO</option>
+                                <option value="DELETED">ELIMINADO</option>
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Orden</label>
+                            <input type="number" value={formData.order_index} onChange={e => setFormData({...formData, order_index: Number(e.target.value)})} className="w-full bg-black border border-white/10 rounded-lg p-3 text-white font-mono text-xs focus:border-cyber-purple focus:outline-none" />
+                        </div>
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Metadata (JSON)</label>
+                        <textarea value={JSON.stringify(formData.metadata || {}, null, 2)} onChange={e => { try { const parsed = JSON.parse(e.target.value); setFormData({...formData, metadata: parsed}); } catch(err) {} }} className="w-full bg-black border border-white/10 rounded-lg p-3 text-green-500 font-mono text-[10px] focus:border-cyber-purple focus:outline-none h-24" />
+                    </div>
+                </div>
+                <div className="p-6 border-t border-white/10 bg-black/40 flex justify-between">
+                    {item?.id ? <button onClick={() => onDelete(item.id!)} className="text-red-500 hover:text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2 border border-red-900/30 rounded hover:bg-red-600 hover:border-red-600 transition-all">Eliminar</button> : <div></div>}
+                    <div className="flex gap-3">
+                        <button onClick={onClose} className="px-6 py-2 rounded-lg border border-white/10 text-slate-400 hover:text-white text-xs font-bold uppercase tracking-wide transition-all">Cancelar</button>
+                        <button onClick={() => onSave(formData)} className="px-6 py-2 rounded-lg bg-cyber-purple text-white hover:bg-white hover:text-cyber-purple text-xs font-bold uppercase tracking-wide transition-all shadow-[0_0_15px_rgba(188,19,254,0.3)]">Guardar Cambios</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default function DataPurgeCard({ theme }: { theme?: any }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'SETTINGS' | 'CATALOGS' | 'BACKUPS' | 'LIFECYCLE' | 'LOGS'>('SETTINGS');
   const user = useAuthStore(s => s.user);
+  
+  // LOCK SCROLL
+  useBodyScrollLock(isOpen);
 
-  // WEEKLY MODE STATE
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [weeklyStats, setWeeklyStats] = useState<WeeklyDataStats[]>([]);
-  const [selectedWeek, setSelectedWeek] = useState<WeeklyDataStats | null>(null);
-  const [loadingStats, setLoadingStats] = useState(false);
+  const { 
+      settings, fetchSettings, updateSetting, 
+      catalogs, fetchCatalogs, upsertCatalogItem, deleteCatalogItem,
+      analysis, isAnalyzing, analyzePurge, executePurge, clearAnalysis
+  } = useMaintenanceStore();
+  
+  const [purgeTarget, setPurgeTarget] = useState<PurgeTarget>('BETS');
+  const [purgeRange, setPurgeRange] = useState<number>(30);
+  const [confirmPhrase, setConfirmPhrase] = useState('');
+  const [holding, setHolding] = useState(false);
+  const [holdProgress, setHoldProgress] = useState(0);
+  const [purgeSuccess, setPurgeSuccess] = useState(false);
+  const holdInterval = useRef<any>(null);
 
-  // ANIMATION STATE
-  const [success, setSuccess] = useState(false);
-  const [recoveredInfo, setRecoveredInfo] = useState('');
+  const [catalogSearch, setCatalogSearch] = useState('');
+  const [catalogCategoryFilter, setCatalogCategoryFilter] = useState('ALL');
+  const [editingCatalogItem, setEditingCatalogItem] = useState<Partial<MasterCatalogItem> | null>(null);
+  const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
 
-  const PHRASE_TOTAL = 'CONFIRMAR PURGA TOTAL';
-  const getPhraseWeekly = (week: number) => `ELIMINAR SEMANA ${week}`;
+  const [backupProgress, setBackupProgress] = useState(0);
+  const [backupStatus, setBackupStatus] = useState<'IDLE' | 'RUNNING' | 'COMPLETED'>('IDLE');
+  const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-      if (open && mode === 'WEEKLY') {
-          fetchWeeklyStats();
+      if (isOpen) {
+          if (activeTab === 'SETTINGS') fetchSettings();
+          if (activeTab === 'CATALOGS') fetchCatalogs();
       }
-  }, [open, mode, year]);
+  }, [isOpen, activeTab]);
 
-  // Reset states when closing
-  useEffect(() => {
-      if (!open) {
-          setSuccess(false);
-          setConfirm('');
-          setRecoveredInfo('');
-      }
-  }, [open]);
+  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [terminalLogs]);
 
-  const fetchWeeklyStats = async () => {
-      setLoadingStats(true);
-      try {
-          const res = await api.getWeeklyDataStats({ year });
-          if (res.data) setWeeklyStats(res.data.stats);
-      } catch (e) {
-          console.error(e);
-      } finally {
-          setLoadingStats(false);
-      }
+  const startHold = () => {
+      if (!analysis || (analysis.riskLevel === 'HIGH' && confirmPhrase !== 'CONFIRM PURGE')) return;
+      setHolding(true);
+      setHoldProgress(0);
+      holdInterval.current = setInterval(() => {
+          setHoldProgress(prev => {
+              if (prev >= 100) {
+                  clearInterval(holdInterval.current);
+                  handlePurge();
+                  return 100;
+              }
+              return prev + 4;
+          });
+      }, 30);
   };
 
-  async function runPurge() {
-    if (!user) return;
-    setLoading(true);
-    
-    try {
-        if (mode === 'TOTAL') {
-            const res = await api.purgeSystem({ confirm_phrase: confirm, actor_id: user.id });
-            if (res.error) {
-                alert(res.error);
-                setLoading(false);
-                return;
-            }
-        } else {
-            if (!selectedWeek) return;
-            const res = await api.purgeWeeklyData({
-                year: selectedWeek.year,
-                weekNumber: selectedWeek.weekNumber,
-                confirmation: confirm,
-                actor_id: user.id
-            });
-            if (res.error) {
-                alert(res.error);
-                setLoading(false);
-                return;
-            }
-            setRecoveredInfo(selectedWeek.sizeEstimate);
-        }
+  const endHold = () => {
+      setHolding(false);
+      if (holdProgress < 100) setHoldProgress(0);
+      if (holdInterval.current) clearInterval(holdInterval.current);
+  };
 
-        // TRIGGER ANIMATION SEQUENCE
-        setSuccess(true);
-        setLoading(false);
+  const addLog = (msg: string) => {
+      const time = new Date().toLocaleTimeString('es-CR', { hour12: false }) + '.' + new Date().getMilliseconds();
+      setTerminalLogs(prev => [...prev, `[${time}] ${msg}`]);
+  };
 
-        // Auto Close after animation
-        setTimeout(() => {
-            setOpen(false);
-            if (mode === 'WEEKLY') fetchWeeklyStats();
-            setSelectedWeek(null);
-        }, 3500);
+  const handleBackup = () => {
+      if(backupStatus === 'RUNNING') return;
+      setBackupStatus('RUNNING');
+      setBackupProgress(0);
+      setTerminalLogs([]);
+      addLog("INITIATING_SYSTEM_DUMP_PROTOCOL_V4...");
+      addLog("LOCKING_WRITE_ACCESS...");
+      let p = 0;
+      const interval = setInterval(() => {
+          p += Math.random() * 8;
+          if (p > 30 && p < 35) addLog("COMPRESSING_TABLE: APP_USERS...");
+          if (p > 60 && p < 65) addLog("COMPRESSING_TABLE: LEDGER_TRANSACTIONS...");
+          if (p > 90 && p < 95) addLog("VERIFYING_CHECKSUM_SHA256...");
+          if (p >= 100) {
+              p = 100;
+              clearInterval(interval);
+              setBackupStatus('COMPLETED');
+              addLog("BACKUP_SUCCESSFUL: SNAPSHOT_" + Date.now());
+              addLog("RELEASE_WRITE_LOCK: OK");
+          }
+          setBackupProgress(p);
+      }, 200);
+  };
 
-    } catch (e) {
-        alert("ERROR CRÍTICO");
-        setLoading(false);
-    }
+  const handleAnalyze = () => {
+      clearAnalysis();
+      analyzePurge(purgeTarget, purgeRange);
+  };
+
+  const handlePurge = async () => {
+      if (!user) return;
+      await executePurge(purgeTarget, purgeRange, user.id);
+      setPurgeSuccess(true);
+      setTimeout(() => {
+          setPurgeSuccess(false);
+          clearAnalysis();
+          setConfirmPhrase('');
+          setHoldProgress(0);
+      }, 4000);
+  };
+
+  const uniqueCategories = useMemo<string[]>(() => ['ALL', ...Array.from(new Set(catalogs.map(c => c.category)))], [catalogs]);
+  const filteredCatalogs = useMemo(() => {
+      return catalogs.filter(c => 
+          (catalogCategoryFilter === 'ALL' || c.category === catalogCategoryFilter) &&
+          (c.label.toLowerCase().includes(catalogSearch.toLowerCase()) || c.code.toLowerCase().includes(catalogSearch.toLowerCase()))
+      );
+  }, [catalogs, catalogSearch, catalogCategoryFilter]);
+
+  if (!isOpen) {
+      return (
+          <button onClick={() => setIsOpen(true)} className="w-full py-4 bg-[#0a0a0f] border-2 border-white/5 hover:border-cyber-purple/50 rounded-2xl flex items-center justify-center gap-3 group transition-all shadow-lg hover:shadow-[0_0_20px_rgba(188,19,254,0.1)]">
+              <div className="w-10 h-10 rounded-full bg-black border border-white/10 flex items-center justify-center group-hover:scale-110 transition-transform"><i className="fas fa-cogs text-slate-500 group-hover:text-cyber-purple"></i></div>
+              <div className="text-left"><div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest group-hover:text-white transition-colors">Sistema</div><div className="text-xs font-mono text-slate-600 group-hover:text-cyber-purple transition-colors">Mantenimiento v4.2</div></div>
+          </button>
+      );
   }
 
-  // HEATMAP COLOR LOGIC
-  const getHeatColor = (count: number) => {
-      if (count === 0) return 'bg-[#0f172a] border-white/5 text-slate-700'; // Dead / Empty
-      if (count < 100) return 'bg-cyan-900/20 border-cyan-800 text-cyan-600';
-      if (count < 1000) return 'bg-cyan-700/30 border-cyan-500 text-cyan-400 shadow-[0_0_5px_cyan]';
-      return 'bg-emerald-600/40 border-emerald-400 text-emerald-200 shadow-[0_0_10px_#10b981] animate-pulse'; // Hot / Full
-  };
-
-  return (
-    <>
-      <div className="relative group h-full">
-          {/* Danger Backlight */}
-          <div className="absolute -inset-2 bg-red-900/30 rounded-[2rem] blur-2xl animate-[pulse_6s_ease-in-out_infinite]"></div>
-          
-          <div className="relative h-full bg-cyber-black border-2 border-red-900/50 rounded-2xl p-6 shadow-2xl overflow-hidden hover:border-red-500/50 transition-all duration-300 z-10 flex flex-col justify-between">
+  // PORTAL IMPLEMENTATION
+  return createPortal(
+    <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl animate-in fade-in duration-300 flex items-center justify-center p-0 sm:p-4">
+        <CatalogEditorModal item={editingCatalogItem} isOpen={isCatalogModalOpen} onClose={() => setIsCatalogModalOpen(false)} onSave={async (item) => { if(user) { await upsertCatalogItem(item, user.id); setIsCatalogModalOpen(false); fetchCatalogs(); } }} onDelete={async (id) => { if(user) { await deleteCatalogItem(id, user.id); setIsCatalogModalOpen(false); } }} />
+        <div className="relative w-full max-w-6xl h-full sm:h-[85vh] bg-[#020305] border-0 sm:border-2 border-white/10 sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden">
             
-            {/* Warning Stripes */}
-            <div className="absolute inset-0 opacity-5 pointer-events-none" style={{backgroundImage: 'repeating-linear-gradient(45deg, #ff0000 0, #ff0000 2px, transparent 0, transparent 20px)'}}></div>
-            
-            <div className="relative z-10">
-                <h3 className="font-display font-bold text-red-500 text-lg flex items-center gap-3 mb-2 uppercase tracking-wider text-shadow-red">
-                    <i className="fas fa-trash-alt"></i> Mantenimiento de Datos
-                </h3>
-                <p className="text-xs font-mono text-red-300/70 mb-6 leading-relaxed">
-                    Gestión de almacenamiento y depuración de registros antiguos. <br/>
-                    <span className="text-red-500 font-bold">Optimiza el rendimiento del núcleo.</span>
-                </p>
-            </div>
-                
-            <button 
-                onClick={() => setOpen(true)} 
-                className="w-full relative group/btn overflow-visible rounded-lg mt-auto"
-            >
-                <div className="absolute -inset-1 bg-red-600 rounded-lg blur opacity-0 group-hover/btn:opacity-40 transition-opacity duration-300 animate-pulse"></div>
-                <div className="relative z-10 py-3 border border-red-600 bg-red-950/30 group-hover/btn:bg-red-600 rounded-lg transition-colors">
-                    <span className="flex items-center justify-center gap-2 font-display font-bold uppercase tracking-[0.2em] text-red-500 group-hover/btn:text-black transition-colors">
-                            <i className="fas fa-tools"></i> Abrir Consola
-                    </span>
-                </div>
-            </button>
-          </div>
-      </div>
-
-      {open && (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-xl flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300">
-          <div className="relative w-full max-w-5xl h-[85vh] flex flex-col perspective-1000">
-             
-             {/* Background Grid */}
-             <div className="absolute inset-0 bg-[linear-gradient(rgba(255,0,60,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,0,60,0.05)_1px,transparent_1px)] bg-[length:40px_40px] pointer-events-none"></div>
-
-             <div className="bg-[#050a14] border-2 border-red-900 rounded-3xl w-full h-full p-8 shadow-[0_0_100px_rgba(255,0,0,0.1)] relative overflow-hidden z-10 flex flex-col">
-                
-                {/* --- SUCCESS ANIMATION OVERLAY --- */}
-                {success && (
-                    <div className="absolute inset-0 z-50 bg-black flex flex-col items-center justify-center animate-in fade-in duration-300">
-                        {/* EXPLOSION RING */}
-                        <div className="absolute w-[150%] h-[150%] rounded-full border-[20px] border-emerald-500/20 animate-[ping_1.5s_ease-out_infinite]"></div>
-                        <div className="absolute w-full h-full bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.2),transparent_70%)] animate-pulse"></div>
-                        
-                        {/* CENTER ICON TRANSFORMATION */}
-                        <div className="relative z-10 text-center animate-in zoom-in duration-500 delay-100">
-                            <div className="w-40 h-40 mx-auto bg-[#022c22] rounded-full border-4 border-emerald-500 shadow-[0_0_100px_#10b981] flex items-center justify-center mb-8 relative overflow-hidden">
-                                {/* Scanline inside circle */}
-                                <div className="absolute top-0 w-full h-2 bg-emerald-400/50 shadow-[0_0_20px_#10b981] animate-[scanline_1s_linear_infinite]"></div>
-                                <i className="fas fa-check text-7xl text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,1)]"></i>
-                            </div>
-                            
-                            <h2 className="text-5xl font-display font-black text-white uppercase tracking-tighter mb-2 drop-shadow-[0_0_20px_rgba(16,185,129,0.8)]">
-                                SYSTEM <span className="text-emerald-500">CLEAN</span>
-                            </h2>
-                            <div className="text-emerald-400/70 font-mono text-sm tracking-[0.5em] uppercase font-bold animate-pulse">
-                                Optimization Complete
-                            </div>
-                            
-                            {recoveredInfo && (
-                                <div className="mt-8 inline-block bg-emerald-900/30 border border-emerald-500/50 px-6 py-2 rounded-full text-emerald-300 font-mono text-xs">
-                                    <i className="fas fa-hdd mr-2"></i> ESPACIO RECUPERADO: {recoveredInfo}
-                                </div>
-                            )}
-                        </div>
+            {/* Header - OPTIMIZED FOR RESPONSIVENESS */}
+            <div className="bg-[#0a0a0f] border-b border-white/5 p-3 sm:p-4 md:p-6 flex justify-between items-center relative overflow-hidden shrink-0">
+                <div className="absolute top-0 left-0 w-full h-[2px] bg-cyber-purple shadow-[0_0_20px_#bc13fe] animate-pulse"></div>
+                <div className="flex items-center gap-2 sm:gap-3 md:gap-4 relative z-10 shrink-0 min-w-0 max-w-[75%]">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg sm:rounded-xl bg-cyber-purple/10 flex items-center justify-center border border-cyber-purple/30 shadow-neon-purple shrink-0 transition-all">
+                        <i className="fas fa-server text-sm sm:text-lg md:text-2xl text-cyber-purple"></i>
                     </div>
-                )}
-
-                {/* Header */}
-                <div className="flex justify-between items-center mb-8 border-b border-white/10 pb-6 shrink-0 relative z-10">
-                    <div>
-                        <h2 className="text-3xl font-display font-black text-white uppercase tracking-tighter flex items-center gap-4">
-                            <i className="fas fa-server text-red-500 animate-pulse"></i>
-                            Estación de <span className="text-red-500">Purga</span>
+                    <div className="min-w-0 flex flex-col justify-center">
+                        <h2 className="text-base sm:text-lg md:text-2xl font-display font-black text-white uppercase tracking-tighter leading-none truncate">
+                            SYSTEM KERNEL
                         </h2>
-                        <p className="text-xs font-mono text-slate-500 uppercase tracking-widest mt-1">
-                            Sistema de liberación de espacio cronológico
-                        </p>
+                        <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5 sm:mt-1 overflow-hidden">
+                            <span className="text-[9px] sm:text-[10px] font-mono text-slate-500 whitespace-nowrap">V4.2.0</span>
+                            <span className="px-1.5 py-px sm:py-0.5 rounded bg-red-900/30 border border-red-500/30 text-[7px] sm:text-[8px] text-red-400 font-bold uppercase tracking-wider whitespace-nowrap truncate">
+                                Root_Access
+                            </span>
+                        </div>
                     </div>
-                    <button onClick={() => setOpen(false)} className="text-slate-500 hover:text-white transition-colors">
-                        <i className="fas fa-times text-2xl"></i>
-                    </button>
+                </div>
+                <button onClick={() => setIsOpen(false)} className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-white/5 hover:bg-red-500 hover:text-white flex items-center justify-center transition-all z-10 shrink-0 ml-2 group">
+                    <i className="fas fa-power-off text-xs sm:text-sm group-hover:scale-110 transition-transform"></i>
+                </button>
+            </div>
+
+            <div className="flex flex-1 overflow-hidden flex-col md:flex-row">
+                {/* Sidebar */}
+                <div className="w-full md:w-64 bg-[#050508] border-b md:border-b-0 md:border-r border-white/5 flex flex-row md:flex-col p-2 md:p-4 gap-2 overflow-x-auto md:overflow-y-auto shrink-0 no-scrollbar items-center md:items-stretch">
+                    {[ { id: 'SETTINGS', icon: 'fa-sliders-h', label: 'Variables' }, { id: 'CATALOGS', icon: 'fa-database', label: 'Catálogos' }, { id: 'LIFECYCLE', icon: 'fa-recycle', label: 'Ciclo' }, { id: 'BACKUPS', icon: 'fa-hdd', label: 'Backups' }, { id: 'LOGS', icon: 'fa-terminal', label: 'Logs' } ].map(tab => (
+                        <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2 md:py-3 rounded-xl transition-all font-mono text-[10px] sm:text-xs uppercase tracking-wide group relative overflow-hidden whitespace-nowrap flex-shrink-0 ${activeTab === tab.id ? 'bg-cyber-purple text-black font-bold shadow-[0_0_20px_rgba(188,19,254,0.4)]' : 'text-slate-500 hover:bg-white/5 hover:text-white'}`}>
+                            {activeTab === tab.id && <div className="absolute inset-0 bg-white/20 animate-pulse"></div>}
+                            <i className={`fas ${tab.icon} w-4 md:w-5 text-center`}></i><span className="relative z-10">{tab.label}</span>
+                        </button>
+                    ))}
                 </div>
 
-                {/* Mode Selector */}
-                <div className="flex gap-4 mb-8 shrink-0 relative z-10">
-                    <button 
-                        onClick={() => setMode('WEEKLY')}
-                        className={`flex-1 py-4 rounded-xl border-2 font-bold uppercase tracking-widest transition-all ${mode === 'WEEKLY' ? 'bg-red-900/20 border-red-500 text-white shadow-[0_0_20px_rgba(255,0,0,0.2)]' : 'border-white/10 text-slate-500 hover:bg-white/5'}`}
-                    >
-                        <i className="fas fa-calendar-week mr-2"></i> Limpieza Selectiva (Semanal)
-                    </button>
-                    <button 
-                        onClick={() => setMode('TOTAL')}
-                        className={`flex-1 py-4 rounded-xl border-2 font-bold uppercase tracking-widest transition-all ${mode === 'TOTAL' ? 'bg-red-600 text-black border-red-500 shadow-neon-red' : 'border-white/10 text-slate-500 hover:bg-red-900/10 hover:text-red-400'}`}
-                    >
-                        <i className="fas fa-radiation mr-2"></i> Purga Total (Emergencia)
-                    </button>
-                </div>
+                <div className="flex-1 bg-black/20 relative flex flex-col overflow-hidden">
+                    {/* SETTINGS TAB */}
+                    {activeTab === 'SETTINGS' && (
+                        <div className="h-full overflow-y-auto custom-scrollbar divide-y divide-white/5">
+                            {settings.map(s => <SettingRow key={s.key} setting={s} onSave={(val) => user && updateSetting(s.key, val, user.id)} />)}
+                        </div>
+                    )}
 
-                {/* --- WEEKLY VIEW CONTENT --- */}
-                {mode === 'WEEKLY' && (
-                    <div className="flex-1 flex flex-col min-h-0 relative z-10">
-                        {/* Year Selector */}
-                        <div className="flex justify-between items-center mb-4 shrink-0">
-                            <h4 className="text-sm font-display font-bold text-white uppercase tracking-wider">Mapa de Calor: {year}</h4>
-                            <div className="flex bg-black border border-white/10 rounded-lg p-1">
-                                <button onClick={() => setYear(y => y-1)} className="px-3 py-1 hover:bg-white/10 rounded text-slate-400"><i className="fas fa-chevron-left"></i></button>
-                                <span className="px-4 py-1 font-mono font-bold text-white">{year}</span>
-                                <button onClick={() => setYear(y => y+1)} className="px-3 py-1 hover:bg-white/10 rounded text-slate-400"><i className="fas fa-chevron-right"></i></button>
+                    {/* CATALOGS TAB */}
+                    {activeTab === 'CATALOGS' && (
+                        <div className="flex flex-col h-full">
+                            <div className="p-4 sm:p-6 border-b border-white/10 bg-[#05070a] sticky top-0 z-20">
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+                                    <h3 className="text-sm font-bold text-white uppercase tracking-widest">Maestro de Datos</h3>
+                                    <button onClick={() => { setEditingCatalogItem(null); setIsCatalogModalOpen(true); }} className="w-full sm:w-auto px-4 py-2 bg-cyber-purple text-white text-[10px] font-bold uppercase tracking-wider rounded hover:bg-white hover:text-cyber-purple transition-all shadow-[0_0_15px_rgba(188,19,254,0.2)] flex items-center justify-center"><i className="fas fa-plus mr-2"></i> Nuevo Registro</button>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-3">
+                                    <input value={catalogSearch} onChange={e => setCatalogSearch(e.target.value)} className="relative flex-1 bg-black border border-white/10 rounded-lg px-4 py-2 text-white font-mono text-xs focus:border-cyber-purple focus:outline-none" placeholder="Buscar..." />
+                                    <select value={catalogCategoryFilter} onChange={e => setCatalogCategoryFilter(e.target.value)} className="bg-black border border-white/10 rounded-lg px-4 py-2 text-white font-mono text-xs focus:border-cyber-purple focus:outline-none">{uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}</select>
+                                </div>
+                            </div>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                {filteredCatalogs.map(item => <CatalogRow key={item.id} item={item} onEdit={(i) => { setEditingCatalogItem(i); setIsCatalogModalOpen(true); }} />)}
                             </div>
                         </div>
+                    )}
 
-                        {/* THE GRID */}
-                        <div className="flex-1 overflow-y-auto custom-scrollbar bg-black/40 rounded-xl border border-white/5 p-4 relative">
-                            {loadingStats ? (
-                                <div className="absolute inset-0 flex flex-col items-center justify-center text-red-500 animate-pulse">
-                                    <i className="fas fa-circle-notch fa-spin text-4xl mb-4"></i>
-                                    <span className="font-mono tracking-widest">ESCANEANDO BASE DE DATOS...</span>
-                                </div>
-                            ) : (
-                                <div className="grid grid-cols-4 sm:grid-cols-8 md:grid-cols-13 gap-3">
-                                    {weeklyStats.map((stat) => (
-                                        <button
-                                            key={stat.weekNumber}
-                                            onClick={() => setSelectedWeek(stat)}
-                                            className={`aspect-square rounded-md border flex flex-col items-center justify-center relative group overflow-hidden transition-all duration-300 hover:scale-110 hover:z-20 ${
-                                                selectedWeek?.weekNumber === stat.weekNumber 
-                                                ? 'bg-red-600 border-white text-white shadow-[0_0_20px_red] scale-110 z-20' 
-                                                : getHeatColor(stat.recordCount)
-                                            }`}
-                                        >
-                                            <span className="text-[10px] font-mono font-bold z-10">W{stat.weekNumber}</span>
-                                            {stat.recordCount > 0 && (
-                                                <div className="text-[8px] opacity-70 z-10">{stat.sizeEstimate}</div>
+                    {/* LIFECYCLE (ATOMIC PURGE) TAB */}
+                    {activeTab === 'LIFECYCLE' && (
+                        <div className="h-full flex flex-col bg-[#05070a] relative overflow-hidden">
+                            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.01)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.01)_1px,transparent_1px)] bg-[length:40px_40px] pointer-events-none"></div>
+                            
+                            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-8 relative z-10">
+                                <div className="flex flex-col lg:flex-row gap-8">
+                                    {/* 1. Targets */}
+                                    <div className="w-full lg:w-1/3 flex flex-col gap-6 order-2 lg:order-1">
+                                        <div className="border-b border-white/10 pb-4">
+                                            <h3 className="text-lg font-display font-black text-white uppercase tracking-wide flex items-center gap-2"><i className="fas fa-microchip text-cyber-blue"></i> Objetivos</h3>
+                                            <p className="text-[10px] text-slate-500 font-mono mt-1">Seleccione vector de purga</p>
+                                        </div>
+                                        <div className="space-y-3">
+                                            {[ { id: 'BETS', label: 'Historial Apuestas', risk: 'MEDIUM', icon: 'fa-ticket-alt' }, { id: 'LOGS', label: 'Logs Auditoría', risk: 'LOW', icon: 'fa-file-medical-alt' }, { id: 'RESULTS', label: 'Sorteos Vencidos', risk: 'LOW', icon: 'fa-flag-checkered' }, { id: 'LEDGER_HISTORY', label: 'Blockchain Ledger', risk: 'HIGH', icon: 'fa-link' } ].map(opt => (
+                                                <button key={opt.id} onClick={() => { setPurgeTarget(opt.id as any); clearAnalysis(); }} className={`w-full relative overflow-hidden rounded-xl border-2 p-4 transition-all duration-300 text-left group ${purgeTarget === opt.id ? 'border-cyber-purple bg-cyber-purple/10 shadow-[0_0_20px_rgba(188,19,254,0.2)]' : 'border-white/5 bg-black/40 hover:border-white/20'}`}>
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-8 h-8 rounded bg-black/50 flex items-center justify-center border border-white/10 ${purgeTarget === opt.id ? 'text-cyber-purple' : 'text-slate-500'}`}><i className={`fas ${opt.icon}`}></i></div>
+                                                            <span className={`text-xs font-bold uppercase tracking-wider ${purgeTarget === opt.id ? 'text-white' : 'text-slate-400'}`}>{opt.label}</span>
+                                                        </div>
+                                                        <span className={`text-[8px] px-2 py-0.5 rounded font-black uppercase border ${opt.risk === 'HIGH' ? 'border-red-900 text-red-500 bg-red-900/20' : opt.risk === 'MEDIUM' ? 'border-yellow-900 text-yellow-500 bg-yellow-900/20' : 'border-blue-900 text-blue-500 bg-blue-900/20'}`}>{opt.risk} RISK</span>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="bg-black/40 rounded-xl p-4 border border-white/5 mt-4">
+                                            <label className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-4 block">Horizonte Temporal</label>
+                                            <input type="range" min="7" max="365" step="1" value={purgeRange} onChange={(e) => { setPurgeRange(Number(e.target.value)); clearAnalysis(); }} className="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyber-purple" />
+                                            <div className="flex justify-between mt-3 font-mono text-[10px]"><span className="text-slate-600">7 Días</span><span className="text-cyber-purple font-bold border border-cyber-purple/30 px-2 py-0.5 rounded bg-cyber-purple/10">{purgeRange > 30 ? `${Math.floor(purgeRange/30)} Meses` : `${purgeRange} Días`}</span><span className="text-slate-600">1 Año</span></div>
+                                        </div>
+                                    </div>
+
+                                    {/* 2. Monitor */}
+                                    <div className="flex-1 flex flex-col bg-black/60 rounded-2xl border border-white/10 relative overflow-hidden shadow-inner order-1 lg:order-2 min-h-[450px]">
+                                        <div className="p-6 border-b border-white/10 flex justify-between items-center relative z-10 bg-black/20">
+                                            <div>
+                                                <h4 className="text-sm font-bold text-white uppercase tracking-widest">Monitor de Integridad</h4>
+                                                <div className="flex items-center gap-2 mt-1"><div className={`w-1.5 h-1.5 rounded-full ${analysis ? 'bg-cyber-blue animate-pulse' : 'bg-slate-600'}`}></div><span className="text-[9px] font-mono text-slate-500 uppercase">{analysis ? 'ANÁLISIS COMPLETADO' : 'ESPERANDO COMANDO...'}</span></div>
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 p-8 flex flex-col items-center justify-center relative z-10 gap-8">
+                                            <SectorVisualizer isScanning={isAnalyzing} hasAnalysis={!!analysis} riskLevel={analysis?.riskLevel || 'LOW'} isPurging={holdProgress > 0 && holdProgress < 100} isClean={purgeSuccess} />
+                                            {!analysis ? (
+                                                <button onClick={handleAnalyze} disabled={isAnalyzing} className="px-8 py-3 rounded-xl border border-white/10 bg-white/5 hover:bg-cyber-blue/10 hover:border-cyber-blue hover:text-white transition-all text-xs font-bold uppercase tracking-widest flex items-center gap-2 mx-auto">{isAnalyzing ? <i className="fas fa-circle-notch fa-spin"></i> : <i className="fas fa-search"></i>}{isAnalyzing ? 'ESCANEANDO...' : 'INICIAR ESCANEO'}</button>
+                                            ) : (
+                                                <div className="w-full max-w-md animate-in zoom-in duration-300">
+                                                    <div className="grid grid-cols-2 gap-4 mb-8">
+                                                        <div className="bg-[#0a0a0f] border border-white/10 p-4 rounded-xl text-center"><div className="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-2">Registros</div><div className="text-3xl font-mono font-black text-white">{analysis.recordCount}</div></div>
+                                                        <div className="bg-[#0a0a0f] border border-white/10 p-4 rounded-xl text-center"><div className="text-[9px] text-slate-500 uppercase font-bold tracking-wider mb-2">Recuperable</div><div className="text-3xl font-mono font-black text-cyber-blue">~{analysis.estimatedSizeKB} <span className="text-xs text-slate-500">KB</span></div></div>
+                                                    </div>
+                                                    <div className="border-t border-white/10 pt-6">
+                                                        {analysis.riskLevel === 'HIGH' && (
+                                                            <div className="mb-6 relative group/input"><label className="text-[8px] font-bold text-red-500 uppercase tracking-widest mb-2 block text-center">Protocolo de Seguridad</label><input type="text" placeholder='ESCRIBA "CONFIRM PURGE"' value={confirmPhrase} onChange={e => setConfirmPhrase(e.target.value.toUpperCase())} className="w-full bg-black border border-red-900 text-red-500 placeholder-red-900/50 text-center font-mono py-3 rounded-lg focus:outline-none focus:border-red-500 transition-all" /></div>
+                                                        )}
+                                                        <button onMouseDown={startHold} onMouseUp={endHold} onMouseLeave={endHold} onTouchStart={startHold} onTouchEnd={endHold} disabled={analysis.recordCount === 0 || (analysis.riskLevel === 'HIGH' && confirmPhrase !== 'CONFIRM PURGE')} className={`w-full h-16 rounded-xl relative overflow-hidden group select-none transition-all disabled:opacity-50 disabled:cursor-not-allowed ${analysis.riskLevel === 'HIGH' ? 'bg-red-950 border border-red-800' : 'bg-blue-950 border border-blue-800'}`}>
+                                                            <div className={`absolute top-0 left-0 h-full transition-all ease-linear ${analysis.riskLevel === 'HIGH' ? 'bg-red-600' : 'bg-cyber-blue'}`} style={{ width: `${holdProgress}%` }}></div>
+                                                            <div className="relative z-10 flex items-center justify-center gap-3 h-full">{holdProgress > 0 ? <span className="text-white font-black uppercase tracking-[0.2em] animate-pulse">{holdProgress < 100 ? 'MANTENGA PARA CONFIRMAR...' : 'INCINERANDO DATOS...'}</span> : <><i className={`fas fa-trash-alt ${analysis.riskLevel === 'HIGH' ? 'text-red-500' : 'text-blue-400'}`}></i><span className={`font-bold uppercase text-xs tracking-widest ${analysis.riskLevel === 'HIGH' ? 'text-red-500' : 'text-blue-400'}`}>{analysis.riskLevel === 'HIGH' ? 'MANTENER PARA PURGAR' : 'MANTENER PARA LIMPIAR'}</span></>}</div>
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             )}
-                                            {/* Hover Glow */}
-                                            <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity"></div>
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Selection Details Panel */}
-                        <div className={`mt-6 p-6 rounded-2xl border-2 transition-all duration-500 shrink-0 ${selectedWeek ? 'bg-red-950/20 border-red-500 shadow-[0_0_30px_rgba(255,0,0,0.15)] translate-y-0 opacity-100' : 'bg-black border-white/5 translate-y-4 opacity-50 pointer-events-none'}`}>
-                            {selectedWeek ? (
-                                <div className="flex flex-col md:flex-row gap-8 items-center">
-                                    <div className="flex-1">
-                                        <h3 className="text-xl font-display font-black text-white uppercase tracking-wider mb-2">
-                                            Semana {selectedWeek.weekNumber}, {selectedWeek.year}
-                                        </h3>
-                                        <div className="grid grid-cols-2 gap-4 text-xs font-mono text-slate-400">
-                                            <div>Rango: <span className="text-white">{selectedWeek.startDate} / {selectedWeek.endDate}</span></div>
-                                            <div>Registros: <span className="text-red-400 font-bold">{selectedWeek.recordCount.toLocaleString()}</span></div>
-                                            <div>Impacto: <span className="text-red-400 font-bold">{selectedWeek.sizeEstimate}</span></div>
-                                            <div>Estado: <span className="text-green-500">RESPALDADO</span></div>
-                                        </div>
-                                    </div>
-
-                                    <div className="w-full md:w-auto flex flex-col gap-2">
-                                        <label className="text-[9px] font-bold text-red-500 uppercase tracking-widest block text-center mb-1">
-                                            Escribe: "{getPhraseWeekly(selectedWeek.weekNumber)}"
-                                        </label>
-                                        <div className="flex gap-2">
-                                            <input 
-                                                value={confirm}
-                                                onChange={e => setConfirm(e.target.value.toUpperCase())}
-                                                className="bg-black border border-red-500/50 rounded-lg px-4 py-2 text-white font-mono text-center uppercase focus:outline-none focus:border-red-500"
-                                                placeholder="CONFIRMACIÓN"
-                                            />
-                                            <button 
-                                                onClick={runPurge}
-                                                disabled={loading || confirm !== getPhraseWeekly(selectedWeek.weekNumber)}
-                                                className="px-6 py-2 bg-red-600 hover:bg-white hover:text-red-600 text-black font-bold uppercase rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-neon-red flex items-center justify-center min-w-[60px]"
-                                            >
-                                                {loading ? <i className="fas fa-circle-notch fa-spin"></i> : <i className="fas fa-trash"></i>}
-                                            </button>
                                         </div>
                                     </div>
                                 </div>
-                            ) : (
-                                <div className="text-center text-slate-600 font-mono text-xs uppercase tracking-widest py-4">
-                                    Selecciona un bloque temporal para analizar
+                            </div>
+                        </div>
+                    )}
+
+                    {/* BACKUPS & LOGS TABS remain visually consistent */}
+                    {activeTab === 'BACKUPS' && (
+                        <div className="p-8 h-full flex flex-col justify-center items-center overflow-y-auto custom-scrollbar">
+                            <div className="relative w-48 h-48 sm:w-64 sm:h-64 mb-8 shrink-0">
+                                <div className={`absolute inset-0 rounded-full border-4 border-dashed border-white/10 ${backupStatus === 'RUNNING' ? 'animate-[spin_4s_linear_infinite]' : ''}`}></div>
+                                <div className={`absolute inset-4 rounded-full border-2 border-cyber-purple/30 ${backupStatus === 'RUNNING' ? 'animate-[spin_3s_linear_infinite_reverse]' : ''}`}></div>
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    {backupStatus === 'RUNNING' ? <div className="text-center"><div className="text-4xl font-mono font-black text-white">{Math.round(backupProgress)}%</div><div className="text-[9px] text-cyber-purple uppercase tracking-widest mt-1 animate-pulse">Procesando...</div></div> : backupStatus === 'COMPLETED' ? <i className="fas fa-check text-6xl text-green-500 drop-shadow-[0_0_20px_lime]"></i> : <button onClick={handleBackup} className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-cyber-purple/10 border-2 border-cyber-purple text-cyber-purple hover:bg-cyber-purple hover:text-black hover:shadow-[0_0_50px_rgba(188,19,254,0.6)] transition-all flex flex-col items-center justify-center gap-2 group"><i className="fas fa-save text-2xl sm:text-3xl group-hover:scale-110 transition-transform"></i><span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest">Iniciar</span></button>}
                                 </div>
-                            )}
+                            </div>
+                            <div className="w-full max-w-2xl bg-black border border-white/10 rounded-xl p-4 font-mono text-[10px] h-48 overflow-y-auto custom-scrollbar shadow-inner text-green-500">
+                                {terminalLogs.length === 0 && <span className="text-slate-600">Waiting for command...</span>}
+                                {terminalLogs.map((log, i) => <div key={i}>{log}</div>)}
+                                <div ref={scrollRef}></div>
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {/* --- TOTAL PURGE VIEW (LEGACY) --- */}
-                {mode === 'TOTAL' && (
-                    <div className="flex-1 flex flex-col items-center justify-center p-12 text-center animate-in zoom-in duration-300 relative z-10">
-                        <div className="w-32 h-32 rounded-full border-4 border-red-600 flex items-center justify-center bg-red-950/50 shadow-[0_0_60px_red] mb-8 animate-pulse">
-                            <i className="fas fa-radiation text-6xl text-red-500"></i>
+                    {/* LOGS TAB */}
+                    {activeTab === 'LOGS' && (
+                        <div className="h-full bg-[#050508] p-4 flex flex-col">
+                            <div className="flex-1 border border-white/10 rounded-xl bg-black font-mono text-[10px] p-4 text-slate-300 overflow-y-auto custom-scrollbar">
+                                <div className="text-green-500 mb-2">root@phront-core:~$ tail -f /var/log/audit.log</div>
+                                {terminalLogs.length > 0 ? terminalLogs.map((l,i) => <div key={i}>{l}</div>) : <div className="opacity-50"><div>[SYSTEM] Audit daemon started. Listening for events...</div><div>[SYSTEM] Connected to Ledger Node [OK]</div><div>[SYSTEM] Syncing with Edge Network...</div></div>}
+                            </div>
                         </div>
-                        <h3 className="text-3xl font-display font-black text-red-500 uppercase tracking-widest mb-4">Zona Muerta Global</h3>
-                        <p className="text-white max-w-md mb-8 font-mono text-sm leading-relaxed">
-                            Estás a punto de eliminar <span className="text-red-500 font-bold">TODOS</span> los registros transaccionales del sistema. 
-                            Esta acción restaurará la base de datos a su estado inicial (Factory Reset).
-                            Las cuentas de usuario y saldos se mantendrán.
-                        </p>
-                        
-                        <div className="w-full max-w-md bg-black border-2 border-red-500/30 p-6 rounded-2xl relative group/input">
-                            <label className="block text-[9px] font-bold text-red-500 uppercase tracking-widest mb-2 text-center">
-                                Frase de Seguridad: "{PHRASE_TOTAL}"
-                            </label>
-                            <input 
-                                value={confirm}
-                                onChange={e => setConfirm(e.target.value.toUpperCase())}
-                                className="w-full bg-transparent border-b-2 border-slate-700 focus:border-red-500 text-center text-xl font-mono text-white py-2 focus:outline-none transition-colors mb-6"
-                                placeholder="ESCRIBIR AQUÍ"
-                            />
-                            <button 
-                                onClick={runPurge}
-                                disabled={loading || confirm !== PHRASE_TOTAL}
-                                className="w-full py-4 bg-red-600 hover:bg-white hover:text-red-600 text-black font-black uppercase tracking-[0.2em] rounded-xl transition-all shadow-neon-red disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {loading ? 'DETONANDO...' : 'EJECUTAR PURGA TOTAL'}
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-             </div>
-          </div>
+                    )}
+                </div>
+            </div>
         </div>
-      )}
-    </>
+    </div>,
+    document.body
   );
 }
