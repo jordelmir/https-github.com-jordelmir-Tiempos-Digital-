@@ -1,8 +1,8 @@
-
 import React, { useMemo, useState, useEffect } from 'react';
 import { useLiveResults } from '../hooks/useLiveResults';
 import { api } from '../services/edgeApi';
 import { useAuthStore } from '../store/useAuthStore';
+import MatrixRain from './ui/MatrixRain';
 
 export default function TopNumbersPanel() {
     const { history } = useLiveResults();
@@ -116,6 +116,16 @@ export default function TopNumbersPanel() {
             {/* MAIN PANEL */}
             <div className="relative bg-[#050a14] border-y-2 border-x border-t-cyber-neon/30 border-b-cyber-purple/30 border-x-transparent rounded-[2rem] p-6 shadow-2xl overflow-hidden backdrop-blur-xl">
                 
+                {/* --- INTERNAL MATRIX RAIN (Predictive Purple) --- */}
+                <div className="absolute inset-0 opacity-15 pointer-events-none">
+                    <MatrixRain 
+                        colorHex="#bc13fe" 
+                        speed={0.3} 
+                        density="LOW" 
+                        opacity={0.2} 
+                    />
+                </div>
+
                 {/* Background Decor */}
                 <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
                 <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
@@ -147,7 +157,7 @@ export default function TopNumbersPanel() {
                 </div>
 
                 {/* SCROLLABLE LIST */}
-                <div className="relative w-full">
+                <div className="relative w-full z-10">
                     {/* Fade Edges */}
                     <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#050a14] to-transparent z-10 pointer-events-none"></div>
                     <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#050a14] to-transparent z-10 pointer-events-none"></div>

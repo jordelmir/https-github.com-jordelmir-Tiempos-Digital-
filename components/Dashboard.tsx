@@ -1,6 +1,5 @@
 
-// ... [Imports] ...
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { UserRole, AppUser, DrawTime, GameMode } from '../types';
 import UserCreationForm from './UserCreationForm';
@@ -21,9 +20,9 @@ import { formatCurrency } from '../constants';
 import { supabase } from '../lib/supabaseClient';
 import { api } from '../services/edgeApi';
 import AnimatedIconUltra from './ui/AnimatedIconUltra';
-import WinnerOverlay from './WinnerOverlay'; // IMPORT NEW COMPONENT
+import WinnerOverlay from './WinnerOverlay';
 
-// ... [Existing PendingBet interface & SystemStatusHUD] ...
+// Internal type for the Staging Queue
 interface PendingBet {
     id: string;
     number: string;
@@ -32,6 +31,7 @@ interface PendingBet {
     mode: GameMode;
 }
 
+// --- SUB-COMPONENT: SYSTEM STATUS HUD (RESPONSIVE) ---
 const SystemStatusHUD = () => {
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -125,39 +125,84 @@ const SystemStatusHUD = () => {
     );
 };
 
-// ... [PowerCard Component] ...
-const PowerCard = ({ label, value, sub, icon, theme, isMoney, isWarning, onClick, editable }: any) => (
-  <div 
-      onClick={onClick}
-      className={`relative group bg-[#050a14] border-2 ${isWarning ? 'border-red-500 shadow-neon-red' : `${theme.border} ${theme.shadow}`} p-6 rounded-2xl backdrop-blur-md overflow-hidden transition-all duration-300 ${onClick ? 'cursor-pointer hover:scale-[1.02]' : ''}`}
-  >
-      {/* Internal Glow */}
-      <div className={`absolute -inset-1 ${isWarning ? 'bg-red-600' : theme.glow} rounded-2xl opacity-10 blur-xl transition-opacity duration-500 group-hover:opacity-20`}></div>
+// --- HOLOGRAPHIC TILT POWER CARD ---
+const PowerCard = ({ label, value, sub, icon, theme, isMoney, isWarning, onClick, editable }: any) => {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [rotate, setRotate] = useState({ x: 0, y: 0 });
+  const [glare, setGlare] = useState({ x: 50, y: 50, opacity: 0 });
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!cardRef.current) return;
+      const rect = cardRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
       
-      <div className="relative z-10 flex justify-between items-start">
-          <div>
-              <div className={`text-[10px] font-mono font-bold uppercase tracking-widest mb-2 ${isWarning ? 'text-red-500' : 'text-slate-400'}`}>
-                  {label} {editable && <i className="fas fa-pencil-alt ml-2 opacity-50"></i>}
-              </div>
-              <div className={`text-3xl font-mono font-bold ${isWarning ? 'text-red-500 drop-shadow-[0_0_10px_red]' : isMoney ? theme.text : 'text-white'} text-glow-sm`}>
-                  {value}
-              </div>
-              {sub && <div className="text-[9px] font-mono text-red-400 mt-1 animate-pulse">{sub}</div>}
-          </div>
-          
-          <div className={`w-12 h-12 rounded-xl bg-black/50 flex items-center justify-center border ${isWarning ? 'border-red-500' : theme.border} shadow-inner`}>
-              {/* ANIMATED ICON INTEGRATION */}
-              <AnimatedIconUltra profile={{ animation: isWarning ? 'pulse' : 'infinite', theme: isWarning ? 'neon' : 'futuristic', speed: 3 }}>
-                  <i className={`fas ${icon} text-xl ${isWarning ? 'text-red-500' : theme.text}`}></i>
-              </AnimatedIconUltra>
-          </div>
-      </div>
-  </div>
-);
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+      
+      const rotateX = ((y - centerY) / centerY) * -10; // Max 10 deg
+      const rotateY = ((x - centerX) / centerX) * 10;
+
+      setRotate({ x: rotateX, y: rotateY });
+      setGlare({ x: (x / rect.width) * 100, y: (y / rect.height) * 100, opacity: 1 });
+  };
+
+  const handleMouseLeave = () => {
+      setRotate({ x: 0, y: 0 });
+      setGlare(prev => ({ ...prev, opacity: 0 }));
+  };
+
+  return (
+    <div 
+        ref={cardRef}
+        onClick={onClick}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        className={`relative group h-full rounded-2xl transition-all duration-200 perspective-1000 ${onClick ? 'cursor-pointer' : ''}`}
+        style={{
+            transform: `perspective(1000px) rotateX(${rotate.x}deg) rotateY(${rotate.y}deg) scale3d(1, 1, 1)`,
+            transition: 'transform 0.1s ease-out'
+        }}
+    >
+        {/* Dynamic Glow Background */}
+        <div className={`absolute -inset-1 ${isWarning ? 'bg-red-600' : theme.glow} rounded-2xl opacity-20 blur-xl group-hover:opacity-40 transition-opacity duration-500`}></div>
+        
+        {/* Main Card Content */}
+        <div className={`relative h-full bg-[#050a14] border-2 ${isWarning ? 'border-red-500 shadow-neon-red' : `${theme.border} ${theme.shadow}`} p-6 rounded-2xl overflow-hidden backdrop-blur-md z-10 preserve-3d`}>
+            
+            {/* Holographic Glare */}
+            <div 
+                className="absolute inset-0 pointer-events-none z-20 mix-blend-overlay opacity-0 transition-opacity duration-300"
+                style={{
+                    opacity: glare.opacity * 0.4,
+                    background: `radial-gradient(circle at ${glare.x}% ${glare.y}%, rgba(255,255,255,0.8) 0%, transparent 60%)`
+                }}
+            ></div>
+
+            <div className="relative z-10 flex justify-between items-start tz-20">
+                <div>
+                    <div className={`text-[10px] font-mono font-bold uppercase tracking-widest mb-2 ${isWarning ? 'text-red-500' : 'text-slate-400'}`}>
+                        {label} {editable && <i className="fas fa-pencil-alt ml-2 opacity-50"></i>}
+                    </div>
+                    <div className={`text-3xl font-mono font-bold ${isWarning ? 'text-red-500 drop-shadow-[0_0_10px_red]' : isMoney ? theme.text : 'text-white'} text-glow-sm tz-10`}>
+                        {value}
+                    </div>
+                    {sub && <div className="text-[9px] font-mono text-red-400 mt-1 animate-pulse">{sub}</div>}
+                </div>
+                
+                <div className={`w-12 h-12 rounded-xl bg-black/50 flex items-center justify-center border ${isWarning ? 'border-red-500' : theme.border} shadow-inner tz-30`}>
+                    <AnimatedIconUltra profile={{ animation: isWarning ? 'pulse' : 'infinite', theme: isWarning ? 'neon' : 'futuristic', speed: 3 }}>
+                        <i className={`fas ${icon} text-xl ${isWarning ? 'text-red-500' : theme.text}`}></i>
+                    </AnimatedIconUltra>
+                </div>
+            </div>
+        </div>
+    </div>
+  );
+};
 
 export default function Dashboard() {
   const { user, fetchUser, setUser } = useAuthStore(); 
-  // ... [Existing state] ...
   const [players, setPlayers] = useState<AppUser[]>([]);
   const [vendors, setVendors] = useState<AppUser[]>([]);
   const [loadingLists, setLoadingLists] = useState(true);
@@ -204,11 +249,12 @@ export default function Dashboard() {
   const isVendor = user?.role === UserRole.Vendedor;
   const isClient = user?.role === UserRole.Cliente;
 
-  // ... [Existing useEffects and helper functions] ...
+  // Auto-update selected draw based on clock ONLY ON INITIAL LOAD or if user hasn't interacted
   useEffect(() => {
       if (nextDraw) setSelectedDraw(nextDraw);
   }, [nextDraw]);
 
+  // --- LOAD GLOBAL SETTINGS (MULTIPLIERS) ---
   const fetchSettings = async () => {
       try {
           const res = await api.getGlobalSettings();
@@ -225,6 +271,7 @@ export default function Dashboard() {
       fetchSettings();
   }, []);
 
+  // --- THEME ENGINE v5.0 (NARRATIVE COLORS) ---
   const theme = useMemo(() => {
     switch (selectedDraw) {
         case DrawTime.MEDIODIA: 
@@ -238,14 +285,15 @@ export default function Dashboard() {
     }
   }, [selectedDraw]);
 
-  // ... [fetchLists, handleUserCreated, etc. - Unchanged] ...
   const fetchLists = async () => {
     if (!user) return;
-    if (isClient) return; 
+    if (isClient) return; // Clients don't need lists
 
     setLoadingLists(true);
     
+    // Admins see all clients. Vendors see only their clients (Logic handled in MockDB/API simulation)
     if (isAdmin || isVendor) {
+        // Note: The API call logic inside supabaseClient handles the 'issuer_id' filtering for Vendors
         const { data: clientsData } = await supabase.from('app_users').select('*').eq('role', 'Cliente').limit(100);
         if (clientsData) setPlayers(clientsData as AppUser[]);
     }
@@ -291,7 +339,7 @@ export default function Dashboard() {
       });
       setSavingMultiplier(false);
       setEditingMultiplier(false);
-      fetchSettings(); 
+      fetchSettings(); // Refresh to ensure sync
   };
 
   const handleAddToQueue = () => {
@@ -402,7 +450,6 @@ export default function Dashboard() {
   const isReventados = gameMode === GameMode.REVENTADOS;
   
   const consoleBorder = useMemo(() => {
-      // ... [Border logic] ...
       if (isMarketClosed) return 'border-red-900 opacity-50';
       if (isReventados) return 'border-red-600 shadow-[0_0_40px_rgba(220,38,38,0.6),inset_0_0_20px_rgba(220,38,38,0.2)]'; 
       switch (selectedDraw) {
@@ -453,44 +500,143 @@ export default function Dashboard() {
             isOpen={adminResultOpen}
             onClose={() => setAdminResultOpen(false)}
             onPublishSuccess={(data) => handleAdminResultPublish(data)} // PASS CALLBACK
+            initialDraw={null}
           />
       )}
 
       {/* --- EDIT MULTIPLIER MODAL (ADMIN ONLY) --- */}
       {editingMultiplier && isAdmin && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-xl animate-in fade-in duration-300">
-              <div className="relative w-[500px] perspective-1000">
-                  <div className={`absolute -inset-4 rounded-full blur-3xl opacity-30 animate-breathe transition-all duration-1000 bg-gradient-to-r from-cyber-emerald to-red-600 ${savingMultiplier ? 'scale-150 opacity-80' : ''}`}></div>
-                  <div className="bg-[#02040a] border-2 border-white/10 p-0 rounded-3xl relative z-10 w-full overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.8)]">
-                    <div className="p-8 relative">
-                        <h3 className="text-white font-black mb-4 uppercase">Calibración de Núcleo</h3>
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                             <div>
-                                 <label className="text-xs text-cyber-emerald block mb-2">Base (X)</label>
-                                 <div className="relative">
-                                     <input type="number" value={customMultiplier} onChange={e => setCustomMultiplier(Number(e.target.value))} className="bg-black border border-white/20 text-white p-2 rounded w-full z-20 relative" />
-                                     <div className="absolute top-0 right-0 flex flex-col h-full z-30">
-                                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.1),transparent)] animate-pulse pointer-events-none"></div>
-                                         <button onClick={() => setCustomMultiplier(p => Math.max(1, p+1))} className="flex-1 px-2 text-cyber-emerald hover:text-white transition-colors relative z-40 bg-black/50 hover:bg-white/10"><i className="fas fa-chevron-up text-[10px]"></i></button>
-                                         <button onClick={() => setCustomMultiplier(p => Math.max(1, p-1))} className="flex-1 px-2 text-cyber-emerald hover:text-white transition-colors relative z-40 bg-black/50 hover:bg-white/10"><i className="fas fa-chevron-down text-[10px]"></i></button>
+              <div className="relative w-[500px] perspective-1000 group">
+                  {/* ALIVE REACTOR CORE BACKLIGHT */}
+                  <div className={`absolute -inset-20 rounded-full blur-[100px] opacity-40 animate-[pulse_4s_ease-in-out_infinite] bg-gradient-to-r from-cyber-emerald via-teal-500 to-green-600 ${savingMultiplier ? 'scale-125 opacity-60 from-red-500 to-orange-600' : ''}`}></div>
+                  
+                  <div className="bg-[#050a14] border-[4px] border-cyber-emerald/50 p-0 rounded-[2.5rem] relative z-10 w-full overflow-hidden shadow-[0_0_150px_rgba(16,185,129,0.3),inset_0_0_50px_rgba(16,185,129,0.1)] backdrop-blur-2xl ring-2 ring-white/10 ring-offset-4 ring-offset-black">
+                    
+                    {/* Header - High Voltage */}
+                    <div className="p-8 border-b border-cyber-emerald/30 bg-gradient-to-b from-cyber-emerald/10 to-transparent flex items-center gap-6 relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-[2px] bg-cyber-emerald shadow-[0_0_20px_#10b981] animate-[scanline_2s_linear_infinite]"></div>
+                        
+                        <div className="w-16 h-16 rounded-2xl bg-black border-2 border-cyber-emerald flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.4)] relative group/icon overflow-hidden">
+                            <div className="absolute inset-0 bg-cyber-emerald opacity-20 blur-md animate-pulse"></div>
+                            
+                            {/* Orbital Rings - Core Animation */}
+                            <div className="absolute inset-1 rounded-full border-2 border-cyber-emerald/60 border-t-transparent animate-[spin_3s_linear_infinite]"></div>
+                            <div className="absolute inset-3 rounded-full border-2 border-cyber-emerald/40 border-b-transparent animate-[spin_5s_linear_infinite_reverse]"></div>
+                            
+                            <i className="fas fa-atom text-4xl text-cyber-emerald relative z-10 animate-[spin_10s_linear_infinite] drop-shadow-[0_0_10px_currentColor]"></i>
+                        </div>
+                        <div>
+                            <h3 className="text-white font-display font-black uppercase tracking-[0.2em] text-2xl drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]">
+                                Núcleo <span className="text-cyber-emerald animate-pulse">Global</span>
+                            </h3>
+                            <div className="text-[10px] font-mono text-emerald-400 uppercase tracking-[0.4em] font-bold animate-pulse">
+                                Calibración de Factores
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="p-10 relative">
+                        {/* Background Grid breathing */}
+                        <div className="absolute inset-0 bg-[linear-gradient(rgba(16,185,129,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.05)_1px,transparent_1px)] bg-[length:30px_30px] opacity-30 animate-[pulse_4s_infinite]"></div>
+
+                        <div className="grid grid-cols-2 gap-8 mb-10 relative z-10">
+                             {/* BASE MULTIPLIER INPUT */}
+                             <div className="relative group/input">
+                                 <div className="flex justify-between items-end mb-4">
+                                     <label className="text-[10px] font-black text-cyber-emerald uppercase tracking-[0.3em]">
+                                         Factor Base
+                                     </label>
+                                     <div className="px-2 py-0.5 rounded bg-cyber-emerald/20 border border-cyber-emerald/50 text-[9px] font-bold text-cyber-emerald shadow-[0_0_10px_rgba(16,185,129,0.3)]">
+                                         TIEMPOS
+                                     </div>
+                                 </div>
+                                 
+                                 <div className="relative h-32 bg-[#020202] border-[3px] border-cyber-emerald/40 rounded-3xl overflow-hidden flex items-center justify-center transition-all duration-300 group-hover/input:border-cyber-emerald group-hover/input:shadow-[0_0_50px_rgba(16,185,129,0.2)]">
+                                     {/* Inner Glow */}
+                                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.15),transparent)] opacity-50 group-hover/input:opacity-100 transition-opacity"></div>
+                                     
+                                     {/* Holographic Input - CENTERED WITH PADDING */}
+                                     <div className="w-full h-full flex items-center justify-center px-12">
+                                         <input 
+                                            type="number" 
+                                            value={customMultiplier} 
+                                            onChange={e => setCustomMultiplier(Number(e.target.value))} 
+                                            className="bg-transparent text-4xl md:text-6xl font-display font-black text-emerald-400 text-center w-full z-20 focus:outline-none drop-shadow-[0_0_20px_rgba(16,185,129,0.8)]" 
+                                         />
+                                     </div>
+                                     
+                                     {/* Controls */}
+                                     <div className="absolute right-0 top-0 bottom-0 w-12 flex flex-col border-l-[3px] border-cyber-emerald/40 z-30 bg-[#0a101f]">
+                                         <button onClick={() => setCustomMultiplier(p => Math.max(1, p+1))} className="flex-1 hover:bg-cyber-emerald hover:text-black text-cyber-emerald transition-all flex items-center justify-center active:bg-white group/btn"><i className="fas fa-chevron-up text-sm group-hover/btn:scale-125 transition-transform"></i></button>
+                                         <div className="h-[3px] bg-cyber-emerald/40"></div>
+                                         <button onClick={() => setCustomMultiplier(p => Math.max(1, p-1))} className="flex-1 hover:bg-cyber-emerald hover:text-black text-cyber-emerald transition-all flex items-center justify-center active:bg-white group/btn"><i className="fas fa-chevron-down text-sm group-hover/btn:scale-125 transition-transform"></i></button>
                                      </div>
                                  </div>
                              </div>
-                             <div>
-                                 <label className="text-xs text-red-500 block mb-2">Rev (Ω)</label>
-                                 <div className="relative">
-                                     <input type="number" value={customReventadosMultiplier} onChange={e => setCustomReventadosMultiplier(Number(e.target.value))} className="bg-black border-white/20 border text-white p-2 rounded w-full z-20 relative" />
-                                     <div className="absolute top-0 right-0 flex flex-col h-full z-30">
-                                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,0,0,0.1),transparent)] animate-pulse pointer-events-none"></div>
-                                         <button onClick={() => setCustomReventadosMultiplier(p => Math.max(1, p+1))} className="flex-1 px-2 text-red-500 hover:text-white transition-colors relative z-40 bg-black/50 hover:bg-white/10"><i className="fas fa-chevron-up text-[10px]"></i></button>
-                                         <button onClick={() => setCustomReventadosMultiplier(p => Math.max(1, p-1))} className="flex-1 px-2 text-red-500 hover:text-white transition-colors relative z-40 bg-black/50 hover:bg-white/10"><i className="fas fa-chevron-down text-[10px]"></i></button>
+
+                             {/* REVENTADOS INPUT */}
+                             <div className="relative group/input">
+                                 <div className="flex justify-between items-end mb-4">
+                                     <label className="text-[10px] font-black text-red-500 uppercase tracking-[0.3em]">
+                                         Factor Omega
+                                     </label>
+                                     <div className="px-2 py-0.5 rounded bg-red-900/40 border border-red-500/50 text-[9px] font-bold text-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]">
+                                         REVENTADOS
+                                     </div>
+                                 </div>
+
+                                 <div className="relative h-32 bg-[#020202] border-[3px] border-red-600/40 rounded-3xl overflow-hidden flex items-center justify-center transition-all duration-300 group-hover/input:border-red-500 group-hover/input:shadow-[0_0_50px_rgba(239,68,68,0.2)]">
+                                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(239,68,68,0.15),transparent)] opacity-50 group-hover/input:opacity-100 transition-opacity"></div>
+                                     
+                                     {/* Holographic Input - CENTERED WITH PADDING */}
+                                     <div className="w-full h-full flex items-center justify-center px-12">
+                                         <input 
+                                            type="number" 
+                                            value={customReventadosMultiplier} 
+                                            onChange={e => setCustomReventadosMultiplier(Number(e.target.value))} 
+                                            className="bg-transparent text-4xl md:text-6xl font-display font-black text-[#ff003c] text-center w-full z-20 focus:outline-none drop-shadow-[0_0_20px_rgba(239,68,68,0.8)]" 
+                                         />
+                                     </div>
+                                     
+                                     <div className="absolute right-0 top-0 bottom-0 w-12 flex flex-col border-l-[3px] border-red-600/40 z-30 bg-[#1f0a0a]">
+                                         <button onClick={() => setCustomReventadosMultiplier(p => Math.max(1, p+1))} className="flex-1 hover:bg-red-500 hover:text-black text-red-500 transition-all flex items-center justify-center active:bg-white group/btn"><i className="fas fa-chevron-up text-sm group-hover/btn:scale-125 transition-transform"></i></button>
+                                         <div className="h-[3px] bg-red-600/40"></div>
+                                         <button onClick={() => setCustomReventadosMultiplier(p => Math.max(1, p-1))} className="flex-1 hover:bg-red-500 hover:text-black text-red-500 transition-all flex items-center justify-center active:bg-white group/btn"><i className="fas fa-chevron-down text-sm group-hover/btn:scale-125 transition-transform"></i></button>
                                      </div>
                                  </div>
                              </div>
                         </div>
-                        <div className="flex gap-4 relative z-50">
-                            <button onClick={() => setEditingMultiplier(false)} className="flex-1 p-3 bg-slate-800 rounded text-xs uppercase font-bold relative z-50 hover:bg-slate-700 transition-colors">Cancelar</button>
-                            <button onClick={handleUpdateMultiplier} className="flex-1 p-3 bg-cyber-emerald text-black rounded text-xs uppercase font-bold relative z-50 hover:bg-white transition-colors">Guardar</button>
+
+                        {/* Action Buttons - Massive Tactile Feel */}
+                        <div className="flex gap-6 relative z-50 pt-6 border-t border-white/10">
+                            <button 
+                                onClick={() => setEditingMultiplier(false)} 
+                                className="h-16 px-8 rounded-2xl border-2 border-slate-700 text-slate-400 font-black uppercase tracking-widest hover:border-white hover:text-white hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-all text-xs bg-black"
+                            >
+                                <span className="flex flex-col items-center">
+                                    <i className="fas fa-times mb-1 text-lg"></i>
+                                    CANCELAR
+                                </span>
+                            </button>
+                            
+                            <button 
+                                onClick={handleUpdateMultiplier} 
+                                className="flex-1 h-16 bg-white text-black font-black uppercase tracking-[0.3em] rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-[0_0_60px_rgba(255,255,255,0.5)] flex items-center justify-center gap-4 group/save overflow-hidden relative"
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-50 -translate-x-full group-hover/save:animate-[shine_0.5s_ease-in-out]"></div>
+                                {savingMultiplier ? (
+                                    <>
+                                        <i className="fas fa-circle-notch fa-spin text-2xl"></i>
+                                        <span>SINCRONIZANDO...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <i className="fas fa-save text-2xl group-hover/save:animate-bounce"></i>
+                                        <span>CONFIRMAR CAMBIOS</span>
+                                    </>
+                                )}
+                            </button>
                         </div>
                     </div>
                   </div>
@@ -555,7 +701,11 @@ export default function Dashboard() {
         />
         <PowerCard 
             label="Multiplicador Activo" 
-            value={gameMode === GameMode.REVENTADOS ? `${customReventadosMultiplier}x` : `${customMultiplier}x`} 
+            value={
+                gameMode === GameMode.REVENTADOS 
+                ? <span className="text-[#ff003c] drop-shadow-[0_0_15px_#ff003c]">{customReventadosMultiplier}x</span>
+                : <span className="text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.8)]">{customMultiplier}x</span>
+            } 
             icon="fa-crosshairs" 
             theme={theme}
             isWarning={gameMode === GameMode.REVENTADOS}
@@ -666,12 +816,14 @@ export default function Dashboard() {
                             })}
                         </div>
                         
-                        {/* Betting Inputs */}
+                        {/* Betting Inputs - CENTERED & THEMED */}
                         <div className="flex flex-col md:flex-row gap-8 items-stretch relative z-20">
                             <div className="flex-1 relative group/field">
                                 <div className={`relative bg-black/90 rounded-2xl border-2 p-1 h-full overflow-hidden ${theme.border}`}>
                                     <div className="h-full rounded-xl bg-gradient-to-b from-slate-900/50 to-black/80 flex flex-col items-center justify-center p-4 relative">
-                                        <label className={`text-[10px] font-mono font-bold ${isReventados ? 'text-red-400' : 'text-cyber-blue'} uppercase tracking-wider mb-2`}>Número</label>
+                                        <label className={`text-[10px] font-mono font-bold ${isReventados ? 'text-red-400' : theme.text} uppercase tracking-wider mb-2`}>Número</label>
+                                        
+                                        {/* THEMED INPUT COLOR */}
                                         <input 
                                             id="betNumberInput"
                                             type="number" 
@@ -679,7 +831,7 @@ export default function Dashboard() {
                                             onChange={(e) => setBetNumber(e.target.value.slice(0,2))}
                                             onKeyDown={(e) => e.key === 'Enter' && handleAddToQueue()}
                                             disabled={isMarketClosed}
-                                            className={`bg-transparent text-5xl sm:text-6xl md:text-7xl font-mono ${isReventados ? 'text-red-500 drop-shadow-[0_0_10px_red]' : 'text-white'} text-center focus:outline-none placeholder-slate-800 w-full z-10`}
+                                            className={`bg-transparent text-5xl sm:text-6xl md:text-7xl font-mono ${isReventados ? 'text-red-500 drop-shadow-[0_0_10px_red]' : `${theme.text} drop-shadow-[0_0_10px_currentColor]`} text-center focus:outline-none placeholder-slate-800 w-full z-10 transition-colors duration-500`}
                                             placeholder="00"
                                         />
                                     </div>
@@ -689,14 +841,16 @@ export default function Dashboard() {
                             <div className="flex-1 relative group/field">
                                 <div className={`relative bg-black/90 rounded-2xl border-2 p-1 h-full overflow-hidden ${theme.border}`}>
                                     <div className="h-full rounded-xl bg-gradient-to-b from-slate-900/50 to-black/80 flex flex-col items-center justify-center p-4 relative">
-                                        <label className={`text-[10px] font-mono font-bold ${isReventados ? 'text-red-400' : 'text-cyber-blue'} uppercase tracking-wider mb-2`}>Inversión</label>
+                                        <label className={`text-[10px] font-mono font-bold ${isReventados ? 'text-red-400' : theme.text} uppercase tracking-wider mb-2`}>Inversión</label>
+                                        
+                                        {/* THEMED INPUT COLOR */}
                                         <input 
                                             type="number" 
                                             value={betAmount}
                                             onChange={(e) => setBetAmount(e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && handleAddToQueue()}
                                             disabled={isMarketClosed}
-                                            className={`bg-transparent text-3xl sm:text-4xl md:text-5xl font-mono ${isReventados ? 'text-red-500 drop-shadow-[0_0_10px_red]' : 'text-white'} text-center focus:outline-none placeholder-slate-800 w-full z-10`}
+                                            className={`bg-transparent text-3xl sm:text-4xl md:text-5xl font-mono ${isReventados ? 'text-red-500 drop-shadow-[0_0_10px_red]' : `${theme.text} drop-shadow-[0_0_10px_currentColor]`} text-center focus:outline-none placeholder-slate-800 w-full z-10 transition-colors duration-500`}
                                             placeholder="0"
                                         />
                                     </div>

@@ -1,4 +1,5 @@
 
+
 import { supabase, MockDB } from '../lib/supabaseClient';
 import { ApiResponse, AppUser, TransactionResponse, DrawResultPayload, GameMode, DrawResult, Bet, AuditEventType, AuditSeverity, WeeklyDataStats, RiskAnalysisReport, SystemSetting, MasterCatalogItem, PurgeTarget, PurgeAnalysis, LedgerTransaction } from '../types';
 import { formatCurrency } from '../constants';
@@ -259,16 +260,13 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
             // Fetch Global Limit from Settings
             const settingsList = MockDB.getSettingsList();
             const globalLimitSetting = settingsList.find((s:any) => s.key === 'GLOBAL_LIMIT');
-            // If setting exists use it, else Infinity. If limitObj exists and is not -2 (reset), use it.
-            // If limitObj is 0 (blocked), it takes precedence.
             
             let limit = Infinity;
             if (limitObj && limitObj.max_amount !== -2) {
                 limit = limitObj.max_amount;
             } else if (globalLimitSetting) {
                 const val = Number(globalLimitSetting.value);
-                if (val > 0) limit = val * 100; // Convert to cents if stored as units, assumes stored as units
-                // If stored as raw, check logic. Assuming UI saves raw units, here we need cents.
+                if (val > 0) limit = val * 100; 
             }
 
             // Calculate Exposure
@@ -497,14 +495,141 @@ async function invokeEdgeFunction<T>(functionName: string, body: any): Promise<A
             return { data: { success: true } as any };
         }
         if (functionName === 'getCatalogs') {
-            return { data: [] as any }; // Placeholder for catalogs
+            return { data: [] as any };
         }
         if (functionName === 'analyzePurge') {
             return { data: MockDB.analyzePurge(body.target, body.days) as any };
         }
         if (functionName === 'executePurge') {
+            // Enhanced Execute Logic for DEEP_CLEAN
+            if (body.target === 'DEEP_CLEAN') {
+                let count = 0;
+                count += MockDB.executePurge('BETS', body.days);
+                count += MockDB.executePurge('AUDIT', body.days);
+                count += MockDB.executePurge('RESULTS', body.days);
+                count += MockDB.executePurge('LEDGER_HISTORY', body.days);
+                
+                MockDB.addAudit({
+                    actor_id: body.actor_id,
+                    action: 'DEEP_SYSTEM_PURGE',
+                    type: AuditEventType.ADMIN_PURGE,
+                    severity: AuditSeverity.FORENSIC,
+                    target_resource: 'ALL_HISTORICAL_DATA',
+                    metadata: { records_deleted: count, cutoff_days: body.days }
+                });
+                return { data: { success: true, count } as any };
+            }
+            
             const count = MockDB.executePurge(body.target, body.days);
             return { data: { success: true, count } as any };
+        }
+        
+        // NEW: Weekly Stats Mock
+        if (functionName === 'getWeeklyDataStats') {
+            const bets = MockDB.getBets();
+            const weeksMap = new Map<string, WeeklyDataStats>();
+            
+            // Helper to get week number
+            const getWeek = (d: Date) => {
+                const onejan = new Date(d.getFullYear(), 0, 1);
+                return Math.ceil((((d.getTime() - onejan.getTime()) / 86400000) + onejan.getDay() + 1) / 7);
+            };
+
+            // Process Bets for stats
+            bets.forEach((b: any) => {
+                const date = new Date(b.created_at);
+                const weekNum = getWeek(date);
+                const year = date.getFullYear();
+                const key = `${year}-${weekNum}`;
+                
+                if (!weeksMap.has(key)) {
+                    // Start of week date
+                    const startOfWeek = new Date(date);
+                    const day = startOfWeek.getDay() || 7; 
+                    if(day !== 1) startOfWeek.setHours(-24 * (day - 1));
+                    
+                    const endOfWeek = new Date(startOfWeek);
+                    endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+                    weeksMap.set(key, {
+                        year,
+                        weekNumber: weekNum,
+                        recordCount: 0,
+                        startDate: startOfWeek.toISOString(),
+                        endDate: endOfWeek.toISOString(),
+                        sizeEstimate: '0 KB'
+                    });
+                }
+                
+                const stats = weeksMap.get(key)!;
+                stats.recordCount++;
+            });
+            
+            // Convert to array and format size
+            const statsArray = Array.from(weeksMap.values()).map(s => ({
+                ...s,
+                sizeEstimate: `${(s.recordCount * 0.5).toFixed(1)} KB` // Approx size
+            })).sort((a,b) => a.weekNumber - b.weekNumber);
+
+            // If empty (new DB), seed dummy data for visualization
+            if (statsArray.length === 0) {
+                const now = new Date();
+                for(let i=0; i<8; i++) {
+                    const d = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+                    const weekNum = getWeek(d);
+                    statsArray.unshift({
+                        year: d.getFullYear(),
+                        weekNumber: weekNum,
+                        recordCount: Math.floor(Math.random() * 5000) + 500,
+                        startDate: d.toISOString(),
+                        endDate: d.toISOString(),
+                        sizeEstimate: `${Math.floor(Math.random() * 2000)} KB`
+                    });
+                }
+            }
+
+            return { data: { stats: statsArray } as any };
+        }
+        
+        if (functionName === 'purgeWeeklyData') {
+            // This is the direct hook for the Card's button if it calls 'purgeWeeklyData'
+            // We'll interpret the confirmation phrase here to determine DEEP_CLEAN
+            if (body.confirmation === 'PURGA TOTAL SISTEMA') {
+                 // Trigger Deep Clean logic internally
+                 let count = 0;
+                 // Assuming week logic converts to days cutoff approximately
+                 // Current week vs Target week difference
+                 const currentWeek = 52; // Mock
+                 const diffWeeks = currentWeek - body.weekNumber;
+                 const days = diffWeeks * 7;
+                 
+                 count += MockDB.executePurge('BETS', days);
+                 count += MockDB.executePurge('AUDIT', days);
+                 count += MockDB.executePurge('RESULTS', days);
+                 count += MockDB.executePurge('LEDGER_HISTORY', days);
+                 
+                 MockDB.addAudit({
+                    actor_id: body.actor_id,
+                    action: 'DEEP_SYSTEM_PURGE',
+                    type: AuditEventType.ADMIN_PURGE,
+                    severity: AuditSeverity.FORENSIC,
+                    target_resource: `WEEK-${body.weekNumber}-ALL`,
+                    metadata: { records_deleted: count }
+                });
+                return { data: { success: true, message: 'Sistema purgado.' } as any };
+            }
+
+            if (body.confirmation !== 'CONFIRMAR LIMPIEZA' && body.confirmation !== 'ARCHIVAR LOGS') return { error: 'Confirmación inválida' };
+            
+            MockDB.addAudit({
+                actor_id: body.actor_id,
+                action: 'PURGE_WEEKLY_DATA',
+                type: AuditEventType.ADMIN_PURGE,
+                severity: AuditSeverity.WARNING,
+                target_resource: `WEEK-${body.weekNumber}`,
+                metadata: { year: body.year }
+            });
+            return { data: { success: true, message: 'Limpieza realizada' } as any };
         }
 
         return { message: 'Simulación exitosa' } as any;
@@ -568,7 +693,10 @@ export const api = {
   
   // System
   purgeSystem: async (payload: { confirm_phrase: string; actor_id?: string }) => invokeEdgeFunction<{ ok: boolean; message: string }>('purgeSystem', payload),
+  
+  // NEW WEEKLY PURGE LOGIC
   getWeeklyDataStats: async (payload: { year: number }) => invokeEdgeFunction<{ stats: WeeklyDataStats[] }>('getWeeklyDataStats', payload),
   purgeWeeklyData: async (payload: { year: number; weekNumber: number; confirmation: string; actor_id: string }) => invokeEdgeFunction<{ success: boolean; message: string }>('purgeWeeklyData', payload),
+  
   generateAIAnalysis: async (payload: { drawTime: string }) => invokeEdgeFunction<any>('generateAIAnalysis', payload),
 };

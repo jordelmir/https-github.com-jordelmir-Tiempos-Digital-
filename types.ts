@@ -1,4 +1,5 @@
 
+
 export enum UserRole {
   SuperAdmin = 'SuperAdmin',
   Vendedor = 'Vendedor',
@@ -48,6 +49,7 @@ export interface Bet {
   draw_id?: string;
   amount_bigint: number;
   numbers: string;
+  mode: string;
   status: 'PENDING' | 'WON' | 'LOST' | 'REFUNDED';
   created_at: string;
 }
@@ -198,7 +200,7 @@ export interface MasterCatalogItem {
 }
 
 // --- ATOMIC LIFECYCLE MANAGEMENT ---
-export type PurgeTarget = 'BETS' | 'AUDIT' | 'RESULTS' | 'LEDGER_HISTORY';
+export type PurgeTarget = 'BETS' | 'AUDIT' | 'RESULTS' | 'LEDGER_HISTORY' | 'DEEP_CLEAN';
 
 export interface PurgeAnalysis {
     target: PurgeTarget;

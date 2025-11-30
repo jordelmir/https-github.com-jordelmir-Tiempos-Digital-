@@ -117,6 +117,20 @@
         min-height: 100vh;
       }
 
+      /* --- CINEMATIC NOISE TEXTURE (THE GLUE) --- */
+      .cinematic-grain {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 9998;
+        opacity: 0.035;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        mix-blend-mode: overlay;
+      }
+
       /* --- NEURAL NETWORK BACKGROUND --- */
       .neural-bg {
         position: fixed;
@@ -220,6 +234,17 @@
         will-change: transform, filter, opacity;
       }
 
+      /* ... (rest of styles) ... */
+      /* 3D Depth Classes (tz-*) to avoid Tailwind Conflict */
+      .tz-10 { transform: translateZ(10px); }
+      .tz-20 { transform: translateZ(20px); }
+      .tz-30 { transform: translateZ(30px); }
+      .tz-40 { transform: translateZ(40px); }
+      .tz-50 { transform: translateZ(50px); }
+      
+      .preserve-3d { transform-style: preserve-3d; }
+      .perspective-1000 { perspective: 1000px; }
+
       .icon-glow-neon {
         filter: drop-shadow(0 0 8px rgba(99,102,241,0.8)) drop-shadow(0 0 18px rgba(99,102,241,0.25));
       }
@@ -272,6 +297,7 @@
 </script>
 </head>
   <body>
+    <div class="cinematic-grain"></div>
     <div class="neural-bg">
       <div class="star-dust"></div>
       <div class="neural-web"></div>

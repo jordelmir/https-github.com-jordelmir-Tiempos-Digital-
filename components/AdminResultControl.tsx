@@ -1,11 +1,91 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { DrawTime } from '../types';
 import { api } from '../services/edgeApi';
 import { useAuthStore } from '../store/useAuthStore';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import AnimatedIconUltra from './ui/AnimatedIconUltra';
+
+// --- INTERNAL MATRIX ENGINE FOR MODAL ---
+const MatrixRainOverlay = ({ colorHex, speed = 1 }: { colorHex: string, speed?: number }) => {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        let width = canvas.width = canvas.offsetWidth;
+        let height = canvas.height = canvas.offsetHeight;
+        
+        // Characters: Katakana + Hex + Operators for "Hacker" feel
+        const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF<>';
+        const charArray = chars.split('');
+        
+        const fontSize = 12;
+        const columns = Math.ceil(width / fontSize);
+        const drops: number[] = Array(columns).fill(1).map(() => Math.random() * -50); // Start staggered
+
+        const draw = () => {
+            // Trail effect (fade out previous frame)
+            ctx.fillStyle = `rgba(2, 4, 10, 0.15)`; // Heavy fade for clean trails
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.font = `bold ${fontSize}px monospace`;
+            
+            for (let i = 0; i < drops.length; i++) {
+                // Randomize lightness for depth
+                const isBright = Math.random() > 0.95;
+                
+                // Color Logic
+                ctx.fillStyle = isBright ? '#ffffff' : colorHex;
+                
+                // Random character
+                const text = charArray[Math.floor(Math.random() * charArray.length)];
+                
+                const x = i * fontSize;
+                const y = drops[i] * fontSize;
+
+                ctx.fillText(text, x, y);
+
+                // Reset drop or move down
+                if (y > height && Math.random() > 0.985) {
+                    drops[i] = 0;
+                }
+                drops[i] += 0.5 * speed; // Speed control
+            }
+        };
+
+        let animationFrameId: number;
+        const loop = () => {
+            draw();
+            animationFrameId = requestAnimationFrame(loop);
+        };
+        loop();
+
+        const handleResize = () => {
+            if(canvas) {
+                width = canvas.width = canvas.offsetWidth;
+                height = canvas.height = canvas.offsetHeight;
+            }
+        };
+        window.addEventListener('resize', handleResize);
+
+        return () => {
+            cancelAnimationFrame(animationFrameId);
+            window.removeEventListener('resize', handleResize);
+        };
+    }, [colorHex, speed]);
+
+    return (
+        <canvas 
+            ref={canvasRef} 
+            className="absolute inset-0 w-full h-full opacity-30 mix-blend-screen pointer-events-none"
+        />
+    );
+};
 
 interface AdminResultControlProps {
   isOpen: boolean;
@@ -44,7 +124,8 @@ export default function AdminResultControl({ isOpen, onClose, onPublishSuccess, 
           name: 'hazard',
           color: 'text-red-500',
           border: 'border-red-500',
-          bgHex: '#0f0202',
+          bgHex: '#0f0202', // Deep Red Black
+          matrixHex: '#ff003c', // Matrix Rain Red
           shadow: 'shadow-neon-red',
           glow: 'bg-red-600',
           inputColor: 'text-red-500 drop-shadow-[0_0_15px_rgba(255,0,0,1)]',
@@ -55,7 +136,8 @@ export default function AdminResultControl({ isOpen, onClose, onPublishSuccess, 
           name: 'history',
           color: 'text-cyber-emerald',
           border: 'border-cyber-emerald',
-          bgHex: '#020a05',
+          bgHex: '#020a05', // Deep Green Black
+          matrixHex: '#10b981', // Matrix Rain Green
           shadow: 'shadow-neon-emerald',
           glow: 'bg-cyber-emerald',
           iconColor: 'text-cyber-emerald',
@@ -68,7 +150,8 @@ export default function AdminResultControl({ isOpen, onClose, onPublishSuccess, 
               name: 'solar',
               color: 'text-cyber-solar',
               border: 'border-cyber-solar',
-              bgHex: '#0c0400',
+              bgHex: '#0c0400', // Deep Orange Black
+              matrixHex: '#ff5f00', // Matrix Rain Orange
               shadow: 'shadow-neon-solar',
               glow: 'bg-cyber-solar',
               iconColor: 'text-cyber-solar',
@@ -79,7 +162,8 @@ export default function AdminResultControl({ isOpen, onClose, onPublishSuccess, 
               name: 'vapor',
               color: 'text-cyber-vapor',
               border: 'border-cyber-vapor',
-              bgHex: '#05020c',
+              bgHex: '#05020c', // Deep Purple Black
+              matrixHex: '#7c3aed', // Matrix Rain Purple
               shadow: 'shadow-neon-vapor',
               glow: 'bg-cyber-vapor',
               iconColor: 'text-cyber-vapor',
@@ -91,7 +175,8 @@ export default function AdminResultControl({ isOpen, onClose, onPublishSuccess, 
               name: 'abyss',
               color: 'text-blue-400',
               border: 'border-blue-600',
-              bgHex: '#02040a',
+              bgHex: '#02040a', // Deep Blue Black
+              matrixHex: '#2563eb', // Matrix Rain Blue
               shadow: 'shadow-neon-abyss',
               glow: 'bg-cyber-blue',
               iconColor: 'text-cyber-blue',
@@ -243,13 +328,16 @@ export default function AdminResultControl({ isOpen, onClose, onPublishSuccess, 
         <div className="relative w-full h-full sm:h-auto sm:max-w-4xl sm:max-h-[90vh] flex flex-col sm:mx-4 overflow-hidden shadow-2xl sm:rounded-3xl border-0 sm:border transition-all duration-700" 
              style={{ borderColor: theme.bgHex !== '#02040a' ? 'rgba(255,255,255,0.1)' : '', backgroundColor: theme.bgHex }}>
             
+            {/* --- REACTIVE MATRIX RAIN BACKGROUND --- */}
+            <MatrixRainOverlay colorHex={theme.matrixHex} speed={isReventado ? 2 : 1} />
+
             {/* Desktop-only outer glow */}
             <div className={`absolute -inset-2 ${theme.glow} rounded-3xl opacity-20 blur-2xl animate-pulse transition-colors duration-700 hidden sm:block pointer-events-none`}></div>
 
             <div className="flex flex-col md:flex-row h-full w-full relative z-10">
                 
                 {/* --- HEADER PANEL (Top on Mobile, Left on Desktop) --- */}
-                <div id="admin-control-panel-left" className="bg-black/40 p-3 md:p-8 md:w-1/3 border-b md:border-b-0 md:border-r border-white/10 relative flex flex-row md:flex-col justify-between items-center md:items-stretch shrink-0 transition-colors duration-500">
+                <div id="admin-control-panel-left" className="bg-black/60 backdrop-blur-md p-3 md:p-8 md:w-1/3 border-b md:border-b-0 md:border-r border-white/10 relative flex flex-row md:flex-col justify-between items-center md:items-stretch shrink-0 transition-colors duration-500">
                     <div className={`absolute top-0 left-0 w-full h-1 md:h-1 bg-gradient-to-r from-transparent via-${theme.color.replace('text-', '')} to-transparent opacity-50`}></div>
                     
                     <div className="flex-1 md:flex-none flex items-center md:block gap-3">
@@ -273,17 +361,17 @@ export default function AdminResultControl({ isOpen, onClose, onPublishSuccess, 
                             type="date" 
                             value={date}
                             onChange={e => setDate(e.target.value)}
-                            className={`bg-black border ${theme.border} rounded-lg p-1.5 md:p-3 text-white font-mono text-xs md:text-sm focus:outline-none shadow-inner transition-colors duration-500 text-center w-32 md:w-full`}
+                            className={`bg-black/80 border ${theme.border} rounded-lg p-1.5 md:p-3 text-white font-mono text-xs md:text-sm focus:outline-none shadow-inner transition-colors duration-500 text-center w-32 md:w-full`}
                         />
                     </div>
                     
-                    <button onClick={onClose} className="md:hidden ml-3 text-slate-400 hover:text-white bg-white/5 p-2 rounded-full h-8 w-8 flex items-center justify-center">
+                    <button onClick={onClose} className="md:hidden ml-3 text-slate-400 hover:text-white bg-white/5 p-2 rounded-full h-8 w-8 flex items-center justify-center border border-white/10">
                         <i className="fas fa-times"></i>
                     </button>
                 </div>
 
                 {/* --- CONTENT PANEL (Scrollable Area) --- */}
-                <div id="admin-control-panel-right" className="flex-1 relative flex flex-col bg-black/20 overflow-y-auto custom-scrollbar">
+                <div id="admin-control-panel-right" className="flex-1 relative flex flex-col bg-transparent overflow-y-auto custom-scrollbar">
                     
                     {/* Desktop Close */}
                     <button onClick={onClose} className="absolute top-4 right-4 text-slate-600 hover:text-white transition-colors z-20 hidden md:block"><i className="fas fa-times text-lg"></i></button>
@@ -291,21 +379,21 @@ export default function AdminResultControl({ isOpen, onClose, onPublishSuccess, 
                     <div className="p-4 md:p-8 flex flex-col h-full">
                         
                         {/* DRAW SELECTOR */}
-                        <div className="mb-4 md:mb-8 shrink-0">
+                        <div className="mb-4 md:mb-8 shrink-0 relative z-20">
                             <label className="text-[8px] md:text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest mb-2 block">Seleccionar Sorteo</label>
                             <div className="grid grid-cols-3 gap-2 md:gap-4">
                                 {Object.values(DrawTime).map((t) => {
                                     const isActive = selectedDraw === t;
                                     let activeClass = '';
-                                    if (t.includes('Mediodía')) activeClass = 'border-cyber-solar text-cyber-solar bg-cyber-solar/10 shadow-neon-solar';
-                                    else if (t.includes('Tarde')) activeClass = 'border-cyber-vapor text-cyber-vapor bg-cyber-vapor/10 shadow-neon-vapor';
-                                    else activeClass = 'border-blue-600 text-blue-400 bg-blue-900/20 shadow-neon-abyss';
+                                    if (t.includes('Mediodía')) activeClass = 'border-cyber-solar text-cyber-solar bg-cyber-solar/20 shadow-neon-solar';
+                                    else if (t.includes('Tarde')) activeClass = 'border-cyber-vapor text-cyber-vapor bg-cyber-vapor/20 shadow-neon-vapor';
+                                    else activeClass = 'border-blue-600 text-blue-400 bg-blue-900/40 shadow-neon-abyss';
 
                                     return (
                                         <button
                                             key={t}
                                             onClick={() => setSelectedDraw(t)}
-                                            className={`relative py-2 md:py-4 rounded-lg md:rounded-xl border transition-all duration-300 flex flex-col items-center gap-1 overflow-hidden group ${isActive ? activeClass : 'border-white/10 text-slate-500 hover:bg-white/5'}`}
+                                            className={`relative py-2 md:py-4 rounded-lg md:rounded-xl border transition-all duration-300 flex flex-col items-center gap-1 overflow-hidden group backdrop-blur-sm ${isActive ? activeClass : 'border-white/10 text-slate-500 hover:bg-white/5 bg-black/40'}`}
                                         >
                                             <i className={`fas ${getDrawIcon(t)} text-xs md:text-xl ${isActive ? 'animate-bounce' : ''}`}></i>
                                             <span className="text-[8px] md:text-[10px] font-black uppercase tracking-wider">{t.split(' ')[0]}</span>
@@ -316,11 +404,11 @@ export default function AdminResultControl({ isOpen, onClose, onPublishSuccess, 
                         </div>
 
                         {/* INPUTS AREA - Centered Vertical Space */}
-                        <div className="flex-1 flex flex-col justify-center gap-4 md:gap-6 mb-4 md:mb-8">
+                        <div className="flex-1 flex flex-col justify-center gap-4 md:gap-6 mb-4 md:mb-8 relative z-20">
                             
                             {/* MAIN NUMBER */}
                             <div className="relative group/reactor w-full">
-                                <div className={`bg-black/40 border-2 ${theme.border} rounded-2xl p-4 md:p-6 flex flex-col items-center relative z-10 transition-all duration-300 shadow-inner group-focus-within/reactor:bg-black/60`}>
+                                <div className={`bg-black/60 border-2 ${theme.border} rounded-2xl p-4 md:p-6 flex flex-col items-center relative z-10 transition-all duration-300 shadow-lg backdrop-blur-md group-focus-within/reactor:bg-black/80 group-focus-within/reactor:shadow-[0_0_30px_rgba(0,0,0,0.5)]`}>
                                     <label className="text-[8px] md:text-[10px] font-mono font-bold text-white uppercase tracking-[0.3em] mb-1 opacity-50">Número Ganador</label>
                                     
                                     <div className="relative w-full text-center">
@@ -339,7 +427,7 @@ export default function AdminResultControl({ isOpen, onClose, onPublishSuccess, 
                             </div>
 
                             {/* REVENTADOS TOGGLE */}
-                            <div className={`w-full flex items-center justify-between rounded-2xl p-3 md:p-4 transition-all duration-500 relative overflow-hidden border-2 ${isReventado ? 'bg-red-950/30 border-red-500 shadow-[0_0_30px_rgba(255,0,0,0.4)]' : 'bg-slate-900/20 border-white/10'} ${shake ? 'animate-[shake_0.5s_ease-in-out]' : ''}`}>
+                            <div className={`w-full flex items-center justify-between rounded-2xl p-3 md:p-4 transition-all duration-500 relative overflow-hidden border-2 backdrop-blur-md ${isReventado ? 'bg-red-950/60 border-red-500 shadow-[0_0_30px_rgba(255,0,0,0.4)]' : 'bg-slate-900/40 border-white/10'} ${shake ? 'animate-[shake_0.5s_ease-in-out]' : ''}`}>
                                 {isReventado && <div className="absolute inset-0 opacity-20 animate-[scroll_2s_linear_infinite]" style={{backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 10px, #ff0000 10px, #ff0000 20px)', backgroundSize: '200% 200%'}}></div>}
 
                                 <div className="flex items-center gap-3 relative z-10">
@@ -352,13 +440,13 @@ export default function AdminResultControl({ isOpen, onClose, onPublishSuccess, 
                                 </div>
                                 
                                 <div className={`transition-all duration-500 relative z-10 w-20 md:w-24 ${isReventado ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'}`}>
-                                    <input type="tel" maxLength={2} value={reventadoNumber} onChange={e => handleReventadoChange(e.target.value)} className={`w-full bg-black border-2 border-red-500 rounded-lg py-1.5 md:py-2 text-center text-lg md:text-2xl text-red-500 font-mono font-bold focus:outline-none shadow-neon-red placeholder-red-900/50 ${revInputAnim ? 'scale-110' : ''}`} placeholder="--" />
+                                    <input type="tel" maxLength={2} value={reventadoNumber} onChange={e => handleReventadoChange(e.target.value)} className={`w-full bg-black/80 border-2 border-red-500 rounded-lg py-1.5 md:py-2 text-center text-lg md:text-2xl text-red-500 font-mono font-bold focus:outline-none shadow-neon-red placeholder-red-900/50 ${revInputAnim ? 'scale-110' : ''}`} placeholder="--" />
                                 </div>
                             </div>
                         </div>
 
                         {/* ACTION BUTTON - Sticky Bottom on Mobile if needed, but flex-1 handles it */}
-                        <div className="shrink-0 pt-2">
+                        <div className="shrink-0 pt-2 relative z-20">
                             <button 
                                 onMouseDown={handleInteractionStart}
                                 onMouseUp={handleInteractionEnd}
@@ -367,12 +455,12 @@ export default function AdminResultControl({ isOpen, onClose, onPublishSuccess, 
                                 onTouchEnd={handleInteractionEnd}
                                 disabled={loading || !winningNumber || (isReventado && !reventadoNumber) || success}
                                 className={`
-                                    w-full py-4 rounded-xl font-display font-black uppercase tracking-[0.2em] transition-all relative overflow-hidden group select-none border-2 text-xs md:text-sm
+                                    w-full py-4 rounded-xl font-display font-black uppercase tracking-[0.2em] transition-all relative overflow-hidden group select-none border-2 text-xs md:text-sm shadow-xl
                                     ${success 
                                         ? 'bg-black border-green-500 text-green-500 shadow-[0_0_50px_lime]' 
                                         : isReventado 
-                                            ? 'bg-red-900/20 border-red-600 text-red-500 hover:shadow-neon-red hover:text-white' 
-                                            : `${theme.color.replace('text-', 'border-')} text-white hover:shadow-${theme.shadow}`
+                                            ? 'bg-red-900/40 border-red-600 text-red-500 hover:shadow-neon-red hover:text-white backdrop-blur-md' 
+                                            : `${theme.color.replace('text-', 'border-')} ${theme.color.replace('text-', 'bg-')}/20 text-white hover:shadow-${theme.shadow} backdrop-blur-md`
                                     }
                                     ${charging ? (isReventado ? 'animate-[shake_0.2s_ease-in-out_infinite]' : 'animate-pulse') : ''}
                                     disabled:opacity-50 disabled:cursor-not-allowed
@@ -394,7 +482,7 @@ export default function AdminResultControl({ isOpen, onClose, onPublishSuccess, 
                                         </div>
                                     ) : (
                                         <>
-                                            {charging ? <span className={`${isReventado ? 'text-white font-black drop-shadow-[0_0_10px_black]' : 'text-black font-bold'}`}>{progress < 100 ? (isReventado ? 'ARMANDO...' : 'CARGANDO...') : 'EJECUTANDO...'}</span> : <><i className={`fas ${isReventado ? 'fa-radiation fa-spin-slow' : 'fa-fingerprint'} text-lg`}></i><span>{isReventado ? 'DETONAR' : 'PUBLICAR'}</span></>}
+                                            {charging ? <span className={`${isReventado ? 'text-white font-black drop-shadow-[0_0_10px_black]' : 'text-white font-bold'}`}>{progress < 100 ? (isReventado ? 'ARMANDO...' : 'CARGANDO...') : 'EJECUTANDO...'}</span> : <><i className={`fas ${isReventado ? 'fa-radiation fa-spin-slow' : 'fa-fingerprint'} text-lg`}></i><span>{isReventado ? 'DETONAR' : 'PUBLICAR'}</span></>}
                                         </>
                                     )}
                                 </div>

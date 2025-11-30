@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
+import MatrixRain from './ui/MatrixRain';
 
 type LoginRole = 'ADMIN' | 'VENDOR' | 'PLAYER';
 
@@ -33,7 +33,8 @@ export default function Login() {
                   backlight: 'bg-[#4c1d95]', 
                   label: 'MERCHANT_PRIME',
                   ringColor: 'border-violet-500',
-                  containerBorder: 'border-violet-500/50'
+                  containerBorder: 'border-violet-500/50',
+                  matrixColor: '#8b5cf6'
               };
           case 'PLAYER':
               // DARK NEON BLUE PHOSPHORESCENT (Deep Abyss)
@@ -51,7 +52,8 @@ export default function Login() {
                   backlight: 'bg-[#0e7490]', 
                   label: 'PLAYER_GRID_V2',
                   ringColor: 'border-cyan-400',
-                  containerBorder: 'border-cyan-500/50'
+                  containerBorder: 'border-cyan-500/50',
+                  matrixColor: '#06b6d4'
               };
           case 'ADMIN':
           default:
@@ -70,7 +72,8 @@ export default function Login() {
                   backlight: 'bg-[#be123c]',
                   label: 'ROOT_ACCESS_LEVEL_5',
                   ringColor: 'border-rose-500',
-                  containerBorder: 'border-rose-600/50'
+                  containerBorder: 'border-rose-600/50',
+                  matrixColor: '#f43f5e'
               };
       }
   }, [activeRole]);
@@ -123,10 +126,10 @@ export default function Login() {
           <div className="relative flex flex-col items-center justify-center h-full w-full overflow-hidden bg-black border-[6px] border-rose-600 rounded-[2.5rem] shadow-[0_0_150px_rgba(225,29,72,0.8),inset_0_0_50px_rgba(225,29,72,0.5)] group ring-4 ring-rose-900 ring-offset-8 ring-offset-black z-10">
               
               {/* Background: Digital Rain (Red Matrix) */}
-              <div className="absolute inset-0 opacity-40 pointer-events-none">
-                  <div className="w-full h-full bg-[linear-gradient(0deg,transparent_20%,rgba(225,29,72,0.6)_50%,transparent_80%)] bg-[length:100%_4px] animate-[scanline_3s_linear_infinite]"></div>
-                  <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_40%,black_100%)]"></div>
+              <div className="absolute inset-0 opacity-40">
+                  <MatrixRain colorHex="#f43f5e" opacity={0.3} density="HIGH" speed={2} brightness={0.8} />
               </div>
+              <div className="absolute inset-0 bg-[radial-gradient(circle,transparent_40%,black_100%)] pointer-events-none"></div>
 
               {/* LASER SCANNER BEAM */}
               <div className={`absolute left-0 w-full h-4 bg-rose-500 shadow-[0_0_50px_#f43f5e] z-20 animate-[scan_1.5s_ease-in-out_infinite] ${viewState === 'ACCESS_GRANTED' ? 'hidden' : 'block'}`}></div>
@@ -167,8 +170,8 @@ export default function Login() {
                       <div className="text-[10px] font-mono text-rose-300 font-bold border border-rose-600 px-3 py-1 bg-black/90 shadow-[0_0_20px_rgba(244,63,94,0.4)]">SYS.ROOT</div>
                       <div className="text-[10px] font-mono text-rose-300 font-bold border border-rose-600 px-3 py-1 bg-black/90 shadow-[0_0_20px_rgba(244,63,94,0.4)]">SEC.LVL.5</div>
                   </div>
-                  <div className="text-center pb-8">
-                      <div className={`font-display font-black text-3xl tracking-[0.3em] transition-all duration-300 ${viewState === 'ACCESS_GRANTED' ? 'text-white drop-shadow-[0_0_30px_white]' : 'text-rose-500 animate-pulse text-shadow-neon-red'}`}>
+                  <div className="text-center pb-8 w-full flex justify-center">
+                      <div className={`font-display font-black text-lg sm:text-2xl md:text-3xl tracking-[0.2em] md:tracking-[0.3em] transition-all duration-300 whitespace-nowrap ${viewState === 'ACCESS_GRANTED' ? 'text-white drop-shadow-[0_0_30px_white]' : 'text-rose-500 animate-pulse text-shadow-neon-red'}`}>
                           {viewState === 'ACCESS_GRANTED' ? 'GRANTED' : 'AUTHENTICATING'}
                       </div>
                   </div>
@@ -184,15 +187,21 @@ export default function Login() {
           <div className="absolute -inset-10 bg-violet-700 rounded-[4rem] blur-3xl opacity-50 animate-pulse"></div>
 
           <div className="relative flex flex-col items-center justify-center h-full w-full overflow-hidden bg-[#0a0514] border-[6px] border-violet-600 rounded-[2.5rem] shadow-[0_0_150px_rgba(139,92,246,0.8),inset_0_0_50px_rgba(124,58,237,0.5)] ring-4 ring-violet-900 ring-offset-8 ring-offset-black z-10">
+              
+              {/* Matrix Rain - Purple */}
+              <div className="absolute inset-0 opacity-30">
+                  <MatrixRain colorHex="#a855f7" opacity={0.2} density="MEDIUM" speed={1.5} brightness={0.6} />
+              </div>
+              
               {/* Deep Void Fog */}
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.4),black_90%)] animate-pulse"></div>
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.2),black_90%)] animate-pulse pointer-events-none"></div>
               
               {/* Grid Overlay - Dark & Subtle */}
-              <div className="absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.1)_1px,transparent_1px)] bg-[length:30px_30px] opacity-50 perspective-1000 transform rotate-x-12"></div>
+              <div className="absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.1)_1px,transparent_1px)] bg-[length:30px_30px] opacity-50 perspective-1000 transform rotate-x-12 pointer-events-none"></div>
 
               <div className="relative z-10 w-72 h-72 flex items-center justify-center">
                   
-                  {/* HEAVY METAL RINGS - Dark Purple */}
+                  {/* Heavy Metal Rings - Dark Purple */}
                   <div className={`absolute inset-0 border-[10px] border-violet-950 border-t-violet-500 rounded-full animate-[spin_6s_linear_infinite] shadow-[0_0_50px_rgba(139,92,246,0.7)]`}></div>
                   <div className={`absolute inset-4 border-[6px] border-indigo-900 border-b-fuchsia-500 rounded-full animate-[spin_8s_linear_infinite_reverse] shadow-[0_0_30px_rgba(217,70,239,0.6)]`}></div>
                   
@@ -223,7 +232,7 @@ export default function Login() {
               </div>
 
               <div className="absolute bottom-16 text-center w-full">
-                  <div className={`font-display font-black text-2xl tracking-[0.3em] uppercase ${viewState === 'ACCESS_GRANTED' ? 'text-white text-shadow-white' : 'text-violet-300 text-shadow-neon-purple'}`}>
+                  <div className={`font-display font-black text-xl md:text-2xl tracking-[0.2em] md:tracking-[0.3em] uppercase ${viewState === 'ACCESS_GRANTED' ? 'text-white text-shadow-white' : 'text-violet-300 text-shadow-neon-purple'}`}>
                       {viewState === 'ACCESS_GRANTED' ? 'ASSETS VERIFIED' : 'SYNCING LEDGER'}
                   </div>
                   <div className="text-[10px] font-mono text-fuchsia-300 mt-2 font-bold tracking-widest">SECURE_CHANNEL_ESTABLISHED</div>
@@ -240,11 +249,16 @@ export default function Login() {
 
           <div className="relative flex flex-col items-center justify-center h-full w-full overflow-hidden bg-[#02040a] border-[6px] border-cyan-400 rounded-[2.5rem] shadow-[0_0_150px_rgba(34,211,238,0.8),inset_0_0_50px_rgba(34,211,238,0.5)] ring-4 ring-cyan-800 ring-offset-8 ring-offset-black z-10">
               
+              {/* Matrix Rain - Cyan */}
+              <div className="absolute inset-0 opacity-40">
+                  <MatrixRain colorHex="#06b6d4" opacity={0.25} density="LOW" speed={1} />
+              </div>
+
               {/* Deep Abyss Background */}
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#083344_0%,#000000_100%)] opacity-90"></div>
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#083344_0%,#000000_100%)] opacity-90 pointer-events-none"></div>
 
               {/* PHOSPHORESCENT GRID LINES */}
-              <div className="absolute inset-0 flex items-center justify-center perspective-500">
+              <div className="absolute inset-0 flex items-center justify-center perspective-500 pointer-events-none">
                   <div className="absolute inset-0 bg-[linear-gradient(0deg,transparent_24%,rgba(6,182,212,0.3)_25%,rgba(6,182,212,0.3)_26%,transparent_27%,transparent_74%,rgba(6,182,212,0.3)_75%,rgba(6,182,212,0.3)_76%,transparent_77%,transparent),linear-gradient(90deg,transparent_24%,rgba(6,182,212,0.3)_25%,rgba(6,182,212,0.3)_26%,transparent_27%,transparent_74%,rgba(6,182,212,0.3)_75%,rgba(6,182,212,0.3)_76%,transparent_77%,transparent)] bg-[length:50px_50px] animate-[pan-down_2s_linear_infinite]"></div>
               </div>
 
@@ -280,7 +294,7 @@ export default function Login() {
                   </div>
               </div>
 
-              <div className="absolute bottom-8 font-display font-black text-3xl italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-cyan-200 drop-shadow-[0_0_15px_rgba(34,211,238,0.9)]">
+              <div className="absolute bottom-8 font-display font-black text-2xl md:text-3xl italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-cyan-200 drop-shadow-[0_0_15px_rgba(34,211,238,0.9)]">
                   {viewState === 'ACCESS_GRANTED' ? 'WELCOME PLAYER_1' : 'CONNECTING...'}
               </div>
               
@@ -308,6 +322,11 @@ export default function Login() {
 
                 <div className={`relative bg-[#050a14]/90 backdrop-blur-2xl border-[4px] rounded-3xl p-1 group overflow-hidden z-10 transition-colors duration-700 ${theme.containerBorder} ${theme.shadow}`}>
                     
+                    {/* SUBTLE INTERNAL MATRIX RAIN FOR FORM */}
+                    <div className="absolute inset-0 opacity-10 pointer-events-none">
+                        <MatrixRain colorHex={theme.matrixColor} speed={0.5} density="LOW" />
+                    </div>
+
                     <div className="relative bg-[#020202]/95 rounded-[1.4rem] p-8 md:p-10 overflow-hidden transition-colors duration-700">
                         
                         {/* Decorative HUD Elements */}
@@ -317,7 +336,7 @@ export default function Login() {
                         </div>
 
                         {/* Logo Section */}
-                        <div className="text-center mb-8">
+                        <div className="text-center mb-8 relative z-10">
                             <div className="inline-flex items-center justify-center w-28 h-28 mb-6 relative group/icon cursor-pointer">
                                 <div className={`absolute inset-0 rounded-full blur-2xl opacity-40 group-hover/icon:opacity-60 animate-pulse transition-all duration-700 ${theme.backlight}`}></div>
                                 <div className={`relative z-10 w-full h-full rounded-full bg-black/60 border-4 group-hover/icon:border-opacity-100 transition-all duration-700 flex items-center justify-center overflow-hidden border-opacity-50 ${theme.border} ${theme.shadow}`}>
@@ -333,7 +352,7 @@ export default function Login() {
                             <p className={`text-xs uppercase tracking-[0.5em] font-bold animate-pulse transition-colors duration-700 ${theme.secondaryText}`}>Acceso Blindado</p>
                         </div>
 
-                        <form onSubmit={handleLogin} className="space-y-6">
+                        <form onSubmit={handleLogin} className="space-y-6 relative z-10">
                             
                             {/* IDENTIFIER INPUT */}
                             <div className="space-y-2">
@@ -379,23 +398,44 @@ export default function Login() {
                                 </div>
                             </div>
 
-                            <button 
-                                type="submit"
-                                className={`w-full py-5 rounded-xl font-display font-black uppercase tracking-[0.2em] relative overflow-hidden group/btn transition-all duration-500 border-t border-white/20 ${theme.btnShadow}`}
-                            >
-                                <div className={`absolute inset-0 ${theme.btnBg} transition-all duration-500 opacity-90 group-hover/btn:opacity-100`}></div>
-                                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-30 mix-blend-multiply"></div>
-                                <div className="absolute inset-0 bg-white/20 -translate-x-full group-hover/btn:animate-[shine_0.5s_ease-in-out]"></div>
-                                
-                                <span className={`relative z-10 flex items-center justify-center gap-3 ${theme.btnText} text-lg shadow-black drop-shadow-md`}>
-                                    <i className="fas fa-power-off"></i> INICIAR SESIÓN
-                                </span>
-                            </button>
+                            {/* --- THE PLASMA CORE BUTTON (IMPROVED NEON/PHOSPHORESCENT) --- */}
+                            <div className="relative group/submit mt-8 perspective-500">
+                                {/* 1. LIQUID NEON GLOW (Underlayer) */}
+                                <div className={`absolute -inset-2 rounded-2xl opacity-40 blur-xl transition-all duration-500 group-hover/submit:opacity-100 group-hover/submit:blur-2xl group-hover/submit:scale-105 animate-pulse ${theme.backlight}`}></div>
+
+                                {/* 2. MAIN BUTTON */}
+                                <button 
+                                    type="submit"
+                                    className={`relative w-full py-6 rounded-xl font-display font-black uppercase tracking-[0.2em] overflow-hidden transition-all duration-300 border-2 bg-black/80 backdrop-blur-xl ${theme.border} group-hover/submit:border-white/50 group-hover/submit:scale-[1.02] shadow-2xl`}
+                                >
+                                    {/* 3. INTERNAL PLASMA FLOW */}
+                                    <div className={`absolute inset-0 opacity-30 ${theme.btnBg} mix-blend-screen`}></div>
+                                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 mix-blend-overlay animate-[pan-up_10s_linear_infinite]"></div>
+                                    
+                                    {/* 4. HIGH VOLTAGE SCANLINE */}
+                                    <div className="absolute top-0 left-0 w-[200%] h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-12 -translate-x-full group-hover/submit:animate-[shine_0.7s_ease-in-out]"></div>
+                                    
+                                    {/* 5. CONTENT LAYER */}
+                                    <div className="relative z-10 flex items-center justify-center gap-4">
+                                        <div className={`p-2 rounded-lg border bg-black/50 ${theme.border} ${theme.primary} group-hover/submit:animate-spin-slow`}>
+                                            <i className="fas fa-power-off text-xl drop-shadow-[0_0_10px_currentColor]"></i>
+                                        </div>
+                                        <span className={`text-xl ${theme.btnText} drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] group-hover/submit:text-white transition-colors`}>
+                                            INICIAR SESIÓN
+                                        </span>
+                                        <i className={`fas fa-chevron-right opacity-0 group-hover/submit:opacity-100 group-hover/submit:translate-x-2 transition-all duration-300 ${theme.primary}`}></i>
+                                    </div>
+
+                                    {/* 6. CORNER ACCENTS (Cyberpunk touches) */}
+                                    <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-white/50 rounded-tl-lg"></div>
+                                    <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-white/50 rounded-br-lg"></div>
+                                </button>
+                            </div>
 
                         </form>
 
                         {/* DEMO ACCESS KEYS - REDESIGNED BUTTONS */}
-                        <div className="mt-10 pt-8 border-t border-white/10">
+                        <div className="mt-10 pt-8 border-t border-white/10 relative z-10">
                             <div className="text-[10px] font-mono text-slate-500 uppercase tracking-[0.3em] mb-4 text-center font-bold">
                                 Protocolo de Acceso Rápido
                             </div>
@@ -466,6 +506,7 @@ export default function Login() {
             0%, 100% { top: 5%; opacity: 0; }
             50% { top: 95%; opacity: 1; }
         }
+        @keyframes pan-up { from { background-position: 0 0; } to { background-position: 0 -100px; } }
       `}</style>
     </div>
   );

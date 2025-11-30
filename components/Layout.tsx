@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { UserRole } from '../types';
 import { formatCurrency, ROUTES } from '../constants';
 import { useNavigate, useLocation } from 'react-router-dom';
+import AnimatedIconUltra from './ui/AnimatedIconUltra';
 
 interface LayoutProps {
   children?: ReactNode;
@@ -27,11 +28,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     setShowLogoutConfirm(false);
     setIsShuttingDown(true);
     
+    // Allow animation to play fully before actual signout
     setTimeout(async () => {
         await signOut();
         setIsShuttingDown(false);
         navigate(ROUTES.LOGIN);
-    }, 1500);
+    }, 800);
   };
 
   const isActive = (path: string) => location.pathname.startsWith(path);
@@ -43,17 +45,30 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isVendor = user.role === UserRole.Vendedor;
 
   return (
-    <div className={`min-h-screen flex flex-col text-slate-200 font-sans selection:bg-cyber-neon selection:text-black transition-opacity duration-300 ${isShuttingDown ? 'opacity-0 scale-95 filter blur-lg' : 'opacity-100'}`}>
+    <div className={`min-h-screen flex flex-col text-slate-200 font-sans selection:bg-cyber-neon selection:text-black`}>
       
-      {/* --- SHUTDOWN ANIMATION OVERLAY (CRT EFFECT) --- */}
+      {/* --- SHUTDOWN ANIMATION OVERLAY (CRT TV EFFECT) --- */}
       {isShuttingDown && (
-          <div className="fixed inset-0 z-[100] bg-black pointer-events-none flex items-center justify-center">
-              <div className="w-full h-[2px] bg-white animate-[shutdownH_0.4s_ease-out_forwards] shadow-[0_0_20px_white]"></div>
-              <div className="absolute h-full w-[2px] bg-white animate-[shutdownV_0.4s_ease-out_0.4s_forwards] shadow-[0_0_20px_white]"></div>
-              <div className="absolute text-cyber-neon font-mono text-xs mt-10 animate-pulse text-glow">SYSTEM_HALT...</div>
+          <div className="fixed inset-0 z-[9999] pointer-events-none flex items-center justify-center">
+              {/* Vertical Shutters (Top/Bottom) */}
+              <div className="absolute top-0 left-0 w-full bg-black animate-[closeVert_0.4s_ease-in_forwards] z-20"></div>
+              <div className="absolute bottom-0 left-0 w-full bg-black animate-[closeVert_0.4s_ease-in_forwards] z-20"></div>
+              
+              {/* The Dying Light (Line -> Dot -> Gone) */}
+              <div className="absolute z-30 bg-white shadow-[0_0_50px_white] animate-[killLight_0.5s_ease-out_0.35s_forwards] rounded-full opacity-0"></div>
+
               <style>{`
-                @keyframes shutdownH { 0% { height: 100vh; background: white; } 50% { height: 2px; background: white; } 100% { height: 2px; width: 0; background: white; } }
-                @keyframes shutdownV { 0% { width: 100vw; opacity: 0; } 50% { width: 2px; opacity: 1; } 100% { height: 0; width: 2px; opacity: 0; } }
+                @keyframes closeVert {
+                    0% { height: 0; }
+                    100% { height: 50.5vh; } /* Overlap slightly to ensure black screen */
+                }
+                @keyframes killLight {
+                    0% { width: 100vw; height: 2px; opacity: 1; }
+                    40% { width: 100vw; height: 4px; opacity: 1; }
+                    60% { width: 100vw; height: 2px; opacity: 1; }
+                    80% { width: 4px; height: 4px; opacity: 1; } /* Collapse to dot */
+                    100% { width: 0; height: 0; opacity: 0; } /* Fade out */
+                }
               `}</style>
           </div>
       )}
@@ -86,7 +101,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             {/* 1. IDENTITY MODULE */}
             <div className="flex items-center gap-4 cursor-pointer" onClick={() => navigate(ROUTES.DASHBOARD)}>
                 <div className="w-8 h-8 flex items-center justify-center bg-cyber-neon/10 rounded-lg border border-cyber-neon/50 shadow-[0_0_15px_rgba(0,240,255,0.3)]">
-                    <i className="fas fa-cube text-cyber-neon animate-pulse"></i>
+                    <AnimatedIconUltra profile={{ animation: 'spin3d', theme: 'neon', speed: 4 }}>
+                        <i className="fas fa-cube text-cyber-neon"></i>
+                    </AnimatedIconUltra>
                 </div>
                 <h1 className="hidden sm:block text-xl font-display font-black italic tracking-wider text-white leading-none">
                     TIEMPOS<span className="text-cyber-neon">PRO</span>
@@ -139,9 +156,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 {/* Logout Button */}
                 <button 
                     onClick={requestSignOut}
-                    className="relative w-8 h-8 flex items-center justify-center rounded-lg bg-cyber-danger/10 text-cyber-danger border border-cyber-danger/50 hover:bg-white hover:text-cyber-danger transition-all shadow-[0_0_10px_rgba(255,0,60,0.2)]"
+                    className="relative w-8 h-8 flex items-center justify-center rounded-lg bg-cyber-danger/10 text-cyber-danger border border-cyber-danger/50 hover:bg-white hover:text-cyber-danger transition-all shadow-[0_0_10px_rgba(255,0,60,0.2)] group/logout"
                 >
-                    <i className="fas fa-power-off text-xs"></i>
+                    <AnimatedIconUltra profile={{ animation: 'pulse', theme: 'neon', enabled: true }}>
+                        <i className="fas fa-power-off text-xs group-hover/logout:scale-110 transition-transform"></i>
+                    </AnimatedIconUltra>
                 </button>
 
                 {/* Mobile Toggle */}
@@ -189,7 +208,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         )}
       </header>
 
-      {/* --- MAIN CONTENT (Padding adjusted for Fixed Header) --- */}
+      {/* --- MAIN CONTENT --- */}
       <main className="flex-1 relative z-10 w-full max-w-8xl mx-auto pt-24 px-4 sm:px-6 lg:px-8 pb-24">
         {children}
       </main>
@@ -209,10 +228,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                  <span><i className="fas fa-database text-blue-500 mr-2"></i> Ledger Hash: Verified</span>
                  <span><i className="fas fa-users text-cyber-orange mr-2"></i> Active Users: 1,042</span>
                  <span><i className="fas fa-bolt text-yellow-400 mr-2"></i> Voltage: Stable</span>
-                 {/* Repeat for infinite loop illusion */}
                  <span><i className="fas fa-server text-cyber-purple mr-2"></i> Edge-Node-01: ONLINE</span>
-                 <span><i className="fas fa-shield-alt text-cyber-success mr-2"></i> Integrity: 100%</span>
-                 <span><i className="fas fa-clock text-cyber-neon mr-2"></i> Sync Latency: 12ms</span>
              </div>
          </div>
 

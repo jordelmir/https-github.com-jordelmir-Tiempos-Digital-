@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { api } from '../services/edgeApi';
 import { DrawTime, RiskLimit, RiskLimitStats } from '../types';
 import { formatCurrency } from '../constants';
+import MatrixRain from './ui/MatrixRain';
 
 // --- TYPES & INTERFACES ---
 type ViewMode = 'SATURATION' | 'VOLUME' | 'VELOCITY';
@@ -280,19 +280,28 @@ export default function RiskLimitManager() {
           hex: '#ff5f00', name: 'solar', gradient: 'from-orange-500 via-red-500 to-yellow-500', 
           border: 'border-cyber-solar', text: 'text-cyber-solar', bg: 'bg-cyber-solar',
           shadow: 'shadow-neon-solar',
-          glowInner: 'shadow-[inset_0_0_20px_rgba(255,95,0,0.2)]'
+          glowInner: 'shadow-[inset_0_0_20px_rgba(255,95,0,0.2)]',
+          stroke: '#ff5f00',
+          ring: 'border-orange-500',
+          ringLight: 'border-orange-300'
       };
       if (displayDraw.includes('Tarde')) return { 
           hex: '#7c3aed', name: 'vapor', gradient: 'from-purple-600 via-indigo-500 to-pink-500', 
           border: 'border-cyber-vapor', text: 'text-cyber-vapor', bg: 'bg-cyber-vapor',
           shadow: 'shadow-neon-vapor',
-          glowInner: 'shadow-[inset_0_0_20px_rgba(124,58,237,0.2)]'
+          glowInner: 'shadow-[inset_0_0_20px_rgba(124,58,237,0.2)]',
+          stroke: '#7c3aed',
+          ring: 'border-purple-500',
+          ringLight: 'border-fuchsia-300'
       };
       return { 
           hex: '#2563eb', name: 'abyss', gradient: 'from-blue-600 via-cyan-500 to-teal-400', 
           border: 'border-blue-600', text: 'text-blue-400', bg: 'bg-blue-600',
-          shadow: 'shadow-[0_0_40px_rgba(37,99,235,0.6)]',
-          glowInner: 'shadow-[inset_0_0_20px_rgba(37,99,235,0.2)]'
+          shadow: 'shadow-neon-blue',
+          glowInner: 'shadow-[inset_0_0_20px_rgba(37,99,235,0.2)]',
+          stroke: '#2563eb',
+          ring: 'border-blue-500',
+          ringLight: 'border-cyan-300'
       };
   }, [displayDraw]);
 
@@ -336,10 +345,39 @@ export default function RiskLimitManager() {
                         
                         <div className="text-right">
                             <div className="text-[9px] text-slate-500 uppercase tracking-widest mb-1">Límite de Contención</div>
-                            <div className={`text-2xl md:text-3xl font-mono font-black ${effectiveGlobalLimit === Infinity ? 'text-cyber-neon' : 'text-white'} drop-shadow-[0_0_15px_rgba(255,255,255,0.4)] transition-all duration-500`}>
+                            <div className={`text-2xl md:text-3xl font-mono font-black ${effectiveGlobalLimit === 0 ? 'text-red-500 drop-shadow-[0_0_10px_red]' : theme.text} drop-shadow-[0_0_15px_rgba(255,255,255,0.4)] transition-all duration-500`}>
                                 {effectiveGlobalLimit === Infinity ? (
-                                    <span className="flex items-center justify-end gap-2 animate-pulse text-cyber-neon"><i className="fas fa-infinity text-xl md:text-2xl"></i> LIBRE</span>
-                                ) : formatCurrency(effectiveGlobalLimit)}
+                                    
+                                    /* --- HYPER-ATOM VISUALIZATION (Top Right) --- */
+                                    <div className="flex items-center justify-end gap-3 relative group/neural">
+                                        
+                                        {/* Orbital System Container */}
+                                        <div className="relative w-12 h-12 flex items-center justify-center">
+                                            
+                                            {/* Nucleus */}
+                                            <div className={`absolute z-20 text-xl font-bold ${theme.text} drop-shadow-[0_0_10px_currentColor]`}>∞</div>
+                                            
+                                            {/* Orbit 1 */}
+                                            <div className={`absolute w-full h-4 border border-current rounded-[100%] animate-[spin_3s_linear_infinite] ${theme.text} opacity-60`}></div>
+                                            
+                                            {/* Orbit 2 */}
+                                            <div className={`absolute w-full h-4 border border-current rounded-[100%] animate-[spin_4s_linear_infinite_reverse] ${theme.text} opacity-60 rotate-60`}></div>
+                                            
+                                            {/* Orbit 3 */}
+                                            <div className={`absolute w-full h-4 border border-current rounded-[100%] animate-[spin_5s_linear_infinite] ${theme.text} opacity-60 -rotate-60`}></div>
+                                            
+                                            {/* Particles */}
+                                            <div className={`absolute w-1 h-1 bg-white rounded-full animate-[orbit_3s_linear_infinite]`}></div>
+                                        </div>
+
+                                        <span className={`text-lg tracking-widest font-bold ${theme.text} animate-pulse drop-shadow-[0_0_5px_currentColor]`}>LIBRE</span>
+                                    </div>
+
+                                ) : (
+                                    <span className={`${theme.text} drop-shadow-[0_0_15px_currentColor]`}>
+                                        {formatCurrency(effectiveGlobalLimit)}
+                                    </span>
+                                )}
                             </div>
                             <div className="text-[10px] font-mono text-slate-500 mt-1 flex items-center justify-end gap-1">
                                 <span className={`w-1 h-3 ${theme.bg}`}></span> Exp: {formatCurrency(totalExposure)}
@@ -350,7 +388,7 @@ export default function RiskLimitManager() {
                     {/* CONTROLS BRIDGE */}
                     <div className="flex flex-col md:flex-row justify-between items-end gap-4 overflow-x-auto pb-2">
                         <div className="flex gap-2 md:gap-3">
-                            {Object.values(DrawTime).map(d => {
+                            {Object.values(DrawTime).map((d) => {
                                 const isActive = activeDraw === d;
                                 return (
                                     <button
@@ -403,6 +441,12 @@ export default function RiskLimitManager() {
 
                 {/* 2. THE GRID (LIVING MATRIX) - ADAPTIVE */}
                 <div className="flex-1 p-4 md:p-6 relative bg-[#020305] overflow-hidden group/grid custom-scrollbar overflow-y-auto">
+                    
+                    {/* MATRIX RAIN BACKGROUND (BEHIND GRID) */}
+                    <div className="absolute inset-0 opacity-20 pointer-events-none">
+                        <MatrixRain colorHex={theme.hex} speed={0.5} density="LOW" opacity={0.3} />
+                    </div>
+
                     <div className={`absolute inset-0 bg-gradient-to-b from-transparent via-${theme.name === 'solar' ? 'orange' : theme.name === 'vapor' ? 'purple' : 'blue'}-500/10 to-transparent w-full h-[30%] pointer-events-none z-0 animate-[scan_6s_linear_infinite] opacity-30`}></div>
                     
                     <div className={`transition-all duration-500 ease-out transform ${isSwitching ? 'scale-95 opacity-0 blur-sm' : 'scale-100 opacity-100 blur-0'}`}>
@@ -415,22 +459,30 @@ export default function RiskLimitManager() {
                                 const isLocked = cell.limit === 0;
                                 
                                 let bgClass = 'bg-[#0f1219]';
+                                // Base Border: Very subtle white to show grid
                                 let borderClass = 'border-white/5';
-                                let textClass = 'text-slate-600';
+                                // Base Text: Thematic Color but dimmed to avoid noise
+                                let textClass = `${theme.text} opacity-40 font-bold transition-all duration-300`;
                                 
                                 if (viewMode === 'SATURATION' && cell.percent > 0) {
                                     bgClass = isHighRisk ? 'bg-red-900/40' : isMedRisk ? 'bg-yellow-900/40' : `bg-${theme.name === 'solar' ? 'orange' : theme.name === 'vapor' ? 'purple' : 'blue'}-900/30`;
+                                    // Override borders for risk zones
                                     borderClass = isHighRisk ? 'border-red-500/50' : isMedRisk ? 'border-yellow-500/50' : `${theme.border.replace('border-', 'border-opacity-50 border-')}`;
+                                    // High contrast text for filled cells
                                     textClass = 'text-white font-bold text-shadow';
                                 }
 
                                 if (isSelected) {
                                     bgClass = 'bg-white/10';
-                                    borderClass = `border-white shadow-[0_0_15px_white]`;
-                                    textClass = 'text-white';
+                                    // CRITICAL UPDATE: Use Theme Color for Selection Border & Shadow
+                                    borderClass = `${theme.border} ${theme.shadow} border-opacity-100`;
+                                    textClass = 'text-white font-black drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]';
                                 } else if (cell.number === hoveredNumber) {
-                                    borderClass = 'border-white/40';
-                                    bgClass = 'bg-white/5';
+                                    // THEMATIC HOVER STATE
+                                    borderClass = `${theme.border} ${theme.shadow} border-opacity-100`;
+                                    bgClass = `${theme.bg.replace('bg-', 'bg-opacity-10 bg-')}`;
+                                    // Full opacity text with glow
+                                    textClass = `${theme.text} opacity-100 font-black drop-shadow-[0_0_10px_currentColor]`;
                                 }
 
                                 // Locked Style Override (Total Block)
@@ -459,7 +511,7 @@ export default function RiskLimitManager() {
                                         `}
                                         style={{ transitionDelay: `${idx * 5}ms` }}
                                     >
-                                        <span className={`text-[10px] sm:text-xs md:text-sm font-mono z-10 transition-colors ${textClass} ${isHighRisk || isLocked ? 'animate-pulse' : ''}`}>
+                                        <span className={`text-[10px] sm:text-xs md:text-sm font-mono z-10 ${textClass} ${isHighRisk || isLocked ? 'animate-pulse' : ''}`}>
                                             {isLocked ? <i className="fas fa-lock text-[8px] sm:text-[10px] mb-1"></i> : cell.number}
                                         </span>
                                         {isLocked && <span className="text-[6px] sm:text-[8px] text-red-500 font-bold">BLOCK</span>}
@@ -504,6 +556,12 @@ export default function RiskLimitManager() {
                 RIGHT PANEL: DUAL MODE
                ==================================================================================== */}
             <div className="xl:w-2/5 bg-[#05070a] flex flex-col relative overflow-hidden transition-all duration-500 z-10 border-t xl:border-t-0 xl:border-l border-white/5">
+                
+                {/* MATRIX RAIN BACKGROUND (BEHIND ATOM) */}
+                <div className="absolute inset-0 opacity-15 pointer-events-none">
+                    <MatrixRain colorHex={theme.hex} speed={0.8} density="MEDIUM" opacity={0.2} />
+                </div>
+
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[length:30px_30px] pointer-events-none"></div>
 
                 {selectedNumber ? (
@@ -569,7 +627,7 @@ export default function RiskLimitManager() {
                                     </div>
                                     <div className="bg-white/5 border border-white/5 rounded-2xl p-4 md:p-5 hover:border-white/10 transition-colors relative overflow-hidden group/card">
                                         <div className="text-[9px] text-slate-400 uppercase mb-2 font-bold tracking-wider">Límite Actual</div>
-                                        <div className="text-lg md:text-2xl font-mono font-bold text-slate-300">
+                                        <div className={`text-lg md:text-2xl font-mono font-bold ${activeCell.limit === 0 ? 'text-red-500' : theme.text} drop-shadow-[0_0_10px_currentColor]`}>
                                             {activeCell.limit === Infinity ? '∞' : formatCurrency(activeCell.limit)}
                                         </div>
                                         <div className={`text-[9px] mt-2 flex items-center gap-1 font-bold ${activeCell.isManual ? 'text-cyan-400' : 'text-slate-500'}`}>
@@ -642,8 +700,8 @@ export default function RiskLimitManager() {
                         )}
                     </div>
                 ) : (
-                    // --- MODE B: GLOBAL CONTROL CENTER ---
-                    <div className="flex-1 flex flex-col relative z-10 animate-in fade-in zoom-in duration-500 bg-[#05070a]">
+                    // --- MODE B: GLOBAL CONTROL CENTER (HYPER ATOM STYLE) ---
+                    <div className="flex-1 flex flex-col relative z-10 animate-in fade-in zoom-in duration-500 bg-[#05070a]/50">
                         <div className="p-6 md:p-8 border-b border-white/5 bg-black/20">
                             <h2 className="text-2xl font-display font-black text-white uppercase tracking-widest flex items-center gap-3">
                                 <div className={`w-10 h-10 rounded-full border-2 ${theme.border} flex items-center justify-center animate-spin-slow shadow-[0_0_20px_currentColor]`}>
@@ -657,24 +715,78 @@ export default function RiskLimitManager() {
                         </div>
 
                         <div className="flex-1 flex flex-col items-center justify-center relative p-8">
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 rounded-full border border-white/5 animate-[spin_20s_linear_infinite]"></div>
-                            <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-60 h-60 rounded-full border-2 border-dashed ${effectiveGlobalLimit === Infinity ? `${theme.border} animate-[spin_10s_linear_infinite]` : 'border-red-500 animate-pulse'} opacity-40`}></div>
-                            <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full border border-white/10 animate-[spin_15s_linear_infinite_reverse]`}></div>
+                            
+                            {/* --- HYPER-ATOM VISUALIZATION --- */}
+                            <div className="relative w-[360px] h-[360px] flex items-center justify-center">
+                                {/* 1. The Deep Void (Background Ambience) */}
+                                <div className={`absolute inset-0 opacity-10 blur-3xl rounded-full ${theme.bg}`}></div>
+                                
+                                {/* 2. The Atom SVG */}
+                                <svg viewBox="0 0 200 200" className="w-full h-full overflow-visible">
+                                    <defs>
+                                        <filter id="atomGlow" x="-50%" y="-50%" width="200%" height="200%">
+                                            <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                                            <feMerge>
+                                                <feMergeNode in="coloredBlur" />
+                                                <feMergeNode in="SourceGraphic" />
+                                            </feMerge>
+                                        </filter>
+                                        <filter id="coreGlow">
+                                            <feGaussianBlur stdDeviation="5" result="blur" />
+                                            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                                        </filter>
+                                    </defs>
 
-                            <div className="text-center z-10">
-                                <div className={`text-[10px] font-bold uppercase tracking-[0.4em] mb-4 ${effectiveGlobalLimit === Infinity ? 'text-cyber-neon' : 'text-red-500'}`}>
-                                    {effectiveGlobalLimit === Infinity ? 'ESTADO: FLUJO LIBRE' : 'ESTADO: CONTENCIÓN'}
+                                    {/* ORBITAL 1 */}
+                                    <g className="origin-center animate-[spin_10s_linear_infinite]">
+                                        <ellipse cx="100" cy="100" rx="95" ry="25" stroke={theme.hex} strokeWidth="2" fill="none" filter="url(#atomGlow)" className="opacity-70 mix-blend-screen" />
+                                        <circle cx="195" cy="100" r="4" fill="#fff" filter="url(#atomGlow)" />
+                                    </g>
+
+                                    {/* ORBITAL 2 (Rotated 60) */}
+                                    <g className="origin-center rotate-60 animate-[spin_12s_linear_infinite_reverse]">
+                                        <ellipse cx="100" cy="100" rx="95" ry="25" stroke={theme.hex} strokeWidth="2" fill="none" filter="url(#atomGlow)" className="opacity-70 mix-blend-screen" />
+                                        <circle cx="5" cy="100" r="4" fill="#fff" filter="url(#atomGlow)" />
+                                    </g>
+
+                                    {/* ORBITAL 3 (Rotated -60) */}
+                                    <g className="origin-center -rotate-60 animate-[spin_15s_linear_infinite]">
+                                        <ellipse cx="100" cy="100" rx="95" ry="25" stroke={theme.hex} strokeWidth="2" fill="none" filter="url(#atomGlow)" className="opacity-70 mix-blend-screen" />
+                                        <circle cx="195" cy="100" r="4" fill="#fff" filter="url(#atomGlow)" />
+                                    </g>
+
+                                    {/* NUCLEUS (Infinity Symbol) */}
+                                    <text 
+                                        x="100" 
+                                        y="115" 
+                                        textAnchor="middle" 
+                                        fill="#fff" 
+                                        className="text-6xl font-black drop-shadow-[0_0_25px_rgba(255,255,255,1)]"
+                                        filter="url(#coreGlow)"
+                                    >
+                                        ∞
+                                    </text>
+                                </svg>
+
+                                {/* 4. Central Data Display Overlay */}
+                                <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+                                    <div className={`mt-24 bg-black/80 backdrop-blur-md px-6 py-2 rounded-2xl border border-white/10 ${effectiveGlobalLimit === 0 ? 'border-red-500 shadow-[0_0_15px_red]' : `${theme.border} shadow-[0_0_15px_${theme.hex}]`}`}>
+                                        <div className={`text-4xl md:text-5xl font-mono font-black ${effectiveGlobalLimit === 0 ? 'text-red-500' : theme.text} text-shadow-sm`}>
+                                            {effectiveGlobalLimit === Infinity ? (
+                                                <span className="flex items-center gap-2 tracking-widest text-2xl">ILIMITADO</span>
+                                            ) : (
+                                                formatCurrency(effectiveGlobalLimit).replace('CRC', '').trim()
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className={`text-4xl md:text-6xl font-mono font-black ${effectiveGlobalLimit === Infinity ? 'text-white' : 'text-red-500 drop-shadow-[0_0_30px_red]'}`}>
-                                    {effectiveGlobalLimit === Infinity ? (
-                                        <i className="fas fa-infinity text-5xl md:text-7xl"></i>
-                                    ) : (
-                                        formatCurrency(effectiveGlobalLimit).replace('CRC', '').trim()
-                                    )}
-                                </div>
-                                <div className="text-[10px] text-slate-500 font-mono mt-4 uppercase tracking-widest border-t border-white/10 pt-2 inline-block px-4">
-                                    Exposición Máxima por Número
-                                </div>
+                            </div>
+
+                            <div className={`text-[10px] font-bold uppercase tracking-[0.4em] mt-8 ${effectiveGlobalLimit === Infinity ? theme.text : effectiveGlobalLimit === 0 ? 'text-red-500 animate-pulse' : theme.text} text-shadow-sm`}>
+                                {effectiveGlobalLimit === Infinity ? 'ESTADO: FLUJO LIBRE' : effectiveGlobalLimit === 0 ? 'ESTADO: BLOQUEO TOTAL' : 'ESTADO: RESTRINGIDO'}
+                            </div>
+                            <div className="text-[10px] text-slate-500 font-mono mt-2 uppercase tracking-widest border-t border-white/10 pt-2 inline-block px-4">
+                                Energía Cuántica Estable
                             </div>
                         </div>
 
@@ -693,8 +805,9 @@ export default function RiskLimitManager() {
                                     className={`relative flex-1 rounded-xl flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest transition-all duration-500 z-10 group
                                     ${effectiveGlobalLimit === Infinity ? theme.text : 'text-slate-500 hover:text-white'}`}
                                 >
-                                    <i className={`fas fa-infinity text-xl ${effectiveGlobalLimit === Infinity ? 'animate-pulse' : ''}`}></i>
-                                    <span>ILIMITADO</span>
+                                    {/* --- ATOM ICON SMALL --- */}
+                                    <i className={`fas fa-atom text-xl ${effectiveGlobalLimit === Infinity ? 'animate-spin-slow' : ''}`}></i>
+                                    <span className={effectiveGlobalLimit === Infinity ? "drop-shadow-[0_0_5px_currentColor]" : ""}>ILIMITADO</span>
                                 </button>
 
                                 <button 
@@ -715,7 +828,7 @@ export default function RiskLimitManager() {
                                             type="number"
                                             value={globalInputValue}
                                             onChange={e => setGlobalInputValue(e.target.value)}
-                                            className="relative w-full bg-black border border-red-900/50 rounded-xl px-4 py-4 text-center text-white font-mono text-xl focus:border-red-500 focus:outline-none transition-colors shadow-inner"
+                                            className={`relative w-full bg-black border border-red-900/50 rounded-xl px-4 py-4 text-center ${theme.text} font-mono text-xl focus:border-red-500 focus:outline-none transition-colors shadow-inner`}
                                             placeholder="DEFINIR LÍMITE..."
                                         />
                                     </div>
@@ -781,6 +894,17 @@ export default function RiskLimitManager() {
             </div>
 
         </div>
+        <style>{`
+            @keyframes dash {
+                to {
+                    stroke-dashoffset: 0;
+                }
+            }
+            @keyframes orbit {
+                from { transform: rotate(0deg) translateX(60px) rotate(0deg); }
+                to { transform: rotate(360deg) translateX(60px) rotate(-360deg); }
+            }
+        `}</style>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 
-import React from 'react';
-import { useServerClock, SalesStatus } from '../hooks/useServerClock';
-import { UserRole, DrawTime } from '../types';
+import React, { useMemo } from 'react';
+import { useServerClock } from '../hooks/useServerClock';
+import { UserRole } from '../types';
 
 interface CountdownTimerProps {
     role: UserRole;
@@ -15,117 +15,175 @@ export default function CountdownTimer({ role }: CountdownTimerProps) {
         const seconds = Math.floor((ms / 1000) % 60);
         const minutes = Math.floor((ms / 1000 / 60) % 60);
         const hours = Math.floor((ms / 1000 / 3600));
-        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        return {
+            h: hours.toString().padStart(2, '0'),
+            m: minutes.toString().padStart(2, '0'),
+            s: seconds.toString().padStart(2, '0')
+        };
     };
 
-    // Visual Logic
-    const isVendor = role === UserRole.Vendedor;
-    const baseColor = isVendor ? 'text-cyber-purple border-cyber-purple' : 'text-cyber-neon border-cyber-neon';
-    const glowColor = isVendor ? 'shadow-neon-purple' : 'shadow-neon-cyan';
-    
-    // Status overrides
-    let statusColor = baseColor;
-    let statusGlow = glowColor;
-    let ringColor = isVendor ? '#bc13fe' : '#00f0ff';
+    const timeObj = formatTime(timeRemaining);
 
-    if (status === 'WARNING') {
-        statusColor = 'text-yellow-400 border-yellow-400';
-        statusGlow = 'shadow-[0_0_30px_rgba(250,204,21,0.5)]';
-        ringColor = '#facc15';
-    } else if (status === 'CLOSED') {
-        statusColor = 'text-red-500 border-red-500';
-        statusGlow = 'shadow-neon-red';
-        ringColor = '#ff003c';
-    } else if (status === 'OPEN') {
-        // Active State - Greenish tint for "Go"
-        statusColor = 'text-cyber-success border-cyber-success';
-        statusGlow = 'shadow-neon-green';
-        ringColor = '#0aff60';
-    }
+    // --- THEME ENGINE ---
+    const theme = useMemo(() => {
+        if (status === 'CLOSED') return {
+            color: 'text-red-500',
+            border: 'border-red-600',
+            shadow: 'shadow-[0_0_30px_rgba(220,38,38,0.5)]',
+            bg: 'bg-red-950/40',
+            stroke: '#ef4444',
+            label: 'BLOQUEO ACTIVO',
+            icon: 'fa-lock'
+        };
+        if (status === 'WARNING') return {
+            color: 'text-yellow-400',
+            border: 'border-yellow-500',
+            shadow: 'shadow-[0_0_30px_rgba(234,179,8,0.5)]',
+            bg: 'bg-yellow-950/40',
+            stroke: '#eab308',
+            label: 'CIERRE INMINENTE',
+            icon: 'fa-exclamation-triangle'
+        };
+        // OPEN
+        return {
+            color: 'text-cyber-success',
+            border: 'border-cyber-success',
+            shadow: 'shadow-[0_0_30px_rgba(16,185,129,0.4)]',
+            bg: 'bg-emerald-950/30',
+            stroke: '#10b981',
+            label: 'SISTEMA ACTIVO',
+            icon: 'fa-clock'
+        };
+    }, [status]);
 
-    // Circular Progress Calculation
-    // Assume a standard 1 hour window for the visual ring or 4 hours. 
-    // Let's use 1 hour (3600000ms) as the full circle for dramatic effect near end.
-    const radius = 45;
+    // SVG Config
+    const radius = 80;
     const circumference = 2 * Math.PI * radius;
-    const maxWindow = 60 * 60 * 1000; // 1 Hour
+    const maxWindow = 60 * 60 * 1000; // 1 Hour context
     const progress = Math.min(timeRemaining / maxWindow, 1);
     const offset = circumference - (progress * circumference);
 
     return (
-        <div className={`relative group overflow-hidden rounded-2xl bg-[#050a14] border-2 ${statusColor.split(' ')[1]} ${statusGlow} p-6 transition-all duration-500 ${status === 'CLOSED' ? 'grayscale-[0.5] opacity-80' : ''}`}>
+        <div className={`relative group h-full overflow-hidden rounded-3xl bg-[#02040a] border-2 transition-all duration-700 ${theme.border} ${theme.shadow}`}>
             
-            {/* Backlight */}
-            <div className={`absolute -inset-1 rounded-2xl opacity-20 blur-xl transition-all duration-1000 ${status === 'WARNING' ? 'bg-yellow-500 animate-pulse' : status === 'CLOSED' ? 'bg-red-600' : isVendor ? 'bg-cyber-purple' : 'bg-cyber-neon'}`}></div>
+            {/* --- REACTOR CORE BACKLIGHT --- */}
+            <div className={`absolute top-1/2 -translate-y-1/2 right-0 w-1/2 h-full opacity-20 blur-[60px] animate-pulse transition-colors duration-1000 ${theme.bg.replace('/40','').replace('950','600')}`}></div>
+            
+            {/* Grid Texture */}
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[length:20px_20px] pointer-events-none"></div>
 
-            <div className="relative z-10 flex justify-between items-center">
+            <div className="relative z-10 flex h-full p-6">
                 
-                {/* Info Side */}
-                <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                        <div className={`w-2 h-2 rounded-full ${status === 'CLOSED' ? 'bg-red-500' : status === 'WARNING' ? 'bg-yellow-400 animate-ping' : 'bg-green-500 animate-pulse'}`}></div>
-                        <span className={`text-[10px] font-mono font-bold uppercase tracking-widest ${status === 'CLOSED' ? 'text-red-400' : 'text-slate-400'}`}>
-                            {status === 'CLOSED' ? 'VENTAS CERRADAS' : status === 'WARNING' ? 'CIERRE INMINENTE' : 'SISTEMA ACTIVO'}
-                        </span>
-                    </div>
+                {/* --- LEFT: TELEMETRY DATA --- */}
+                <div className="flex-1 flex flex-col justify-between">
                     
-                    <h3 className="text-sm font-display font-bold text-white uppercase tracking-wider mb-4">
-                        Sorteo: {nextDraw ? nextDraw.split(' ')[0] : '---'}
-                    </h3>
+                    {/* Status Badge */}
+                    <div>
+                        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border bg-black/60 backdrop-blur-sm mb-4 transition-all duration-500 ${theme.border} ${theme.color}`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${status === 'WARNING' ? 'animate-ping' : 'animate-pulse'} bg-current`}></div>
+                            <span className="text-[9px] font-black uppercase tracking-[0.2em] leading-none pt-0.5">{theme.label}</span>
+                        </div>
 
-                    <div className="bg-black/40 rounded-lg p-2 border border-white/5 inline-block">
-                        <div className="text-[9px] text-slate-500 font-mono mb-0.5">HORA NÚCLEO</div>
-                        <div className="text-xs font-mono text-white flex items-center gap-2">
-                            {serverTime.toLocaleTimeString()}
-                            {isOffline && <i className="fas fa-wifi-slash text-red-500 animate-pulse" title="OFFLINE"></i>}
+                        <div className="space-y-1">
+                            <div className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">Próximo Ciclo</div>
+                            <h3 className="text-xl font-display font-black text-white uppercase tracking-wider drop-shadow-md">
+                                {nextDraw ? nextDraw.split(' ')[0] : '---'}
+                            </h3>
+                        </div>
+                    </div>
+
+                    {/* Server Time Sync */}
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-3 flex items-center gap-3 backdrop-blur-sm">
+                        <div className={`w-8 h-8 rounded-lg bg-black flex items-center justify-center border border-white/10 ${theme.color}`}>
+                            <i className="fas fa-server text-xs"></i>
+                        </div>
+                        <div>
+                            <div className="text-[8px] font-mono text-slate-500 uppercase tracking-wider">Sincronización</div>
+                            <div className="text-xs font-mono font-bold text-white flex items-center gap-2">
+                                {serverTime.toLocaleTimeString()}
+                                {isOffline && <span className="text-[8px] bg-red-500 text-black px-1 rounded font-bold animate-pulse">OFF</span>}
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Timer Ring Side */}
-                <div className="relative w-24 h-24 flex items-center justify-center">
-                    {/* SVG Ring */}
-                    <svg className="absolute inset-0 w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
-                        {/* Track */}
-                        <circle cx="50" cy="50" r={radius} fill="transparent" stroke="#1e293b" strokeWidth="6" />
-                        {/* Progress */}
-                        <circle 
-                            cx="50" cy="50" r={radius} 
-                            fill="transparent" 
-                            stroke={ringColor} 
-                            strokeWidth="6" 
-                            strokeDasharray={circumference} 
-                            strokeDashoffset={status === 'CLOSED' ? circumference : offset}
-                            strokeLinecap="round"
-                            className="transition-all duration-1000 ease-linear"
-                        />
-                    </svg>
+                {/* --- RIGHT: CHRONOMETRIC REACTOR --- */}
+                <div className="w-32 md:w-40 relative flex items-center justify-center">
                     
-                    {/* Digital Time */}
-                    <div className="text-center z-10 flex flex-col items-center">
+                    {/* The Reactor SVG */}
+                    <svg className="w-full h-full overflow-visible" viewBox="0 0 200 200">
+                        <defs>
+                            <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor={theme.stroke} stopOpacity="1" />
+                                <stop offset="100%" stopColor="#fff" stopOpacity="0.5" />
+                            </linearGradient>
+                            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                                <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+                                <feMerge>
+                                    <feMergeNode in="coloredBlur" />
+                                    <feMergeNode in="SourceGraphic" />
+                                </feMerge>
+                            </filter>
+                        </defs>
+
+                        {/* Outer Static Ring */}
+                        <circle cx="100" cy="100" r="90" fill="none" stroke="#1e293b" strokeWidth="1" strokeDasharray="4 4" />
+
+                        {/* Rotating Dashed Ring (Slow) */}
+                        <g className="origin-center animate-[spin_10s_linear_infinite]">
+                            <circle cx="100" cy="100" r="82" fill="none" stroke={theme.stroke} strokeWidth="2" strokeOpacity="0.2" strokeDasharray="10 30" />
+                        </g>
+
+                        {/* Counter-Rotating Inner Ring (Fast) */}
+                        <g className="origin-center animate-[spin_3s_linear_infinite_reverse]">
+                            <circle cx="100" cy="100" r="70" fill="none" stroke={theme.stroke} strokeWidth="1" strokeOpacity="0.3" strokeDasharray="2 8" />
+                        </g>
+
+                        {/* MAIN PROGRESS ARC */}
+                        {status !== 'CLOSED' && (
+                            <circle 
+                                cx="100" cy="100" r={radius} 
+                                fill="none" 
+                                stroke="url(#progressGradient)" 
+                                strokeWidth="6" 
+                                strokeLinecap="round"
+                                strokeDasharray={circumference} 
+                                strokeDashoffset={offset}
+                                filter="url(#glow)"
+                                transform="rotate(-90 100 100)"
+                                className="transition-all duration-1000 ease-linear"
+                            />
+                        )}
+
+                        {/* Center Hub */}
+                        <circle cx="100" cy="100" r="55" fill="#050a14" stroke={theme.stroke} strokeWidth="2" strokeOpacity="0.5" />
+                    </svg>
+
+                    {/* DIGITAL READOUT OVERLAY */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center z-20">
                         {loading ? (
-                            <i className="fas fa-circle-notch fa-spin text-cyber-blue"></i>
+                            <i className={`fas fa-circle-notch fa-spin text-2xl ${theme.color}`}></i>
                         ) : status === 'CLOSED' ? (
-                            <i className="fas fa-lock text-2xl text-red-500"></i>
+                            <div className="flex flex-col items-center animate-in zoom-in duration-300">
+                                <i className="fas fa-lock text-3xl text-red-500 mb-1 drop-shadow-[0_0_10px_rgba(239,68,68,0.8)]"></i>
+                                <span className="text-[10px] font-black text-red-500 tracking-widest">LOCKED</span>
+                            </div>
                         ) : (
-                            <>
-                                <div className={`text-lg font-mono font-bold leading-none ${status === 'WARNING' ? 'text-yellow-400 animate-pulse' : 'text-white'}`}>
-                                    {formatTime(timeRemaining).split(':')[1]}:{formatTime(timeRemaining).split(':')[2]}
+                            <div className="text-center">
+                                <div className={`text-2xl font-mono font-black tracking-tighter leading-none ${theme.color} drop-shadow-[0_0_10px_currentColor]`}>
+                                    {timeObj.h}:{timeObj.m}
                                 </div>
-                                <div className="text-[8px] font-mono text-slate-500 mt-1">
-                                    HR {formatTime(timeRemaining).split(':')[0]}
+                                <div className={`text-lg font-mono font-bold leading-none mt-1 opacity-80 ${theme.color}`}>
+                                    {timeObj.s}
                                 </div>
-                            </>
+                                <div className="text-[7px] text-slate-500 font-bold uppercase tracking-[0.2em] mt-1">
+                                    T-MINUS
+                                </div>
+                            </div>
                         )}
                     </div>
-                </div>
-            </div>
 
-            {/* Footer Message */}
-            <div className={`mt-4 pt-4 border-t border-white/5 text-[10px] font-mono text-center transition-colors ${status === 'CLOSED' ? 'text-red-400' : 'text-slate-500'}`}>
-                {status === 'CLOSED' 
-                    ? (isVendor ? '⛔ Registros sincronizados con servidor.' : '❌ Intenta en el próximo ciclo.')
-                    : 'Sincronización Atómica: 12ms'}
+                </div>
             </div>
         </div>
     );

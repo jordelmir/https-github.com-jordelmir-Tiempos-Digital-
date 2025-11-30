@@ -1,29 +1,45 @@
-
 import React, { useState } from 'react';
 import { useLiveResults } from '../hooks/useLiveResults';
 import { DrawTime, UserRole } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
 import WinningNumberCard from './WinningNumberCard';
 import AdminResultControl from './AdminResultControl'; 
+import MatrixRain from './ui/MatrixRain';
 
 export default function LiveResultsPanel() {
     const { user } = useAuthStore();
     const { getResultByDraw, loading, isOffline } = useLiveResults();
     const [editDraw, setEditDraw] = useState<DrawTime | null>(null);
 
-    // --- THEME ENGINE FOR ROLE BADGE ---
+    // --- THEME ENGINE FOR ROLE BADGE & MATRIX ---
     const getRoleTheme = () => {
         switch (user?.role) {
             case UserRole.SuperAdmin:
-                return 'border-cyber-emerald text-cyber-emerald bg-emerald-950/30 shadow-[0_0_20px_rgba(16,185,129,0.4)]';
+                return { 
+                    badge: 'border-cyber-emerald text-cyber-emerald bg-emerald-950/30 shadow-[0_0_20px_rgba(16,185,129,0.4)]',
+                    matrixColor: '#10b981',
+                    border: 'border-cyber-emerald/40 shadow-[0_0_50px_rgba(16,185,129,0.1)]',
+                    backlight: 'bg-cyber-emerald'
+                };
             case UserRole.Vendedor:
-                return 'border-cyber-purple text-cyber-purple bg-purple-950/30 shadow-[0_0_20px_rgba(188,19,254,0.4)]';
+                return {
+                    badge: 'border-cyber-purple text-cyber-purple bg-purple-950/30 shadow-[0_0_20px_rgba(188,19,254,0.4)]',
+                    matrixColor: '#bc13fe',
+                    border: 'border-cyber-purple/40 shadow-[0_0_50px_rgba(188,19,254,0.1)]',
+                    backlight: 'bg-cyber-purple'
+                };
             case UserRole.Cliente:
             default:
-                // Using Neon Cyan for Players (High Contrast)
-                return 'border-cyber-neon text-cyber-neon bg-cyan-950/30 shadow-[0_0_20px_rgba(0,240,255,0.4)]';
+                return {
+                    badge: 'border-cyber-neon text-cyber-neon bg-cyan-950/30 shadow-[0_0_20px_rgba(0,240,255,0.4)]',
+                    matrixColor: '#00f0ff',
+                    border: 'border-cyber-neon/40 shadow-[0_0_50px_rgba(0,240,255,0.1)]',
+                    backlight: 'bg-cyber-neon'
+                };
         }
     };
+
+    const theme = getRoleTheme();
 
     return (
         <div className="relative w-full group">
@@ -34,17 +50,21 @@ export default function LiveResultsPanel() {
             />
 
             {/* --- CORE BACKLIGHT (Adaptive to Role) --- */}
-            <div className={`absolute -inset-1 rounded-[2.5rem] opacity-30 blur-2xl animate-pulse transition-all duration-1000 group-hover:opacity-50 group-hover:blur-3xl ${
-                user?.role === UserRole.Vendedor ? 'bg-cyber-purple' : 
-                user?.role === UserRole.Cliente ? 'bg-cyber-neon' : 'bg-cyber-emerald'
-            }`}></div>
+            <div className={`absolute -inset-1 rounded-[2.5rem] opacity-30 blur-2xl animate-pulse transition-all duration-1000 group-hover:opacity-50 group-hover:blur-3xl ${theme.backlight}`}></div>
 
             {/* MAIN CONTAINER (Solid Core) */}
-            <div className={`relative w-full bg-[#050a14] border rounded-3xl p-6 md:p-8 overflow-hidden z-10 transition-colors duration-500 ${
-                user?.role === UserRole.Vendedor ? 'border-cyber-purple/40 shadow-[0_0_50px_rgba(188,19,254,0.1)]' : 
-                user?.role === UserRole.Cliente ? 'border-cyber-neon/40 shadow-[0_0_50px_rgba(0,240,255,0.1)]' : 'border-cyber-emerald/40 shadow-[0_0_50px_rgba(16,185,129,0.1)]'
-            }`}>
+            <div className={`relative w-full bg-[#050a14] border rounded-3xl p-6 md:p-8 overflow-hidden z-10 transition-colors duration-500 ${theme.border}`}>
                 
+                {/* --- INTERNAL MATRIX RAIN --- */}
+                <div className="absolute inset-0 opacity-15 pointer-events-none">
+                    <MatrixRain 
+                        colorHex={theme.matrixColor} 
+                        speed={0.8} 
+                        density="LOW" 
+                        opacity={0.3} 
+                    />
+                </div>
+
                 {/* Background Matrix Scanline */}
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_50%,transparent_50%)] bg-[length:100%_4px] pointer-events-none opacity-30"></div>
 
@@ -69,7 +89,7 @@ export default function LiveResultsPanel() {
                     </div>
                     
                     {/* Role Badge - DYNAMIC THEME */}
-                    <div className={`px-6 py-2 rounded-lg border-2 text-[10px] font-bold uppercase tracking-[0.2em] backdrop-blur-md transition-all duration-500 flex items-center gap-2 ${getRoleTheme()}`}>
+                    <div className={`px-6 py-2 rounded-lg border-2 text-[10px] font-bold uppercase tracking-[0.2em] backdrop-blur-md transition-all duration-500 flex items-center gap-2 ${theme.badge}`}>
                         <i className="fas fa-eye opacity-70"></i>
                         VISTA: {user?.role === UserRole.SuperAdmin ? 'ADMIN' : user?.role}
                     </div>

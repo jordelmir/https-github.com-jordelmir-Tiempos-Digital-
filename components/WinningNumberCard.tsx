@@ -66,16 +66,18 @@ export default function WinningNumberCard({ drawTime, result, role, onEdit }: Wi
             setPrevNumber(result.winningNumber);
             
             let steps = 0;
-            const maxSteps = 20;
+            const maxSteps = 25; // Longer spin
             const interval = setInterval(() => {
                 steps++;
+                // Random 2 digit number
                 setDisplayNumber(Math.floor(Math.random() * 100).toString().padStart(2, '0'));
                 if (steps >= maxSteps) {
                     clearInterval(interval);
                     setDisplayNumber(result.winningNumber);
                     setIsSpinning(false);
                 }
-            }, 50);
+            }, 60);
+            return () => clearInterval(interval);
         } else if (!result) {
             setDisplayNumber('--');
         } else {
@@ -118,10 +120,10 @@ export default function WinningNumberCard({ drawTime, result, role, onEdit }: Wi
                             <div className="absolute inset-0 opacity-20 bg-[repeating-linear-gradient(45deg,transparent,transparent_5px,#ff0000_5px,#ff0000_10px)] rounded-full"></div>
                             
                             <div className="flex flex-col items-center">
-                                <span className="font-mono font-black text-2xl text-red-500 drop-shadow-[0_0_10px_#ff0000]">
+                                <span className="font-mono font-black text-3xl text-red-500 drop-shadow-[0_0_10px_#ff0000] animate-pulse">
                                     {result.reventadoNumber || 'R'}
                                 </span>
-                                <span className="text-[8px] font-black text-red-400 uppercase tracking-widest bg-red-950/80 px-1 rounded">REV</span>
+                                <span className="text-[8px] font-black text-red-400 uppercase tracking-widest bg-red-950/80 px-1 rounded mt-1">REV</span>
                             </div>
                         </div>
 
@@ -139,7 +141,7 @@ export default function WinningNumberCard({ drawTime, result, role, onEdit }: Wi
                                         {/* Planet Shine */}
                                         <div className="absolute top-1 left-2 w-3 h-2 bg-white opacity-20 blur-sm rounded-full"></div>
                                         
-                                        <span className={`font-mono font-bold text-lg text-white drop-shadow-md ${isSpinning ? 'blur-[1px]' : ''}`}>
+                                        <span className={`font-mono font-black text-lg drop-shadow-[0_0_10px_rgba(52,211,153,0.8)] ${isSpinning ? 'text-white blur-[1px]' : 'text-emerald-400'}`}>
                                             {displayNumber}
                                         </span>
                                     </div>
@@ -162,7 +164,7 @@ export default function WinningNumberCard({ drawTime, result, role, onEdit }: Wi
                         {/* Surface Shine */}
                         <div className="absolute top-4 left-6 w-8 h-5 bg-white opacity-10 blur-md rounded-full"></div>
 
-                        <span className={`font-mono font-black tracking-tighter text-white text-5xl drop-shadow-[0_0_15px_rgba(255,255,255,0.5)] ${isSpinning ? 'blur-sm scale-110' : 'scale-100'} transition-all duration-100`}>
+                        <span className={`font-mono font-black tracking-tighter text-6xl drop-shadow-[0_0_25px_rgba(16,185,129,0.6)] ${isSpinning ? 'blur-sm scale-110 text-white' : 'scale-100 text-emerald-400'} transition-all duration-100`}>
                             {displayNumber}
                         </span>
                     </div>
