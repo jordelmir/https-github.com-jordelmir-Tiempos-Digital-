@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { UserRole, AppUser, DrawTime, GameMode } from '../types';
@@ -215,8 +214,8 @@ export default function Dashboard() {
   const [selectedUserForWithdraw, setSelectedUserForWithdraw] = useState<AppUser | null>(null);
 
   // Admin God Mode State
-  const [adminResultOpen, setAdminResultOpen] = useState(false);
   const [editingMultiplier, setEditingMultiplier] = useState(false);
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(true); // NEW: Manage Visibility
   
   // Dual Core Multiplier State
   const [customMultiplier, setCustomMultiplier] = useState(90);
@@ -431,19 +430,10 @@ export default function Dashboard() {
 
   // Trigger Win Simulation from Admin Panel
   const handleAdminResultPublish = (resultData: any) => {
-      // Simulate checking if current user won anything
-      // For Demo: If Admin publishes, show the animation to admin as a preview
-      // OR if Client is logged in, show if they matched
-      
-      const simulatedWinAmount = 15000000;
-      
-      setWinnerData({
-          amount: simulatedWinAmount, // Example Win Amount
-          number: resultData.number,
-          draw: resultData.draw,
-          type: resultData.reventado ? 'REVENTADOS' : 'TIEMPOS',
-          newBalance: (user?.balance_bigint || 0) + simulatedWinAmount
-      });
+      // NOTE: We DO NOT simulate wins for the Admin anymore.
+      // Real win detection happens in GlobalBetsTable via useEffect.
+      // This is purely for data consistency if we wanted to log something.
+      console.log("Result Published:", resultData);
   };
 
   const queueTotal = pendingBets.reduce((acc, curr) => acc + curr.amount, 0);
@@ -494,16 +484,6 @@ export default function Dashboard() {
         onSuccess={fetchLists}
       />
       
-      {/* ADMIN ONLY: Result Control */}
-      {isAdmin && (
-          <AdminResultControl 
-            isOpen={adminResultOpen}
-            onClose={() => setAdminResultOpen(false)}
-            onPublishSuccess={(data) => handleAdminResultPublish(data)} // PASS CALLBACK
-            initialDraw={null}
-          />
-      )}
-
       {/* --- EDIT MULTIPLIER MODAL (ADMIN ONLY) --- */}
       {editingMultiplier && isAdmin && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-xl animate-in fade-in duration-300">
@@ -658,30 +638,72 @@ export default function Dashboard() {
                     PANEL DE <span className={`text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-200 to-slate-500`}>MANDO</span>
                 </h2>
             </div>
-
-            <div className="flex items-center gap-6">
-                 {isAdmin && (
-                     <div className="relative group/btn">
-                         <button 
-                            onClick={() => setAdminResultOpen(true)}
-                            className="relative overflow-hidden bg-[#050a14] border-2 border-[#1e3a8a] hover:border-[#3b82f6] text-[#3b82f6] px-8 py-3 rounded-xl backdrop-blur-md transition-all shadow-[0_0_20px_rgba(30,58,138,0.5)] group-hover/btn:scale-105"
-                         >
-                            <div className="flex items-center gap-3">
-                                {/* ULTRA ANIMATION HERE */}
-                                <AnimatedIconUltra profile={{ animation: 'spin3d', theme: 'cyber', speed: 4 }}>
-                                    <i className="fas fa-cube text-xl"></i>
-                                </AnimatedIconUltra>
-                                <div className="flex flex-col items-start">
-                                    <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-white text-shadow-sm">Centro de Control</span>
-                                    <span className="text-[8px] font-mono text-[#3b82f6] opacity-90">RESULTADOS & TIEMPO</span>
-                                </div>
-                            </div>
-                         </button>
-                     </div>
-                 )}
-            </div>
         </div>
       </header>
+
+      {/* --- ADMIN CONTROL CENTER (MANAGED VISIBILITY) --- */}
+      {isAdmin && (
+          <>
+            {isAdminPanelOpen ? (
+                <div className="relative z-50 mb-12 animate-in slide-in-from-top-4 fade-in duration-700">
+                    <AdminResultControl 
+                        onPublishSuccess={(data) => handleAdminResultPublish(data)} 
+                        initialDraw={null}
+                        onClose={() => setIsAdminPanelOpen(false)}
+                    />
+                </div>
+            ) : (
+                <div className="mb-12 flex justify-center animate-in fade-in zoom-in duration-300">
+                    <button 
+                        onClick={() => setIsAdminPanelOpen(true)}
+                        className="group relative w-full max-w-xl h-24 bg-[#030303] border border-white/5 hover:border-red-500/50 rounded-lg overflow-hidden transition-all duration-500 hover:shadow-[0_0_40px_rgba(220,38,38,0.15)] active:scale-[0.98]"
+                    >
+                        {/* Tech Grid Background */}
+                        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[length:20px_20px] opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                        
+                        {/* Red Hazard Stripes (Scanning) */}
+                        <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(220,38,38,0.05)_10px,rgba(220,38,38,0.05)_20px)] opacity-0 group-hover:opacity-100 transition-opacity duration-500 animate-[pulse_2s_infinite]"></div>
+
+                        <div className="relative z-10 flex items-center justify-between px-8 h-full">
+                            
+                            {/* Left: Power Switch Visual */}
+                            <div className="flex items-center gap-6">
+                                <div className="relative w-14 h-14 bg-[#0a0a0a] border border-white/10 rounded flex items-center justify-center group-hover:border-red-500 group-hover:shadow-[0_0_15px_rgba(220,38,38,0.6)] transition-all duration-300">
+                                    <div className="absolute inset-0 bg-red-500/20 opacity-0 group-hover:opacity-100 animate-pulse"></div>
+                                    <i className="fas fa-power-off text-2xl text-slate-700 group-hover:text-red-500 transition-colors duration-300"></i>
+                                </div>
+                                
+                                <div className="flex flex-col items-start">
+                                    <span className="text-[9px] font-mono text-slate-500 uppercase tracking-widest group-hover:text-red-400 transition-colors">
+                                        <i className="fas fa-terminal mr-2"></i>Acceso Administrativo
+                                    </span>
+                                    <span className="text-lg md:text-xl font-display font-black text-white uppercase tracking-[0.2em] group-hover:text-red-500 transition-colors duration-300">
+                                        Inicializar Consola
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Right: Status Indicator */}
+                            <div className="hidden md:flex flex-col items-end gap-1 opacity-50 group-hover:opacity-100 transition-opacity">
+                                <div className="flex gap-1">
+                                    <div className="w-1 h-4 bg-slate-800 group-hover:bg-red-500 transition-colors delay-75"></div>
+                                    <div className="w-1 h-4 bg-slate-800 group-hover:bg-red-500 transition-colors delay-100"></div>
+                                    <div className="w-1 h-4 bg-slate-800 group-hover:bg-red-500 transition-colors delay-150"></div>
+                                </div>
+                                <span className="text-[8px] font-black uppercase text-slate-600 group-hover:text-red-500 tracking-widest">Ready</span>
+                            </div>
+                        </div>
+
+                        {/* Tactical Corners */}
+                        <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-white/10 group-hover:border-red-500 transition-colors"></div>
+                        <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-white/10 group-hover:border-red-500 transition-colors"></div>
+                        <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-white/10 group-hover:border-red-500 transition-colors"></div>
+                        <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-white/10 group-hover:border-red-500 transition-colors"></div>
+                    </button>
+                </div>
+            )}
+          </>
+      )}
 
       {/* --- LIVE RESULTS & TOP NUMBERS --- */}
       <div className="relative z-10 animate-in fade-in slide-in-from-bottom-8 duration-700">

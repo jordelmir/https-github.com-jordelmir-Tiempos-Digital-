@@ -1,8 +1,8 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { api } from '../services/edgeApi';
 import { DrawTime, RiskLimit, RiskLimitStats } from '../types';
 import { formatCurrency } from '../constants';
-import MatrixRain from './ui/MatrixRain';
 
 // --- TYPES & INTERFACES ---
 type ViewMode = 'SATURATION' | 'VOLUME' | 'VELOCITY';
@@ -441,12 +441,6 @@ export default function RiskLimitManager() {
 
                 {/* 2. THE GRID (LIVING MATRIX) - ADAPTIVE */}
                 <div className="flex-1 p-4 md:p-6 relative bg-[#020305] overflow-hidden group/grid custom-scrollbar overflow-y-auto">
-                    
-                    {/* MATRIX RAIN BACKGROUND (BEHIND GRID) */}
-                    <div className="absolute inset-0 opacity-20 pointer-events-none">
-                        <MatrixRain colorHex={theme.hex} speed={0.5} density="LOW" opacity={0.3} />
-                    </div>
-
                     <div className={`absolute inset-0 bg-gradient-to-b from-transparent via-${theme.name === 'solar' ? 'orange' : theme.name === 'vapor' ? 'purple' : 'blue'}-500/10 to-transparent w-full h-[30%] pointer-events-none z-0 animate-[scan_6s_linear_infinite] opacity-30`}></div>
                     
                     <div className={`transition-all duration-500 ease-out transform ${isSwitching ? 'scale-95 opacity-0 blur-sm' : 'scale-100 opacity-100 blur-0'}`}>
@@ -556,12 +550,6 @@ export default function RiskLimitManager() {
                 RIGHT PANEL: DUAL MODE
                ==================================================================================== */}
             <div className="xl:w-2/5 bg-[#05070a] flex flex-col relative overflow-hidden transition-all duration-500 z-10 border-t xl:border-t-0 xl:border-l border-white/5">
-                
-                {/* MATRIX RAIN BACKGROUND (BEHIND ATOM) */}
-                <div className="absolute inset-0 opacity-15 pointer-events-none">
-                    <MatrixRain colorHex={theme.hex} speed={0.8} density="MEDIUM" opacity={0.2} />
-                </div>
-
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[length:30px_30px] pointer-events-none"></div>
 
                 {selectedNumber ? (
@@ -701,7 +689,7 @@ export default function RiskLimitManager() {
                     </div>
                 ) : (
                     // --- MODE B: GLOBAL CONTROL CENTER (HYPER ATOM STYLE) ---
-                    <div className="flex-1 flex flex-col relative z-10 animate-in fade-in zoom-in duration-500 bg-[#05070a]/50">
+                    <div className="flex-1 flex flex-col relative z-10 animate-in fade-in zoom-in duration-500 bg-[#05070a]">
                         <div className="p-6 md:p-8 border-b border-white/5 bg-black/20">
                             <h2 className="text-2xl font-display font-black text-white uppercase tracking-widest flex items-center gap-3">
                                 <div className={`w-10 h-10 rounded-full border-2 ${theme.border} flex items-center justify-center animate-spin-slow shadow-[0_0_20px_currentColor]`}>

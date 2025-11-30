@@ -1,9 +1,8 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>TIEMPOSPRO v3.3 | Phront Maestro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -115,6 +114,51 @@
         color: #e2e8f0;
         overflow-x: hidden; 
         min-height: 100vh;
+        /* Prevent elastic scrolling on Mac/iOS */
+        overscroll-behavior-y: none;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* --- GLOBAL STABILIZATION FIXES --- */
+      
+      /* Remove Number Input Spinners (Chrome, Safari, Edge, Opera) */
+      input::-webkit-outer-spin-button,
+      input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+      }
+      /* Remove Number Input Spinners (Firefox) */
+      input[type=number] {
+        -moz-appearance: textfield;
+      }
+
+      /* Prevent Text Size Inflation on Mobile */
+      html {
+        text-size-adjust: 100%;
+        -webkit-text-size-adjust: 100%;
+      }
+
+      /* Hardware Acceleration for Heavy Containers */
+      .transform-gpu {
+        transform: translateZ(0);
+        will-change: transform, opacity;
+      }
+
+      /* Scrollbar Stabilization */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #02040a; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #1e3a8a; 
+        border-radius: 4px;
+        border: 2px solid #02040a; /* Creates padding effect */
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #00f0ff; 
       }
 
       /* --- CINEMATIC NOISE TEXTURE (THE GLUE) --- */
@@ -140,12 +184,10 @@
         height: 100vh;
         z-index: -1;
         background-color: #02040a;
-        /* Deep Space Gradient Base - Living Void */
         background-image: radial-gradient(circle at 50% 50%, #0a1124 0%, #000000 100%);
         transition: background-image 1s ease-in-out;
       }
 
-      /* The Web Connections (Simulated with SVG Data URI for performance) */
       .neural-web {
         position: absolute;
         top: 0;
@@ -158,7 +200,6 @@
         mask-image: radial-gradient(circle at 50% 50%, black 30%, transparent 80%);
       }
 
-      /* The Breathing Light (The Soul) */
       .neural-breath {
         position: absolute;
         top: 50%;
@@ -172,7 +213,6 @@
         animation: breathe 8s ease-in-out infinite;
       }
 
-      /* Star Dust Particles - Life Element */
       .star-dust {
         position: fixed;
         top: 0;
@@ -196,21 +236,6 @@
         100% { transform: translateY(-100px); opacity: 0.3; }
       }
       
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #02040a; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #1e3a8a; 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #00f0ff; 
-      }
-      
       .text-glow { text-shadow: 0 0 10px currentColor; }
       .text-glow-sm { text-shadow: 0 0 5px currentColor; }
       
@@ -227,14 +252,6 @@
         transition-duration: 700ms;
       }
 
-      /* --- ICON ULTRA STYLES --- */
-      .icon-ultra {
-        display: inline-block;
-        transform-origin: center center;
-        will-change: transform, filter, opacity;
-      }
-
-      /* ... (rest of styles) ... */
       /* 3D Depth Classes (tz-*) to avoid Tailwind Conflict */
       .tz-10 { transform: translateZ(10px); }
       .tz-20 { transform: translateZ(20px); }
@@ -264,10 +281,6 @@
       }
       .icon-trail.trail-on path {
         stroke-dashoffset: 0;
-      }
-
-      .icon-ultra i {
-        display: inline-block;
       }
 
       @media (prefers-reduced-motion: reduce) {

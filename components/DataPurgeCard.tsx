@@ -1,10 +1,10 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { api } from '../services/edgeApi';
 import { WeeklyDataStats, PurgeTarget } from '../types';
 import { formatCurrency } from '../constants';
 import AnimatedIconUltra from './ui/AnimatedIconUltra';
-import MatrixRain from './ui/MatrixRain';
 
 export default function DataPurgeCard({ theme: parentTheme }: { theme?: any }) {
     const { user } = useAuthStore();
@@ -32,8 +32,7 @@ export default function DataPurgeCard({ theme: parentTheme }: { theme?: any }) {
             scanline: 'from-red-500/20',
             barBase: 'bg-red-900/40',
             barActive: 'bg-red-500 shadow-[0_0_20px_#ef4444]',
-            icon: 'fa-radiation',
-            matrixColor: '#ef4444'
+            icon: 'fa-radiation'
         };
         return {
             border: 'border-cyan-500',
@@ -45,8 +44,7 @@ export default function DataPurgeCard({ theme: parentTheme }: { theme?: any }) {
             scanline: 'from-cyan-400/10',
             barBase: 'bg-slate-800/60',
             barActive: 'bg-cyan-400 shadow-[0_0_20px_#22d3ee]',
-            icon: 'fa-server',
-            matrixColor: '#06b6d4'
+            icon: 'fa-server'
         };
     }, [isNuclear]);
 
@@ -121,16 +119,6 @@ export default function DataPurgeCard({ theme: parentTheme }: { theme?: any }) {
             {/* --- MAIN CHASSIS --- */}
             <div className={`relative bg-[#02040a] border-[3px] ${ui.border} rounded-[2.5rem] overflow-hidden ${ui.shadow} flex flex-col h-full transition-all duration-700 z-10 backdrop-blur-xl`}>
                 
-                {/* --- INTERNAL MATRIX RAIN --- */}
-                <div className="absolute inset-0 opacity-20 pointer-events-none">
-                    <MatrixRain 
-                        colorHex={ui.matrixColor} 
-                        speed={isNuclear ? 2 : 0.5} 
-                        density={isNuclear ? 'HIGH' : 'LOW'} 
-                        opacity={0.3} 
-                    />
-                </div>
-
                 {/* Background Grid & Scanline */}
                 <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[length:40px_40px] pointer-events-none opacity-20"></div>
                 <div className={`absolute top-0 left-0 w-full h-[300px] bg-gradient-to-b ${ui.scanline} to-transparent opacity-20 animate-[scan_4s_linear_infinite] pointer-events-none`}></div>
@@ -317,96 +305,104 @@ export default function DataPurgeCard({ theme: parentTheme }: { theme?: any }) {
                                 {/* Button: Clean Bets */}
                                 <button 
                                     onClick={() => setPurgeType('BETS')}
-                                    className="group relative overflow-hidden rounded-xl border border-blue-500/30 bg-blue-950/20 p-5 text-left transition-all hover:border-blue-400 hover:bg-blue-900/30 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:-translate-y-1"
+                                    className="group relative overflow-hidden rounded-xl border border-blue-500/30 bg-blue-950/20 p-5 text-left transition-all hover:border-blue-400 hover:bg-blue-900/30 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)]"
                                 >
-                                    <div className="flex items-center gap-4 relative z-10">
-                                        <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 border border-blue-500/50 group-hover:scale-110 transition-transform">
-                                            <i className="fas fa-ticket-alt"></i>
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-white text-sm uppercase tracking-wider group-hover:text-blue-300">Limpiar Apuestas</div>
-                                            <div className="text-[9px] text-slate-400 mt-1">Elimina tickets de la semana seleccionada.</div>
-                                        </div>
+                                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                    <div className="flex justify-between items-center mb-1 relative z-10">
+                                        <span className="text-xs font-black text-blue-400 uppercase tracking-wider group-hover:text-blue-300">Limpiar Apuestas</span>
+                                        <i className="fas fa-ticket-alt text-blue-500/50 group-hover:text-blue-400 transition-colors"></i>
                                     </div>
+                                    <p className="text-[9px] text-slate-400 relative z-10 leading-relaxed">
+                                        Elimina registros de jugadas. Mantiene contabilidad.
+                                    </p>
                                 </button>
 
-                                {/* Button: Clean Logs */}
+                                {/* Button: Archive Logs */}
                                 <button 
                                     onClick={() => setPurgeType('AUDIT')}
-                                    className="group relative overflow-hidden rounded-xl border border-purple-500/30 bg-purple-950/20 p-5 text-left transition-all hover:border-purple-400 hover:shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:-translate-y-1"
+                                    className="group relative overflow-hidden rounded-xl border border-purple-500/30 bg-purple-950/20 p-5 text-left transition-all hover:border-purple-400 hover:bg-purple-900/30 hover:shadow-[0_0_20px_rgba(168,85,247,0.3)]"
                                 >
-                                    <div className="flex items-center gap-4 relative z-10">
-                                        <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 border border-purple-500/50 group-hover:scale-110 transition-transform">
-                                            <i className="fas fa-clipboard-list"></i>
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-white text-sm uppercase tracking-wider group-hover:text-purple-300">Archivar Logs</div>
-                                            <div className="text-[9px] text-slate-400 mt-1">Comprime y archiva auditoría antigua.</div>
-                                        </div>
+                                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                    <div className="flex justify-between items-center mb-1 relative z-10">
+                                        <span className="text-xs font-black text-purple-400 uppercase tracking-wider group-hover:text-purple-300">Archivar Logs</span>
+                                        <i className="fas fa-file-contract text-purple-500/50 group-hover:text-purple-400 transition-colors"></i>
                                     </div>
+                                    <p className="text-[9px] text-slate-400 relative z-10 leading-relaxed">
+                                        Mueve auditoría a almacenamiento frío simulado.
+                                    </p>
                                 </button>
 
-                                {/* Button: DEEP CLEAN (Nuclear) */}
+                                {/* Button: DEEP CLEAN (NUCLEAR) */}
                                 <button 
                                     onClick={() => setPurgeType('DEEP_CLEAN')}
-                                    className="group relative overflow-hidden rounded-xl border border-red-600/50 bg-red-950/30 p-5 text-left transition-all hover:border-red-500 hover:shadow-[0_0_30px_rgba(220,38,38,0.4)] hover:-translate-y-1 mt-4"
+                                    className="group relative overflow-hidden rounded-xl border-2 border-red-900/50 bg-red-950/10 p-5 text-left transition-all hover:border-red-500 hover:bg-red-900/40 hover:shadow-[0_0_30px_rgba(220,38,38,0.4)] mt-4"
                                 >
-                                    <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(255,0,0,0.05)_10px,rgba(255,0,0,0.05)_20px)] animate-[shine_20s_linear_infinite]"></div>
-                                    <div className="flex items-center gap-4 relative z-10">
-                                        <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center text-red-500 border border-red-500/50 group-hover:scale-110 transition-transform animate-pulse">
-                                            <i className="fas fa-biohazard"></i>
-                                        </div>
-                                        <div>
-                                            <div className="font-black text-red-500 text-sm uppercase tracking-widest drop-shadow-[0_0_5px_rgba(255,0,0,0.8)]">Limpieza Profunda</div>
-                                            <div className="text-[9px] text-red-300 mt-1 font-bold">⚠ ELIMINACIÓN TOTAL DEL PERIODO</div>
-                                        </div>
+                                    {/* Stripes */}
+                                    <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(255,0,0,0.05)_10px,rgba(255,0,0,0.05)_20px)] opacity-50"></div>
+                                    
+                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-1 relative z-10 gap-2 sm:gap-0">
+                                        <span className="text-xs font-black text-red-600 group-hover:text-red-500 uppercase tracking-widest flex items-center gap-2 animate-pulse">
+                                            <i className="fas fa-biohazard"></i> Limpieza Profunda
+                                        </span>
+                                        <i className="fas fa-exclamation-triangle text-red-800 group-hover:text-red-500"></i>
                                     </div>
+                                    <p className="text-[9px] text-red-900/80 group-hover:text-red-400 relative z-10 leading-relaxed font-mono mt-1">
+                                        [PELIGRO] Elimina Apuestas, Logs, Resultados y Ledger. Irreversible.
+                                    </p>
                                 </button>
                             </div>
                         ) : (
-                            <div className="animate-in slide-in-from-right-8 duration-300">
-                                <button onClick={() => { setPurgeType(null); setConfirmation(''); }} className="text-[10px] font-bold text-slate-500 hover:text-white mb-4 flex items-center gap-2 uppercase tracking-wider transition-colors">
-                                    <i className="fas fa-arrow-left"></i> Cancelar Operación
-                                </button>
+                            // CONFIRMATION SCREEN
+                            <div className={`h-full border-2 rounded-2xl p-6 relative overflow-hidden animate-in slide-in-from-right-4 ${ui.border} ${ui.bg}`}>
+                                <div className={`absolute top-0 left-0 w-full h-1 ${ui.accent} shadow-[0_0_15px_currentColor]`}></div>
                                 
-                                <div className={`border-l-2 pl-4 py-2 mb-6 ${ui.border}`}>
-                                    <div className="text-[9px] text-slate-400 uppercase tracking-widest font-bold">Protocolo Iniciado</div>
-                                    <div className={`text-lg font-black uppercase ${ui.text} ${ui.textGlow} mt-1`}>
-                                        {purgeType === 'DEEP_CLEAN' ? 'PURGA NUCLEAR' : purgeType === 'BETS' ? 'LIMPIEZA DE APUESTAS' : 'ARCHIVADO DE LOGS'}
+                                <div className="flex items-start gap-3 mb-6">
+                                    <div className={`w-10 h-10 rounded bg-black border shrink-0 flex items-center justify-center ${ui.border} ${ui.text} shadow-[0_0_15px_currentColor]`}>
+                                        <i className={`fas ${isNuclear ? 'fa-radiation' : 'fa-check-circle'} text-xl`}></i>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className={`text-[10px] font-bold ${ui.text} uppercase tracking-wider`}>Confirmar Acción</div>
+                                        <div className="text-white font-bold uppercase text-sm break-words leading-tight mt-1">{getPurgePhrase()}</div>
                                     </div>
                                 </div>
 
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="text-[9px] font-mono font-bold text-slate-500 uppercase tracking-wider block mb-2">Frase de Confirmación</label>
-                                        <div className="relative">
-                                            <input 
-                                                type="text" 
-                                                value={confirmation}
-                                                onChange={e => setConfirmation(e.target.value.toUpperCase())}
-                                                className={`w-full bg-black border-2 rounded-lg p-3 text-center font-mono text-sm tracking-widest uppercase transition-all focus:outline-none ${confirmation === getPurgePhrase() ? `${ui.border} ${ui.text} ${ui.shadow}` : 'border-slate-800 text-slate-400 focus:border-slate-600'}`}
-                                                placeholder={getPurgePhrase()}
-                                                autoFocus
-                                            />
-                                            {confirmation === getPurgePhrase() && (
-                                                <div className={`absolute right-3 top-1/2 -translate-y-1/2 ${ui.text}`}>
-                                                    <i className="fas fa-check-circle"></i>
-                                                </div>
-                                            )}
-                                        </div>
+                                {isNuclear && (
+                                    <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-lg mb-6 text-[9px] font-mono text-red-300 leading-relaxed animate-pulse">
+                                        ADVERTENCIA: Esta acción destruirá permanentemente todos los registros históricos. Los saldos de usuarios activos se preservarán.
+                                    </div>
+                                )}
+
+                                <div className="space-y-3">
+                                    <div className="relative group/input">
+                                        <input 
+                                            type="text" 
+                                            placeholder={getPurgePhrase()}
+                                            value={confirmation}
+                                            onChange={e => setConfirmation(e.target.value.toUpperCase())}
+                                            className={`w-full bg-black/80 border-2 rounded-lg py-3 text-center font-mono text-xs sm:text-sm focus:outline-none transition-all uppercase placeholder-white/10 ${ui.border} ${ui.text} focus:shadow-[0_0_20px_currentColor]`}
+                                            autoFocus
+                                        />
                                     </div>
 
-                                    <button 
-                                        onClick={handlePurge}
-                                        disabled={confirmation !== getPurgePhrase()}
-                                        className={`w-full py-4 rounded-lg font-black uppercase tracking-[0.2em] text-xs transition-all duration-300 relative overflow-hidden group/btn ${confirmation === getPurgePhrase() ? `${ui.accent} text-black hover:scale-[1.02] shadow-[0_0_30px_currentColor]` : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`}
-                                    >
-                                        <div className="absolute inset-0 bg-white/20 -translate-x-full group-hover/btn:animate-[shine_0.5s_ease-in-out]"></div>
-                                        <span className="relative z-10 flex items-center justify-center gap-2">
-                                            <i className={`fas ${isNuclear ? 'fa-radiation' : 'fa-trash-alt'} ${confirmation === getPurgePhrase() ? 'animate-pulse' : ''}`}></i>
-                                            EJECUTAR
-                                        </span>
-                                    </button>
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={() => { setPurgeType(null); setConfirmation(''); }}
+                                            className="flex-1 py-3 border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-colors"
+                                        >
+                                            Abortar
+                                        </button>
+                                        <button 
+                                            onClick={handlePurge}
+                                            disabled={confirmation !== getPurgePhrase()}
+                                            className={`flex-1 py-3 rounded-lg text-[10px] font-black uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed shadow-lg transition-all ${
+                                                isNuclear
+                                                ? 'bg-red-600 hover:bg-red-500 text-black shadow-[0_0_20px_#dc2626]'
+                                                : 'bg-cyan-500 hover:bg-cyan-400 text-black shadow-[0_0_20px_#06b6d4]'
+                                            }`}
+                                        >
+                                            {isNuclear ? 'DETONAR' : 'EJECUTAR'}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}

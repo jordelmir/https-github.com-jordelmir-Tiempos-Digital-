@@ -1,8 +1,10 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuthStore } from '../store/useAuthStore';
 import { api } from '../services/edgeApi';
 import { UserRole, AppUser } from '../types';
+import MatrixRain from './ui/MatrixRain';
+import AnimatedIconUltra from './ui/AnimatedIconUltra';
 
 interface UserCreationFormProps {
   onCreated?: (newUser: AppUser) => void;
@@ -33,6 +35,7 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
   const [loading, setLoading] = useState(false);
   const [successMode, setSuccessMode] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [inputActive, setInputActive] = useState(false); // Track typing for "Living" effect
 
   const isVendedor = current?.role === UserRole.Vendedor;
   const isAdmin = current?.role === UserRole.SuperAdmin;
@@ -42,12 +45,28 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
     if (isVendedor) setRole(UserRole.Cliente);
   }, [isVendedor]);
 
-  // --- THEME ENGINE (STABLE INTERPOLATION) ---
-  // Inner theme for Role differentiation
-  const activeTheme = useMemo(() => {
-      return role === UserRole.Cliente 
-        ? { color: '#00f0ff', shadow: 'rgba(0, 240, 255, 0.5)', name: 'neon' } // Cliente: Cyan
-        : { color: '#bc13fe', shadow: 'rgba(188, 19, 254, 0.5)', name: 'purple' }; // Vendedor: Purple
+  // --- THEME ENGINE (REACTIVE CORE) ---
+  const ui = useMemo(() => {
+      const isClient = role === UserRole.Cliente;
+      return isClient 
+        ? { 
+            color: 'text-cyber-neon', 
+            border: 'border-cyber-neon', 
+            bg: 'bg-cyan-950', 
+            shadow: 'shadow-neon-cyan', 
+            hex: '#00f0ff',
+            accent: 'bg-cyber-neon',
+            scanline: 'from-cyan-500/50'
+          } 
+        : { 
+            color: 'text-cyber-purple', 
+            border: 'border-cyber-purple', 
+            bg: 'bg-purple-950', 
+            shadow: 'shadow-neon-purple', 
+            hex: '#bc13fe',
+            accent: 'bg-cyber-purple',
+            scanline: 'from-purple-500/50'
+          };
   }, [role]);
 
   // --- REAL-TIME IDENTITY SCANNING ---
@@ -67,7 +86,7 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
           } else {
               setCollisionUser(null);
           }
-      }, 500); // Debounce 500ms
+      }, 600); // Cinematic Scan Delay
 
       return () => clearTimeout(timer);
   }, [cedula]);
@@ -101,7 +120,7 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
         setTimeout(() => {
             onCreated?.(res.data!.user);
             resetForm();
-        }, 3000);
+        }, 3500);
       }
     } catch (err) {
       alert('Error crítico en aprovisionamiento.');
@@ -130,130 +149,113 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
   if (!current || (current.role === UserRole.Cliente)) return null;
 
   return (
-    <div className="relative group h-full">
+    <div className="relative group h-full perspective-1000">
         
-        {/* --- SUCCESS OVERLAY --- */}
+        {/* --- SUCCESS OVERLAY (HOLOGRAPHIC COMPLETION) --- */}
         {successMode && (
-            <div 
-                className="absolute inset-0 z-50 bg-black/95 backdrop-blur-xl rounded-2xl flex flex-col items-center justify-center animate-in fade-in duration-500 overflow-hidden border-2 transition-colors ease-out"
-                style={{ borderColor: role === UserRole.Cliente ? '#22C55E' : '#7C3AED' }}
-            >
-                {role === UserRole.Cliente ? (
-                    <>
-                        <div className="absolute inset-0 bg-green-500/10 animate-pulse"></div>
-                        <div className="relative mb-8 animate-in zoom-in duration-500">
-                            <div className="absolute inset-0 rounded-full bg-green-500 opacity-30 animate-ping blur-xl"></div>
-                            <div className="w-32 h-32 bg-black rounded-full border-4 border-green-500 shadow-[0_0_60px_rgba(34,197,94,0.6)] flex items-center justify-center relative z-10">
-                                <i className="fas fa-check text-6xl text-green-500 animate-[bounce_1s_infinite]"></i>
-                            </div>
+            <div className="absolute inset-0 z-50 bg-[#02040a]/95 backdrop-blur-2xl rounded-3xl flex flex-col items-center justify-center animate-in fade-in zoom-in duration-500 overflow-hidden border-2" style={{ borderColor: ui.hex }}>
+                
+                {/* Background Matrix Explosion */}
+                <div className="absolute inset-0 opacity-20">
+                    <MatrixRain colorHex={ui.hex} speed={4} density="HIGH" />
+                </div>
+
+                <div className="relative z-10 flex flex-col items-center">
+                    <div className="w-32 h-32 relative mb-8">
+                        <div className={`absolute inset-0 rounded-full border-4 ${ui.border} animate-[spin_3s_linear_infinite] opacity-50`}></div>
+                        <div className={`absolute inset-4 rounded-full border-4 border-dashed ${ui.border} animate-[spin_5s_linear_infinite_reverse]`}></div>
+                        <div className={`absolute inset-0 rounded-full ${ui.accent} opacity-20 blur-xl animate-pulse`}></div>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <i className={`fas fa-fingerprint text-6xl ${ui.color} animate-pulse drop-shadow-[0_0_15px_currentColor]`}></i>
                         </div>
-                        <h3 className="text-2xl font-display font-black text-white uppercase tracking-widest drop-shadow-[0_0_10px_#22C55E] mb-2">
-                            Jugador Verificado
-                        </h3>
-                    </>
-                ) : (
-                    <>
-                        <div className="absolute inset-0 bg-purple-600/10"></div>
-                        <div className="absolute top-0 left-0 w-full h-2 bg-purple-500 shadow-[0_0_20px_#8b5cf6] animate-[scanline_1.5s_linear_infinite] z-0 opacity-50"></div>
-                        <div className="relative mb-8 animate-in zoom-in duration-500">
-                            <div className="w-32 h-40 bg-black/80 rounded-lg border-2 border-purple-500 shadow-[0_0_60px_rgba(124,58,237,0.5)] flex flex-col items-center justify-center relative z-10 overflow-hidden">
-                                <i className="fas fa-user-tie text-5xl text-purple-500 mb-2"></i>
-                                <div className="absolute bottom-2 right-2"><i className="fas fa-check-circle text-green-400 text-xl bg-black rounded-full"></i></div>
-                            </div>
-                        </div>
-                        <h3 className="text-2xl font-display font-black text-white uppercase tracking-widest drop-shadow-[0_0_10px_#7C3AED] mb-2">
-                            Vendedor Verificado
-                        </h3>
-                    </>
-                )}
-                <div className="mt-8 font-mono text-[9px] text-slate-400">ID: {cedula}</div>
+                    </div>
+                    
+                    <h3 className="text-3xl font-display font-black text-white uppercase tracking-widest drop-shadow-lg mb-2">
+                        Identidad <span className={ui.color}>Forjada</span>
+                    </h3>
+                    <div className={`px-4 py-1 rounded-full border ${ui.border} bg-black/50 text-xs font-mono ${ui.color} tracking-[0.2em]`}>
+                        ID: {cedula}
+                    </div>
+                </div>
+                
+                {/* Success Scanline */}
+                <div className={`absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-${role === UserRole.Cliente ? 'cyan' : 'purple'}-500 to-transparent animate-[scanline_1s_linear_infinite] shadow-[0_0_30px_currentColor]`}></div>
             </div>
         )}
 
-        {/* --- STABLE FLUID BACKLIGHT SYSTEM (EMERALD OVERRIDE) --- */}
-        <div 
-            className="absolute -inset-2 rounded-[2rem] opacity-50 blur-2xl transition-colors duration-700 ease-in-out"
-            style={{ backgroundColor: '#065f46' }} // Emerald 800
-        ></div>
-        
-        <div 
-            className="absolute -inset-1 rounded-2xl opacity-80 blur-lg transition-colors duration-700 ease-in-out"
-            style={{ backgroundColor: '#10b981' }} // Emerald 500
-        ></div>
-
-        <div 
-            className="relative h-full bg-[#050a14]/90 border-2 rounded-2xl p-0 shadow-2xl overflow-hidden backdrop-blur-xl transition-all duration-700 flex flex-col z-10"
-            style={{ borderColor: '#10b981' }} // Emerald Border
-        >
+        {/* --- LIVING CHASSIS --- */}
+        <div className={`relative h-full bg-[#05070a] border-2 ${ui.border} rounded-[2rem] overflow-hidden shadow-2xl flex flex-col transition-all duration-700 hover:shadow-[0_0_50px_rgba(0,0,0,0.5)]`}>
             
-            {/* Header */}
-            <div className="p-6 border-b border-white/5 flex justify-between items-center bg-black/20">
+            {/* Background Layer: Matrix Rain (Internal) */}
+            <div className="absolute inset-0 opacity-10 pointer-events-none mix-blend-screen">
+                <MatrixRain colorHex={ui.hex} speed={inputActive ? 2 : 0.5} density="MEDIUM" />
+            </div>
+
+            {/* Ambient Breathing Glow */}
+            <div className={`absolute -inset-20 ${ui.bg} opacity-10 blur-[80px] animate-[pulse_6s_ease-in-out_infinite] transition-colors duration-1000`}></div>
+
+            {/* HEADER: HUD STYLE */}
+            <div className="p-6 border-b border-white/5 relative z-10 flex justify-between items-center bg-gradient-to-b from-white/5 to-transparent">
                 <div className="flex items-center gap-4">
-                    <div 
-                        className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center transition-all duration-700 border-2"
-                        style={{ borderColor: activeTheme.color, color: activeTheme.color, boxShadow: `0 0 15px ${activeTheme.shadow}` }}
-                    >
-                        <i className="fas fa-id-card text-lg"></i>
+                    <div className={`w-12 h-12 rounded-xl bg-black border ${ui.border} flex items-center justify-center shadow-[0_0_15px_rgba(0,0,0,0.5)] relative overflow-hidden group/icon`}>
+                        <div className={`absolute inset-0 ${ui.accent} opacity-0 group-hover/icon:opacity-20 transition-opacity`}></div>
+                        <AnimatedIconUltra profile={{ animation: 'pulse', theme: role === UserRole.Cliente ? 'neon' : 'cyber', speed: 2 }}>
+                            <i className={`fas fa-user-plus text-xl ${ui.color}`}></i>
+                        </AnimatedIconUltra>
                     </div>
                     <div>
-                        <h3 className="text-sm font-display font-bold text-white uppercase tracking-wider">
-                            Aprovisionamiento <span style={{ color: activeTheme.color }} className="transition-colors duration-700">Biométrico</span>
+                        <h3 className="text-sm font-display font-black text-white uppercase tracking-wider leading-tight">
+                            Aprovisionamiento <br/><span className={`${ui.text} ${ui.color} transition-colors duration-500 text-glow-sm`}>Biométrico</span>
                         </h3>
-                        <p className="text-[9px] text-slate-500 font-mono uppercase tracking-widest">Creación de Identidad Digital</p>
                     </div>
                 </div>
-                {/* Step Indicator */}
-                <div className="flex gap-1">
-                    {[1, 2, 3].map(i => (
-                        <div 
-                            key={i} 
-                            className="w-2 h-2 rounded-full transition-all duration-500 border"
-                            style={{ 
-                                backgroundColor: step >= i ? activeTheme.color : '#1e293b',
-                                borderColor: step >= i ? activeTheme.color : '#334155',
-                                boxShadow: step >= i ? `0 0 5px ${activeTheme.shadow}` : 'none'
-                            }}
-                        ></div>
+
+                {/* Step Progress - Connected Dots */}
+                <div className="flex items-center gap-2">
+                    {[1, 2, 3].map((s, idx) => (
+                        <div key={s} className="flex items-center">
+                            <div 
+                                className={`w-3 h-3 rounded-full border-2 transition-all duration-500 ${
+                                    step >= s ? `${ui.bg} border-${role === UserRole.Cliente ? 'cyan' : 'purple'}-400 shadow-[0_0_10px_currentColor]` : 'bg-transparent border-slate-700'
+                                }`}
+                            ></div>
+                            {idx < 2 && (
+                                <div className={`w-6 h-0.5 transition-all duration-500 ${step > s ? ui.accent : 'bg-slate-800'}`}></div>
+                            )}
+                        </div>
                     ))}
                 </div>
             </div>
 
-            <form onSubmit={submit} className="flex-1 flex flex-col bg-gradient-to-b from-transparent to-black/30">
+            <form onSubmit={submit} className="flex-1 flex flex-col relative z-10">
                 
-                <div className="flex-1 p-6 relative">
+                <div className="flex-1 p-8 relative overflow-y-auto custom-scrollbar">
                     
-                    {/* ROLE TOGGLE CONTAINER - PHOSPHORESCENT BORDER & GLOW */}
-                    <div className="flex justify-center mb-6">
-                        <div 
-                            className="bg-black/60 p-1.5 rounded-xl border-2 flex gap-4 shadow-lg transition-all duration-500"
-                            style={{
-                                borderColor: activeTheme.color, // Container matches active theme
-                                boxShadow: `0 0 25px ${activeTheme.shadow.replace('0.5', '0.2')}`
-                            }}
-                        >
-                            {/* PLAYER TOGGLE */}
+                    {/* ROLE SLIDER - TACTILE SWITCH */}
+                    <div className="flex justify-center mb-8">
+                        <div className="relative bg-black/60 p-1 rounded-full border border-white/10 flex items-center w-64 shadow-inner">
+                            {/* Sliding Active Background */}
+                            <div 
+                                className={`absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full transition-all duration-500 ease-out shadow-lg ${
+                                    role === UserRole.Cliente 
+                                    ? `left-1 bg-cyan-900/50 border border-cyan-500/50` 
+                                    : `left-[calc(50%+2px)] bg-purple-900/50 border border-purple-500/50`
+                                }`}
+                            ></div>
+
                             <button
                                 type="button"
                                 onClick={() => setRole(UserRole.Cliente)}
-                                className={`px-6 py-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 border-2 border-cyber-neon ${
-                                    role === UserRole.Cliente 
-                                    ? 'bg-cyber-neon text-black shadow-[0_0_20px_#00f0ff]' 
-                                    : 'bg-transparent text-slate-400 shadow-[0_0_10px_rgba(0,240,255,0.2)] hover:text-cyber-neon hover:shadow-[0_0_15px_#00f0ff] hover:bg-cyber-neon/5'
-                                }`}
+                                className={`flex-1 relative z-10 text-[10px] font-black uppercase tracking-widest py-2 rounded-full transition-colors ${role === UserRole.Cliente ? 'text-white' : 'text-slate-500 hover:text-white'}`}
                             >
                                 Jugador
                             </button>
                             
-                            {/* VENDOR TOGGLE (DISABLED FOR VENDORS) */}
                             {isAdmin && (
                                 <button
                                     type="button"
                                     onClick={() => setRole(UserRole.Vendedor)}
-                                    className={`px-6 py-2.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 border-2 border-cyber-purple ${
-                                        role === UserRole.Vendedor 
-                                        ? 'bg-cyber-purple text-black shadow-[0_0_20px_#bc13fe]' 
-                                        : 'bg-transparent text-slate-400 shadow-[0_0_10px_rgba(188,19,254,0.2)] hover:text-cyber-purple hover:shadow-[0_0_15px_#bc13fe] hover:bg-cyber-purple/5'
-                                    }`}
+                                    className={`flex-1 relative z-10 text-[10px] font-black uppercase tracking-widest py-2 rounded-full transition-colors ${role === UserRole.Vendedor ? 'text-white' : 'text-slate-500 hover:text-white'}`}
                                 >
                                     Vendedor
                                 </button>
@@ -261,213 +263,187 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
                         </div>
                     </div>
 
-                    {/* --- STEP 1: IDENTITY --- */}
-                    {step === 1 && (
-                        <div className="space-y-5 animate-in slide-in-from-right-8 duration-300">
-                            <div className="relative group/field">
-                                <label 
-                                    className="absolute -top-2.5 left-3 px-1 bg-[#050a14] text-[9px] font-bold uppercase tracking-widest z-20 transition-colors duration-500"
-                                    style={{ color: activeTheme.color }}
-                                >
-                                    Cédula de Identidad / ID
-                                </label>
+                    {/* STEPS CONTAINER */}
+                    <div className="relative min-h-[300px]">
+                        
+                        {/* --- STEP 1: IDENTITY (LASER SCANNER) --- */}
+                        {step === 1 && (
+                            <div className="space-y-8 animate-in slide-in-from-right-8 fade-in duration-500">
                                 
-                                <div className="relative">
-                                    <input 
-                                        type="text"
-                                        required
-                                        value={cedula}
-                                        onChange={e => setCedula(e.target.value)}
-                                        className={`relative w-full bg-black/60 border-2 rounded-lg px-4 py-3 text-white font-mono placeholder-slate-700 focus:outline-none transition-all duration-300 z-10 ${
-                                            collisionUser 
-                                            ? 'border-red-500 text-red-500 focus:shadow-[0_0_20px_red]' 
-                                            : ''
-                                        }`}
-                                        style={!collisionUser ? { 
-                                            borderColor: activeTheme.color, 
-                                            boxShadow: `0 0 10px ${activeTheme.shadow.replace('0.5', '0.1')}` 
-                                        } : {}}
-                                        placeholder="NO. IDENTIFICACIÓN ÚNICO"
-                                        autoFocus
-                                    />
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 z-20">
-                                        {checkingId && <i className="fas fa-circle-notch fa-spin text-slate-400"></i>}
-                                        {!checkingId && collisionUser && <i className="fas fa-exclamation-triangle text-red-500 animate-pulse"></i>}
-                                        {!checkingId && !collisionUser && cedula.length > 3 && <i className="fas fa-check-circle text-green-500"></i>}
+                                {/* CEDULA INPUT WITH SCANNER */}
+                                <div className="relative group/scan">
+                                    <label className={`text-[9px] font-mono font-bold ${ui.color} uppercase tracking-widest mb-2 block pl-1`}>
+                                        <i className="fas fa-id-card mr-2"></i>Cédula de Identidad
+                                    </label>
+                                    <div className="relative overflow-hidden rounded-xl bg-black/40 border border-white/10 group-focus-within/scan:border-white/30 transition-all">
+                                        <input 
+                                            type="text"
+                                            required
+                                            value={cedula}
+                                            onChange={e => { setCedula(e.target.value); setInputActive(true); }}
+                                            onBlur={() => setInputActive(false)}
+                                            className={`w-full bg-transparent px-6 py-4 text-white font-mono text-lg outline-none placeholder-slate-700 tracking-wider relative z-10 transition-colors ${collisionUser ? 'text-red-500' : ''}`}
+                                            placeholder="SCAN-ID-0000"
+                                            autoFocus
+                                        />
+                                        
+                                        {/* Status Icon */}
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20">
+                                            {checkingId && <i className={`fas fa-circle-notch fa-spin ${ui.color}`}></i>}
+                                            {!checkingId && collisionUser && <i className="fas fa-exclamation-triangle text-red-500 animate-pulse"></i>}
+                                            {!checkingId && !collisionUser && cedula.length > 3 && <i className="fas fa-check text-green-500 drop-shadow-[0_0_5px_lime]"></i>}
+                                        </div>
+
+                                        {/* LASER SCANNER ANIMATION */}
+                                        {(checkingId || inputActive) && (
+                                            <div className={`absolute top-0 left-0 w-2 h-full bg-gradient-to-r from-transparent via-${role === UserRole.Cliente ? 'cyan' : 'purple'}-500 to-transparent opacity-50 animate-[scanline_1.5s_linear_infinite] pointer-events-none z-0`}></div>
+                                        )}
+                                        
+                                        {/* Bottom Highlight */}
+                                        <div className={`absolute bottom-0 left-0 h-[2px] w-0 group-focus-within/scan:w-full transition-all duration-700 ${ui.accent} shadow-[0_0_10px_currentColor]`}></div>
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* COLLISION ALERT CARD */}
-                            {collisionUser && (
-                                <div className="animate-in slide-in-from-top-2 fade-in duration-300 bg-red-950/20 border-2 border-red-500 rounded-lg p-3 relative overflow-hidden shadow-[0_0_20px_rgba(255,0,0,0.2)]">
-                                    <div className="absolute top-0 left-0 w-1 h-full bg-red-500 animate-pulse"></div>
-                                    <div className="flex gap-3 items-start">
-                                        <div className="text-red-500 text-xl mt-1"><i className="fas fa-ban"></i></div>
+                                {/* COLLISION ALERT */}
+                                {collisionUser && (
+                                    <div className="bg-red-950/30 border border-red-500/50 rounded-xl p-4 flex items-start gap-4 animate-in zoom-in duration-300 relative overflow-hidden">
+                                        <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(255,0,0,0.05)_10px,rgba(255,0,0,0.05)_20px)]"></div>
+                                        <div className="w-10 h-10 rounded-lg bg-red-900/50 flex items-center justify-center border border-red-500 text-red-500 shrink-0 shadow-neon-red">
+                                            <i className="fas fa-ban text-xl"></i>
+                                        </div>
                                         <div>
-                                            <div className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-1">
-                                                IDENTIDAD YA REGISTRADA
-                                            </div>
-                                            <div className="text-xs text-white font-mono">
-                                                Cédula vinculada a: <span className="font-bold">{collisionUser.name}</span>
-                                            </div>
-                                            <div className="text-[10px] text-red-300 mt-1 bg-red-900/40 px-2 py-1 rounded inline-block border border-red-500/30">
-                                                ROL ACTUAL: {collisionUser.role.toUpperCase()}
-                                            </div>
-                                            <p className="text-[9px] text-slate-400 mt-2 leading-tight">
-                                                {collisionUser.role !== role 
-                                                    ? "ERROR CRÍTICO: Conflicto de roles. Contacte al SuperAdmin para liberar esta identidad."
-                                                    : "Esta cuenta ya existe en el sistema."}
+                                            <h4 className="text-red-500 font-bold uppercase text-xs tracking-wider mb-1">Identidad Registrada</h4>
+                                            <p className="text-red-400/80 text-[10px] font-mono leading-relaxed">
+                                                ID vinculado a: <span className="text-white font-bold">{collisionUser.name}</span> <br/>
+                                                Rol Actual: {collisionUser.role}
                                             </p>
                                         </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            <div className="relative group/field">
-                                <label 
-                                    className="absolute -top-2.5 left-3 px-1 bg-[#050a14] text-[9px] font-bold uppercase tracking-widest z-20 transition-colors duration-500"
-                                    style={{ color: activeTheme.color }}
-                                >
-                                    Nombre Completo
-                                </label>
-                                <input 
-                                    type="text"
-                                    required
-                                    value={name}
-                                    onChange={e => setName(e.target.value)}
-                                    className="relative w-full bg-black/60 border-2 rounded-lg px-4 py-3 text-white font-mono placeholder-slate-700 focus:outline-none transition-all z-10"
-                                    style={{ 
-                                        borderColor: activeTheme.color,
-                                        caretColor: activeTheme.color,
-                                        boxShadow: `0 0 10px ${activeTheme.shadow.replace('0.5', '0.1')}`
-                                    }}
-                                    placeholder="NOMBRE REGISTRADO"
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* --- STEP 2: CONTACT --- */}
-                    {step === 2 && (
-                        <div className="space-y-5 animate-in slide-in-from-right-8 duration-300">
-                            <div className="relative group/field">
-                                <label 
-                                    className="absolute -top-2.5 left-3 px-1 bg-[#050a14] text-[9px] font-bold uppercase tracking-widest z-20 transition-colors duration-500"
-                                    style={{ color: activeTheme.color }}
-                                >
-                                    Teléfono Móvil
-                                </label>
-                                <input 
-                                    type="tel"
-                                    required
-                                    value={phone}
-                                    onChange={e => setPhone(e.target.value)}
-                                    className="relative w-full bg-black/60 border-2 rounded-lg px-4 py-3 text-white font-mono placeholder-slate-700 focus:outline-none transition-all z-10"
-                                    style={{ 
-                                        borderColor: activeTheme.color,
-                                        caretColor: activeTheme.color,
-                                        boxShadow: `0 0 10px ${activeTheme.shadow.replace('0.5', '0.1')}`
-                                    }}
-                                    placeholder="+506 0000-0000"
-                                    autoFocus
-                                />
-                            </div>
-
-                            <div className="relative group/field">
-                                <label 
-                                    className="absolute -top-2.5 left-3 px-1 bg-[#050a14] text-[9px] font-bold uppercase tracking-widest z-20 transition-colors duration-500"
-                                    style={{ color: activeTheme.color }}
-                                >
-                                    Correo Electrónico {role === UserRole.Cliente && <span className="text-slate-500 text-[8px]">(OPCIONAL)</span>}
-                                </label>
-                                <input 
-                                    type="email"
-                                    required={role === UserRole.Vendedor}
-                                    value={email}
-                                    onChange={e => setEmail(e.target.value)}
-                                    className="relative w-full bg-black/60 border-2 rounded-lg px-4 py-3 text-white font-mono placeholder-slate-700 focus:outline-none transition-all z-10"
-                                    style={{ 
-                                        borderColor: activeTheme.color,
-                                        caretColor: activeTheme.color,
-                                        boxShadow: `0 0 10px ${activeTheme.shadow.replace('0.5', '0.1')}`
-                                    }}
-                                    placeholder={role === UserRole.Vendedor ? "REQUERIDO@RED.COM" : "OPCIONAL@RED.COM"}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* --- STEP 3: SECURITY & FUNDS --- */}
-                    {step === 3 && (
-                        <div className="space-y-5 animate-in slide-in-from-right-8 duration-300">
-                            {/* Balance */}
-                            <div className="relative group/field">
-                                <label className="absolute -top-2.5 left-3 px-1 bg-[#050a14] text-[9px] font-bold text-cyber-success uppercase tracking-widest z-20">Crédito Inicial</label>
-                                <div className="relative flex items-center">
-                                    <input 
-                                        type="number"
-                                        required
-                                        min="0"
-                                        value={balance}
-                                        onChange={e => setBalance(parseFloat(e.target.value))}
-                                        className="w-full bg-black/60 border-2 border-slate-700 rounded-lg px-4 py-3 pl-4 pr-12 text-white font-mono placeholder-slate-700 focus:outline-none focus:border-cyber-success focus:shadow-[0_0_15px_rgba(10,255,96,0.3)] transition-all z-10"
-                                        style={{ borderColor: activeTheme.color }} // Using theme color as requested
-                                        placeholder="0.00"
-                                        autoFocus
-                                    />
-                                    <div className="absolute right-4 text-xs font-bold text-slate-500 z-20">CRC</div>
-                                </div>
-                            </div>
-
-                            {/* PIN Generation */}
-                            <div className="bg-white/5 p-4 rounded-xl border-2 border-white/10 relative overflow-hidden shadow-inner">
-                                <div className="flex justify-between items-center mb-3">
-                                    <label 
-                                        className="text-[9px] font-bold uppercase tracking-widest transition-colors duration-500"
-                                        style={{ color: activeTheme.color }}
-                                    >
-                                        Credenciales de Acceso (PIN)
+                                <div className="relative group/input">
+                                    <label className={`text-[9px] font-mono font-bold ${ui.color} uppercase tracking-widest mb-2 block pl-1`}>
+                                        <i className="fas fa-user mr-2"></i>Nombre Completo
                                     </label>
-                                    <button 
-                                        type="button" 
-                                        onClick={generatePin}
-                                        className={`text-[9px] flex items-center gap-1 text-slate-400 hover:text-white uppercase font-bold`}
-                                    >
-                                        <i className="fas fa-random"></i> Generar
-                                    </button>
+                                    <div className="relative overflow-hidden rounded-xl bg-black/40 border border-white/10 group-focus-within/input:border-white/30 transition-all">
+                                        <input 
+                                            type="text"
+                                            required
+                                            value={name}
+                                            onChange={e => setName(e.target.value)}
+                                            className="w-full bg-transparent px-6 py-4 text-white font-mono text-lg outline-none placeholder-slate-700 tracking-wider relative z-10"
+                                            placeholder="NOMBRE DEL AGENTE"
+                                        />
+                                        <div className={`absolute bottom-0 left-0 h-[2px] w-0 group-focus-within/input:w-full transition-all duration-700 ${ui.accent} shadow-[0_0_10px_currentColor]`}></div>
+                                    </div>
                                 </div>
+                            </div>
+                        )}
+
+                        {/* --- STEP 2: CONTACT (HOLOGRAPHIC INPUTS) --- */}
+                        {step === 2 && (
+                            <div className="space-y-8 animate-in slide-in-from-right-8 fade-in duration-500">
+                                <div className="relative group/input">
+                                    <label className={`text-[9px] font-mono font-bold ${ui.color} uppercase tracking-widest mb-2 block pl-1`}>
+                                        <i className="fas fa-phone mr-2"></i>Móvil Seguro
+                                    </label>
+                                    <div className="relative overflow-hidden rounded-xl bg-black/40 border border-white/10 group-focus-within/input:border-white/30 transition-all">
+                                        <input 
+                                            type="tel"
+                                            required
+                                            value={phone}
+                                            onChange={e => setPhone(e.target.value)}
+                                            className="w-full bg-transparent px-6 py-4 text-white font-mono text-lg outline-none placeholder-slate-700 tracking-wider relative z-10"
+                                            placeholder="+506 0000-0000"
+                                            autoFocus
+                                        />
+                                        <div className={`absolute bottom-0 left-0 h-[2px] w-0 group-focus-within/input:w-full transition-all duration-700 ${ui.accent} shadow-[0_0_10px_currentColor]`}></div>
+                                    </div>
+                                </div>
+
+                                <div className="relative group/input">
+                                    <label className={`text-[9px] font-mono font-bold ${ui.color} uppercase tracking-widest mb-2 block pl-1`}>
+                                        <i className="fas fa-envelope mr-2"></i>Enlace Digital <span className="text-slate-500 text-[8px] ml-2">(OPCIONAL)</span>
+                                    </label>
+                                    <div className="relative overflow-hidden rounded-xl bg-black/40 border border-white/10 group-focus-within/input:border-white/30 transition-all">
+                                        <input 
+                                            type="email"
+                                            value={email}
+                                            onChange={e => setEmail(e.target.value)}
+                                            className="w-full bg-transparent px-6 py-4 text-white font-mono text-lg outline-none placeholder-slate-700 tracking-wider relative z-10"
+                                            placeholder="AGENTE@RED.COM"
+                                        />
+                                        <div className={`absolute bottom-0 left-0 h-[2px] w-0 group-focus-within/input:w-full transition-all duration-700 ${ui.accent} shadow-[0_0_10px_currentColor]`}></div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* --- STEP 3: SECURITY (VAULT UI) --- */}
+                        {step === 3 && (
+                            <div className="space-y-8 animate-in slide-in-from-right-8 fade-in duration-500">
                                 
                                 <div className="relative group/input">
-                                    <input 
-                                        type="text"
-                                        maxLength={6}
-                                        value={pin}
-                                        onChange={e => setPin(e.target.value.replace(/[^0-9]/g, ''))}
-                                        className="relative w-full bg-black border-2 border-slate-800 rounded-lg py-3 text-center text-3xl font-mono tracking-[0.5em] text-white outline-none z-10 transition-all duration-500"
-                                        style={{ 
-                                            borderColor: activeTheme.color,
-                                            boxShadow: `0 0 15px ${activeTheme.shadow.replace('0.5', '0.1')}`
-                                        }}
-                                        placeholder="------"
-                                    />
+                                    <label className="text-[9px] font-mono font-bold text-cyber-success uppercase tracking-widest mb-2 block pl-1">
+                                        <i className="fas fa-coins mr-2"></i>Crédito Inicial
+                                    </label>
+                                    <div className="relative overflow-hidden rounded-xl bg-black/40 border border-white/10 group-focus-within/input:border-cyber-success transition-all flex items-center">
+                                        <input 
+                                            type="number"
+                                            required
+                                            min="0"
+                                            value={balance}
+                                            onChange={e => setBalance(parseFloat(e.target.value))}
+                                            className="w-full bg-transparent px-6 py-4 text-white font-mono text-2xl outline-none placeholder-slate-700 tracking-wider relative z-10"
+                                            placeholder="0.00"
+                                            autoFocus
+                                        />
+                                        <span className="text-xs font-bold text-slate-500 mr-4">CRC</span>
+                                        <div className="absolute bottom-0 left-0 h-[2px] w-0 group-focus-within/input:w-full transition-all duration-700 bg-cyber-success shadow-[0_0_10px_#0aff60]"></div>
+                                    </div>
                                 </div>
-                                <p className="text-[8px] text-slate-500 mt-2 text-center font-mono">
-                                    * El PIN será encriptado. No recuperable.
-                                </p>
-                            </div>
-                        </div>
-                    )}
 
+                                {/* PIN Generator - The Vault Key */}
+                                <div className="bg-[#0a0a0f] border border-white/10 rounded-xl p-4 relative overflow-hidden shadow-inner group/pin hover:border-white/20 transition-all">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <label className={`text-[9px] font-mono font-bold ${ui.color} uppercase tracking-widest`}>
+                                            <i className="fas fa-key mr-2"></i>Llave de Acceso (PIN)
+                                        </label>
+                                        <button 
+                                            type="button" 
+                                            onClick={generatePin}
+                                            className={`text-[9px] font-bold uppercase px-3 py-1 rounded bg-white/5 hover:bg-white/10 ${ui.color} border border-transparent hover:border-white/20 transition-all`}
+                                        >
+                                            <i className="fas fa-random mr-1"></i> Generar
+                                        </button>
+                                    </div>
+                                    
+                                    <div className="relative bg-black rounded-lg border border-slate-800 py-4 flex items-center justify-center">
+                                        <input 
+                                            type="text"
+                                            maxLength={6}
+                                            value={pin}
+                                            onChange={e => setPin(e.target.value.replace(/[^0-9]/g, ''))}
+                                            className="bg-transparent text-center text-3xl font-mono tracking-[0.5em] text-white outline-none w-full z-10"
+                                            placeholder="------"
+                                        />
+                                        {/* Pin Glow */}
+                                        <div className={`absolute inset-0 ${ui.accent} opacity-5 blur-md`}></div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                    </div>
                 </div>
 
-                {/* Navigation & Actions - PHOSPHORESCENT BUTTONS */}
-                <div className="p-6 border-t border-white/5 bg-black/20 flex justify-between gap-4">
+                {/* --- FOOTER: ACTION BAR --- */}
+                <div className="p-6 border-t border-white/5 bg-black/20 flex justify-between gap-4 relative z-20">
                     {step > 1 ? (
                         <button
                             type="button"
                             onClick={() => setStep(prev => prev - 1 as any)}
-                            className="px-6 py-3 rounded-xl border-2 border-slate-700 text-slate-400 hover:text-white hover:border-white hover:shadow-[0_0_15px_white] font-bold uppercase text-xs tracking-wider transition-all"
+                            className="px-6 py-3 rounded-xl border border-white/10 text-slate-400 hover:text-white hover:bg-white/5 font-bold uppercase text-xs tracking-wider transition-all"
                         >
                             Atrás
                         </button>
@@ -483,20 +459,11 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
                                 (step === 2 && (!phone || (role === UserRole.Vendedor && !email)))
                             }
                             onClick={() => setStep(prev => prev + 1 as any)}
-                            className={`px-8 py-3 rounded-xl font-bold uppercase text-xs tracking-wider transition-all duration-300 border-2 ${
+                            className={`px-10 py-3 rounded-xl font-bold uppercase text-xs tracking-widest transition-all duration-300 shadow-lg ${
                                 ((step === 1 && name && cedula && !collisionUser) || (step === 2 && phone))
-                                ? 'text-black hover:scale-105' 
-                                : 'bg-slate-800 text-slate-500 border-slate-800 cursor-not-allowed'
+                                ? `${ui.accent} text-black hover:scale-105 hover:brightness-110 shadow-[0_0_20px_${ui.hex}]` 
+                                : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
                             }`}
-                            style={
-                                ((step === 1 && name && cedula && !collisionUser) || (step === 2 && phone))
-                                ? { 
-                                    backgroundColor: activeTheme.color, 
-                                    borderColor: activeTheme.color,
-                                    boxShadow: `0 0 20px ${activeTheme.shadow}` 
-                                  }
-                                : {}
-                            }
                         >
                             Siguiente
                         </button>
@@ -504,20 +471,11 @@ export default function UserCreationForm({ onCreated }: UserCreationFormProps) {
                         <button 
                             type="submit"
                             disabled={loading || balance === '' || !pin}
-                            className={`px-8 py-3 rounded-xl font-black uppercase text-xs tracking-[0.2em] transition-all duration-300 flex items-center gap-2 border-2 ${
+                            className={`px-10 py-3 rounded-xl font-black uppercase text-xs tracking-[0.2em] transition-all duration-300 flex items-center gap-3 shadow-lg ${
                                 !loading && balance !== '' && pin
-                                ? 'text-black hover:bg-white hover:scale-105 hover:border-white'
-                                : 'bg-slate-800 text-slate-500 border-slate-800 cursor-not-allowed'
+                                ? `${ui.accent} text-black hover:scale-105 hover:brightness-110 shadow-[0_0_30px_${ui.hex}]`
+                                : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
                             }`}
-                            style={
-                                !loading && balance !== '' && pin
-                                ? { 
-                                    backgroundColor: activeTheme.color, 
-                                    borderColor: activeTheme.color,
-                                    boxShadow: `0 0 30px ${activeTheme.shadow}` 
-                                  }
-                                : {}
-                            }
                         >
                             {loading ? <i className="fas fa-circle-notch fa-spin"></i> : <i className="fas fa-fingerprint"></i>}
                             {loading ? 'FORJANDO...' : 'CREAR IDENTIDAD'}

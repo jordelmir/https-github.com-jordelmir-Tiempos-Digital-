@@ -4,7 +4,6 @@ import { useAuthStore } from '../store/useAuthStore';
 import { formatCurrency, formatDate } from '../constants';
 import { Bet } from '../types';
 import TicketViewModal from './TicketViewModal';
-import MatrixRain from './ui/MatrixRain';
 
 interface PersonalBetsPanelProps {
     theme: {
@@ -70,16 +69,6 @@ export default function PersonalBetsPanel({ theme, refreshTrigger }: PersonalBet
             
             <div className="relative bg-cyber-panel/40 border border-white/10 rounded-2xl backdrop-blur-md shadow-2xl flex flex-col h-full overflow-hidden transition-colors duration-500 hover:border-white/20">
                 
-                {/* --- INTERNAL MATRIX RAIN --- */}
-                <div className="absolute inset-0 opacity-15 pointer-events-none">
-                    <MatrixRain 
-                        colorHex={theme.hex || '#ffffff'} 
-                        speed={0.6} 
-                        density="LOW" 
-                        opacity={0.3} 
-                    />
-                </div>
-
                 {/* HEADER & TABS */}
                 <div className="p-6 border-b border-white/5 bg-black/20 flex-shrink-0 relative z-10">
                     <div className="flex justify-between items-center mb-6">
@@ -123,7 +112,7 @@ export default function PersonalBetsPanel({ theme, refreshTrigger }: PersonalBet
                 </div>
 
                 {/* SCROLLABLE LIST */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar relative p-4 space-y-3 z-10">
+                <div className="flex-1 overflow-y-auto custom-scrollbar relative p-4 space-y-3">
                     {/* Scanline Overlay */}
                     <div className="sticky top-0 left-0 w-full h-1 bg-white/5 shadow-[0_0_15px_white] opacity-20 pointer-events-none z-20"></div>
 

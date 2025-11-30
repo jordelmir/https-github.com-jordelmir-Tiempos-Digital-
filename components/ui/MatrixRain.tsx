@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 
 interface MatrixRainProps {
     colorHex?: string;
@@ -8,94 +8,143 @@ interface MatrixRainProps {
     brightness?: number;
 }
 
-const MatrixRain: React.FC<MatrixRainProps> = ({ 
+const MatrixRain = memo(({ 
     colorHex = '#00f0ff', 
     speed = 1, 
     density = 'MEDIUM', 
     opacity = 0.3,
     brightness = 1
-}) => {
+}: MatrixRainProps) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    
+    // Refs to track state without triggering re-renders
+    const stateRef = useRef({
+        width: 0,
+        height: 0,
+        drops: [] as number[],
+        columns: 0,
+        animationId: 0
+    });
 
     useEffect(() => {
         const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
+        const container = containerRef.current;
+        if (!canvas || !container) return;
+
+        const ctx = canvas.getContext('2d', { alpha: true }); // Alpha true for transparency
         if (!ctx) return;
 
-        let width = canvas.width = canvas.parentElement?.clientWidth || window.innerWidth;
-        let height = canvas.height = canvas.parentElement?.clientHeight || window.innerHeight;
-        
-        // Characters: Katakana + Hex + Operators
         const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789ABCDEF<>';
         const charArray = chars.split('');
-        
-        const fontSize = 12;
-        const columns = Math.ceil(width / fontSize);
-        
-        // Density control via drop probability
-        const dropSpawnRate = density === 'HIGH' ? 0.98 : density === 'MEDIUM' ? 0.985 : 0.99;
-        
-        const drops: number[] = Array(columns).fill(1).map(() => Math.random() * -100); 
+        const fontSize = 14;
+
+        // --- STABILITY ENGINE ---
+        const initCanvas = (forceReset = false) => {
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            
+            // Prevent zero-size execution
+            if (width === 0 || height === 0) return;
+
+            // 1. Mobile Keyboard Detection Strategy:
+            // If width is stable but height shrinks significantly (keyboard open), DO NOT reset drops.
+            // Just resize canvas to fit visible area to prevent "jump".
+            const isWidthStable = Math.abs(width - stateRef.current.width) < 50;
+            const isHeightShrink = height < stateRef.current.height * 0.85; // >15% shrink usually keyboard
+            
+            // Should we completely reset the rain simulation?
+            const shouldResetSim = forceReset || !isWidthStable || (width !== stateRef.current.width);
+
+            // Update Internal State
+            stateRef.current.width = width;
+            stateRef.current.height = height;
+
+            // High DPI Scaling (Retina/4K fix)
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            canvas.style.width = `${width}px`;
+            canvas.style.height = `${height}px`;
+            ctx.scale(dpr, dpr);
+
+            if (shouldResetSim) {
+                const densityFactor = density === 'HIGH' ? 1 : density === 'MEDIUM' ? 1.5 : 2.5;
+                const newColumns = Math.ceil(width / (fontSize * densityFactor));
+                
+                stateRef.current.columns = newColumns;
+                stateRef.current.drops = [];
+                
+                for (let i = 0; i < newColumns; i++) {
+                    stateRef.current.drops[i] = Math.random() * -100; // Start off-screen
+                }
+            }
+        };
 
         const draw = () => {
-            // Trail effect
-            ctx.fillStyle = `rgba(0, 0, 0, ${0.1 * brightness})`; 
-            ctx.fillRect(0, 0, width, height);
+            // Fade effect (Trail)
+            // Note: Using fillRect with low opacity creates the trail
+            ctx.fillStyle = `rgba(0, 0, 0, ${0.1 * speed})`; 
+            ctx.fillRect(0, 0, stateRef.current.width, stateRef.current.height);
 
             ctx.font = `bold ${fontSize}px monospace`;
-            
-            for (let i = 0; i < drops.length; i++) {
-                // Randomize lightness for depth
-                const isBright = Math.random() > 0.95;
-                
-                // Color Logic
-                ctx.fillStyle = isBright ? '#ffffff' : colorHex;
-                
-                // Random character
+            ctx.textAlign = 'center';
+
+            const densityFactor = density === 'HIGH' ? 1 : density === 'MEDIUM' ? 1.5 : 2.5;
+
+            for (let i = 0; i < stateRef.current.drops.length; i++) {
                 const text = charArray[Math.floor(Math.random() * charArray.length)];
                 
-                const x = i * fontSize;
-                const y = drops[i] * fontSize;
+                // Color Logic
+                const isBright = Math.random() > 0.98;
+                ctx.fillStyle = isBright ? '#ffffff' : colorHex;
+                ctx.globalAlpha = isBright ? 1 : opacity;
+
+                const x = i * fontSize * densityFactor;
+                const y = stateRef.current.drops[i] * fontSize;
 
                 ctx.fillText(text, x, y);
+                ctx.globalAlpha = 1.0; 
 
-                // Reset drop or move down
-                if (y > height && Math.random() > dropSpawnRate) {
-                    drops[i] = 0;
+                // Reset drop if off screen
+                if (y > stateRef.current.height && Math.random() > 0.975) {
+                    stateRef.current.drops[i] = 0;
                 }
-                drops[i] += 0.5 * speed;
+                
+                stateRef.current.drops[i] += 0.5 * speed; 
             }
+            stateRef.current.animationId = requestAnimationFrame(draw);
         };
 
-        let animationFrameId: number;
-        const loop = () => {
+        // Resize Observer with Debounce for Performance
+        let resizeTimeout: any;
+        const resizeObserver = new ResizeObserver(() => {
+            // Cancel previous frame to avoid stacking
+            if (stateRef.current.animationId) cancelAnimationFrame(stateRef.current.animationId);
+            
+            // Immediate resize for responsiveness, but logic handles data preservation
+            initCanvas(false);
             draw();
-            animationFrameId = requestAnimationFrame(loop);
-        };
-        loop();
+        });
 
-        const handleResize = () => {
-            if(canvas && canvas.parentElement) {
-                width = canvas.width = canvas.parentElement.clientWidth;
-                height = canvas.height = canvas.parentElement.clientHeight;
-            }
-        };
-        window.addEventListener('resize', handleResize);
+        resizeObserver.observe(container);
+
+        // Initial Start
+        initCanvas(true);
+        draw();
 
         return () => {
-            cancelAnimationFrame(animationFrameId);
-            window.removeEventListener('resize', handleResize);
+            cancelAnimationFrame(stateRef.current.animationId);
+            resizeObserver.disconnect();
+            if (resizeTimeout) clearTimeout(resizeTimeout);
         };
-    }, [colorHex, speed, density, brightness]);
+    }, [colorHex, speed, density, opacity]); 
 
     return (
-        <canvas 
-            ref={canvasRef} 
-            className="absolute inset-0 w-full h-full pointer-events-none mix-blend-screen"
-            style={{ opacity }}
-        />
+        <div ref={containerRef} className="absolute inset-0 w-full h-full pointer-events-none overflow-hidden transform-gpu">
+            <canvas ref={canvasRef} className="block w-full h-full" style={{ mixBlendMode: 'screen' }} />
+        </div>
     );
-};
+});
 
 export default MatrixRain;
