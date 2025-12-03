@@ -1,6 +1,5 @@
 
 import React, { useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useLiveResults } from '../hooks/useLiveResults';
 import { DrawTime, UserRole } from '../types';
 import { useAuthStore } from '../store/useAuthStore';
@@ -28,17 +27,11 @@ export default function LiveResultsPanel() {
 
     return (
         <div className="relative w-full group">
-            {editDraw && createPortal(
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="w-full max-w-5xl relative">
-                        <AdminResultControl 
-                            onClose={() => setEditDraw(null)} 
-                            initialDraw={editDraw}
-                        />
-                    </div>
-                </div>,
-                document.body
-            )}
+            <AdminResultControl 
+                isOpen={!!editDraw} 
+                onClose={() => setEditDraw(null)} 
+                initialDraw={editDraw}
+            />
 
             {/* --- CORE BACKLIGHT (Adaptive to Role) --- */}
             <div className={`absolute -inset-1 rounded-[2.5rem] opacity-30 blur-2xl animate-pulse transition-all duration-1000 group-hover:opacity-50 group-hover:blur-3xl ${

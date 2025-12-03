@@ -1,131 +1,170 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { DrawTime } from '../types';
 import { api } from '../services/edgeApi';
 import { useAuthStore } from '../store/useAuthStore';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import AnimatedIconUltra from './ui/AnimatedIconUltra';
 import MatrixRain from './ui/MatrixRain';
 
 interface AdminResultControlProps {
-  onClose?: () => void;
+  isOpen: boolean;
+  onClose: () => void;
   onPublishSuccess?: (data: any) => void;
   initialDraw?: DrawTime | null;
 }
 
-export default function AdminResultControl({ onClose, onPublishSuccess, initialDraw }: AdminResultControlProps) {
+export default function AdminResultControl({ isOpen, onClose, onPublishSuccess, initialDraw }: AdminResultControlProps) {
+  useBodyScrollLock(isOpen); 
+
   const user = useAuthStore(s => s.user);
   
-  // Data State
+  // State
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedDraw, setSelectedDraw] = useState<DrawTime>(DrawTime.NOCHE);
   
-  // Inputs
+  // Input Logic (Virtual Keypad)
+  const [activeField, setActiveField] = useState<'WINNER' | 'REVENTADO'>('WINNER');
   const [winningNumber, setWinningNumber] = useState('');
   const [reventadoNumber, setReventadoNumber] = useState('');
   const [isReventado, setIsReventado] = useState(false);
-  
-  // Hold Logic
-  const [holdProgress, setHoldProgress] = useState(0);
-  const [isHolding, setIsHolding] = useState(false);
-  const holdIntervalRef = useRef<any>(null);
   
   // Execution Logic
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [processedCount, setProcessedCount] = useState(0);
+  const [charging, setCharging] = useState(false);
+  const [progress, setProgress] = useState(0);
 
-  // Initialize
-  useEffect(() => {
-      if (initialDraw) setSelectedDraw(initialDraw);
-  }, [initialDraw]);
+  const isHistorical = date !== new Date().toISOString().split('T')[0];
 
-  // --- THEME ENGINE (MATCHING GAME CONSOLE) ---
+  // --- THEME ENGINE ---
   const theme = useMemo(() => {
       if (isReventado) return {
           name: 'hazard',
-          border: 'border-red-600',
-          text: 'text-red-500',
-          bg: 'bg-[#0f0202]',
-          accent: 'bg-red-600',
-          shadow: 'shadow-[0_0_40px_rgba(220,38,38,0.6)]',
-          matrixHex: '#ff003c',
+          color: 'text-red-500',
+          border: 'border-red-500',
+          bgHex: '#0a0202', 
+          matrixHex: '#ff003c', 
+          shadow: 'shadow-[0_0_30px_rgba(255,0,60,0.4)]',
           glow: 'bg-red-600',
-          scanline: 'from-red-500/50',
-          inputBorder: 'border-red-900',
-          activeDraw: 'bg-red-900/40 text-white border-red-500 shadow-neon-red'
+          panelBg: 'bg-red-950/20'
       };
-
+      
       switch (selectedDraw) {
           case DrawTime.MEDIODIA: return {
               name: 'solar',
+              color: 'text-cyber-solar',
               border: 'border-cyber-solar',
-              text: 'text-cyber-solar',
-              bg: 'bg-[#0c0400]',
-              accent: 'bg-cyber-solar',
-              shadow: 'shadow-[0_0_40px_rgba(255,95,0,0.4)]',
-              matrixHex: '#ff5f00',
+              bgHex: '#080300', 
+              matrixHex: '#ff5f00', 
+              shadow: 'shadow-[0_0_30px_rgba(255,95,0,0.4)]',
               glow: 'bg-cyber-solar',
-              scanline: 'from-orange-500/50',
-              inputBorder: 'border-cyber-solar',
-              activeDraw: 'bg-cyber-solar/20 text-white border-cyber-solar shadow-neon-solar'
+              panelBg: 'bg-orange-950/20'
           };
           case DrawTime.TARDE: return {
               name: 'vapor',
+              color: 'text-cyber-vapor',
               border: 'border-cyber-vapor',
-              text: 'text-cyber-vapor',
-              bg: 'bg-[#05020c]',
-              accent: 'bg-cyber-vapor',
-              shadow: 'shadow-[0_0_40px_rgba(124,58,237,0.4)]',
-              matrixHex: '#7c3aed',
+              bgHex: '#030108', 
+              matrixHex: '#7c3aed', 
+              shadow: 'shadow-[0_0_30px_rgba(124,58,237,0.4)]',
               glow: 'bg-cyber-vapor',
-              scanline: 'from-purple-500/50',
-              inputBorder: 'border-cyber-vapor',
-              activeDraw: 'bg-cyber-vapor/20 text-white border-cyber-vapor shadow-neon-vapor'
+              panelBg: 'bg-purple-950/20'
           };
           case DrawTime.NOCHE: 
           default: return {
               name: 'abyss',
+              color: 'text-blue-400',
               border: 'border-blue-600',
-              text: 'text-blue-400',
-              bg: 'bg-[#02040a]',
-              accent: 'bg-blue-600',
-              shadow: 'shadow-[0_0_40px_rgba(30,58,138,0.6)]',
-              matrixHex: '#3b82f6',
+              bgHex: '#010205', 
+              matrixHex: '#2563eb', 
+              shadow: 'shadow-[0_0_30px_rgba(37,99,235,0.4)]',
               glow: 'bg-cyber-blue',
-              scanline: 'from-blue-500/50',
-              inputBorder: 'border-blue-900',
-              activeDraw: 'bg-blue-900/40 text-white border-blue-600 shadow-neon-blue'
+              panelBg: 'bg-blue-950/20'
           };
       }
   }, [isReventado, selectedDraw]);
 
-  // --- HOLD HANDLERS ---
-  const startHold = () => {
-      if (loading || success || !winningNumber || (isReventado && !reventadoNumber)) return;
-      setIsHolding(true);
-      
-      let progress = 0;
-      holdIntervalRef.current = setInterval(() => {
-          progress += 5; 
-          setHoldProgress(progress);
-          
-          if (progress >= 100) {
-              clearInterval(holdIntervalRef.current);
-              handleSubmit();
-          }
-      }, 30);
+  useEffect(() => {
+      if (isOpen) {
+          setCharging(false);
+          setProgress(0);
+          setLoading(false);
+          setSuccess(false);
+          setProcessedCount(0);
+          if (initialDraw) setSelectedDraw(initialDraw);
+      }
+  }, [isOpen, initialDraw]);
+
+  // --- VIRTUAL KEYPAD LOGIC ---
+  const handleNumPress = (num: string) => {
+      // Haptic Feedback
+      if (navigator.vibrate) navigator.vibrate(10);
+
+      if (activeField === 'WINNER') {
+          if (winningNumber.length < 2) setWinningNumber(prev => prev + num);
+      } else {
+          if (reventadoNumber.length < 2) setReventadoNumber(prev => prev + num);
+      }
   };
 
-  const endHold = () => {
-      if (success || loading) return;
-      setIsHolding(false);
-      setHoldProgress(0);
-      if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
+  const handleBackspace = () => {
+      if (navigator.vibrate) navigator.vibrate(15);
+      if (activeField === 'WINNER') {
+          setWinningNumber(prev => prev.slice(0, -1));
+      } else {
+          setReventadoNumber(prev => prev.slice(0, -1));
+      }
   };
+
+  const handleClear = () => {
+      if (navigator.vibrate) navigator.vibrate(20);
+      if (activeField === 'WINNER') setWinningNumber('');
+      else setReventadoNumber('');
+  };
+
+  // --- EXECUTION LOGIC ---
+  const handleInteractionStart = () => {
+      if (!winningNumber || loading || success) return;
+      if (isReventado && !reventadoNumber) return;
+      setCharging(true);
+  };
+
+  const handleInteractionEnd = () => {
+      if (progress < 100 && !success) {
+          setCharging(false);
+          setProgress(0);
+      }
+  };
+
+  useEffect(() => {
+      let interval: any;
+      if (charging && !loading && !success) {
+          interval = setInterval(() => {
+              setProgress(prev => {
+                  if (prev >= 100) {
+                      clearInterval(interval);
+                      return 100;
+                  }
+                  return prev + 5; // Faster charge
+              });
+          }, 20);
+      } else {
+          clearInterval(interval);
+          if (!success && !loading) setProgress(0);
+      }
+      return () => clearInterval(interval);
+  }, [charging, loading, success]);
+
+  useEffect(() => {
+      if (progress === 100 && !loading && !success) {
+          handleSubmit();
+      }
+  }, [progress]);
 
   const handleSubmit = async () => {
     setLoading(true);
-    setHoldProgress(100);
-
     try {
         const res = await api.publishDrawResult({
             date,
@@ -139,7 +178,8 @@ export default function AdminResultControl({ onClose, onPublishSuccess, initialD
         if (res.error) {
             alert(res.error);
             setLoading(false);
-            setHoldProgress(0);
+            setCharging(false);
+            setProgress(0);
         } else {
             setProcessedCount(res.data?.processed || 0);
             setSuccess(true);
@@ -150,201 +190,246 @@ export default function AdminResultControl({ onClose, onPublishSuccess, initialD
                     reventado: isReventado
                 });
             }
-            // Auto close after 2 seconds (No animation needed for admin)
             setTimeout(() => {
-                if(onClose) onClose();
-            }, 2000);
+                setWinningNumber('');
+                setReventadoNumber('');
+                onClose(); 
+            }, 2500);
         }
     } catch (e) {
-        alert("Error de conexión al Núcleo.");
+        alert("Error de conexión.");
         setLoading(false);
-        setHoldProgress(0);
+        setCharging(false);
+        setProgress(0);
     }
   };
 
-  if (!user) return null;
+  const getDrawIcon = (draw: DrawTime) => {
+      if (draw.includes('Mediodía')) return 'fa-sun';
+      if (draw.includes('Tarde')) return 'fa-cloud-sun';
+      return 'fa-moon';
+  };
 
-  return (
-    <div className={`relative w-full rounded-[3rem] p-1 overflow-hidden border-2 transition-all duration-700 z-10 mb-12 group/panel select-none ${theme.border} ${theme.shadow}`} style={{ backgroundColor: theme.bg }}>
+  if (!isOpen || !user) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[150] flex items-center justify-center bg-[#000000] animate-in fade-in duration-300">
         
-        {/* --- BACKGROUND FX --- */}
-        <div className={`absolute -inset-1 ${theme.glow} rounded-[3rem] opacity-20 blur-xl animate-pulse transition-all duration-1000`}></div>
-        <div className="absolute inset-0 opacity-20 pointer-events-none z-0 mix-blend-screen">
-            <MatrixRain colorHex={theme.matrixHex} speed={isReventado ? 3 : 1} density="MEDIUM" />
+        {/* --- STABLE BACKGROUND LAYER (NO FLICKER) --- */}
+        <div className="absolute inset-0 z-0">
+            {/* Dark Gradient Base */}
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a] to-black"></div>
+            {/* Memoized Matrix Rain */}
+            <div className="absolute inset-0 opacity-20 mix-blend-screen pointer-events-none">
+                <MatrixRain colorHex={theme.matrixHex} speed={isReventado ? 2 : 0.8} density="MEDIUM" />
+            </div>
+            {/* Vignette */}
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,black_100%)]"></div>
         </div>
 
-        {/* --- MAIN INTERFACE --- */}
-        <div className="relative z-10 p-6 md:p-12">
+        {/* --- MAIN CHASSIS (FIXED DIMENSIONS FOR STABILITY) --- */}
+        <div className={`relative z-10 w-full h-full md:h-[800px] md:w-[1000px] bg-[#020202] md:rounded-[2rem] md:border-2 ${theme.border} flex flex-col md:flex-row overflow-hidden shadow-2xl transition-colors duration-700`}>
             
-            {/* HEADER - RESPONSIVE FIX */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
-                <div className="w-full">
-                    <div className="flex items-center gap-3 sm:gap-4 mb-2">
-                        {/* ICON */}
-                        <div className={`relative w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 flex items-center justify-center rounded-full border border-white/20 bg-black/50 shadow-[0_0_15px_rgba(255,255,255,0.1)]`}>
-                            <div className={`absolute inset-0 rounded-full ${theme.glow} opacity-30 blur-md animate-pulse`}></div>
-                            <AnimatedIconUltra profile={{ animation: isReventado ? 'pulse' : 'spin3d', theme: isReventado ? 'neon' : 'cyber' }}>
-                                <i className={`fas ${isReventado ? 'fa-biohazard' : 'fa-satellite-dish'} ${theme.text} text-sm sm:text-base relative z-10`}></i>
-                            </AnimatedIconUltra>
+            {/* LEFT PANEL: STATUS & CONFIG (35%) */}
+            <div className="w-full md:w-[35%] bg-black/60 backdrop-blur-md border-b md:border-b-0 md:border-r border-white/10 p-6 flex flex-col relative overflow-hidden">
+                <div className={`absolute top-0 left-0 w-full h-1 ${theme.glow} shadow-[0_0_20px_currentColor]`}></div>
+                
+                {/* Header */}
+                <div className="mb-8">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className={`w-10 h-10 rounded-lg border flex items-center justify-center ${theme.border} ${theme.color} shadow-[0_0_15px_currentColor]`}>
+                            <i className="fas fa-satellite-dish text-xl animate-pulse"></i>
                         </div>
-                        
-                        {/* TITLE - ADAPTIVE TEXT */}
-                        <h3 className="text-lg sm:text-2xl md:text-3xl font-display font-black text-white uppercase tracking-widest drop-shadow-lg leading-tight break-words">
-                            Gestión <span className={`block sm:inline ${theme.text}`}>Resultados</span>
-                        </h3>
+                        <div>
+                            <h2 className="text-xl font-display font-black text-white uppercase tracking-widest leading-none">
+                                Estación <span className={theme.color}>Live</span>
+                            </h2>
+                            <p className="text-[9px] font-mono text-slate-500 uppercase tracking-[0.2em] font-bold">Protocolo de Inyección</p>
+                        </div>
                     </div>
+                    <div className="h-px w-full bg-white/10 my-4"></div>
                     
-                    {/* SUBTITLE */}
-                    <div className="text-[8px] sm:text-[10px] font-mono text-slate-500 uppercase tracking-[0.2em] pl-14 sm:pl-16">
-                        Consola de Inyección Maestra
+                    {/* Date Config */}
+                    <div className="bg-white/5 rounded-xl p-3 border border-white/5 mb-4">
+                        <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block mb-1">Fecha de Operación</label>
+                        <input 
+                            type="date" 
+                            value={date}
+                            onChange={e => setDate(e.target.value)}
+                            className="bg-transparent text-white font-mono text-sm w-full focus:outline-none"
+                        />
+                    </div>
+
+                    {/* Draw Selection */}
+                    <label className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block mb-2">Sorteo Objetivo</label>
+                    <div className="space-y-2">
+                        {Object.values(DrawTime).map((t) => (
+                            <button
+                                key={t}
+                                onClick={() => setSelectedDraw(t)}
+                                className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all duration-300 ${
+                                    selectedDraw === t 
+                                    ? `${theme.border} ${theme.panelBg} text-white shadow-inner` 
+                                    : 'border-white/5 bg-black/40 text-slate-500 hover:bg-white/5'
+                                }`}
+                            >
+                                <i className={`fas ${getDrawIcon(t)} ${selectedDraw === t ? theme.color : ''}`}></i>
+                                <span className="text-xs font-bold uppercase tracking-wider">{t.split(' ')[0]}</span>
+                                {selectedDraw === t && <div className={`ml-auto w-2 h-2 rounded-full ${theme.glow} animate-pulse`}></div>}
+                            </button>
+                        ))}
                     </div>
                 </div>
 
-                {onClose && (
-                    <button onClick={onClose} className="absolute top-4 right-4 md:static md:top-auto md:right-auto bg-white/5 hover:bg-white/10 border border-white/10 rounded-full w-8 h-8 md:w-10 md:h-10 flex items-center justify-center text-white transition-colors z-20">
-                        <i className="fas fa-times"></i>
-                    </button>
-                )}
+                {/* Close Button (Mobile Only Top Right) */}
+                <button onClick={onClose} className="md:hidden absolute top-4 right-4 text-slate-500 hover:text-white"><i className="fas fa-times text-xl"></i></button>
             </div>
 
-            {success ? (
-                // --- SUCCESS STATE (TECHNICAL / ADMIN) ---
-                <div className="h-[400px] flex flex-col items-center justify-center animate-in zoom-in duration-300">
-                    <div className={`w-32 h-32 rounded-full border-4 ${theme.border} flex items-center justify-center bg-black/50 shadow-[0_0_50px_${theme.matrixHex}] mb-6 relative overflow-hidden`}>
-                        <div className={`absolute inset-0 ${theme.accent} opacity-20 animate-ping`}></div>
-                        <i className={`fas fa-check text-6xl ${theme.text} drop-shadow-[0_0_10px_currentColor]`}></i>
-                    </div>
-                    <h3 className="text-3xl font-display font-black text-white uppercase tracking-widest">
-                        RESULTADO <span className={theme.text}>INYECTADO</span>
-                    </h3>
-                    <div className="mt-4 flex flex-col items-center gap-2">
-                        <div className="bg-black/60 border border-white/10 rounded px-4 py-2 text-xs font-mono text-slate-400">
-                            HASH: {Date.now().toString(16).toUpperCase()}-SHA256
-                        </div>
-                        <div className="text-[10px] text-slate-500 font-mono">
-                            Cerrando consola de forma segura...
-                        </div>
-                    </div>
-                </div>
-            ) : (
-                // --- INPUT STATE ---
-                <>
-                    {/* DRAW SELECTOR (Consola Style) */}
-                    <div className="grid grid-cols-3 gap-2 sm:gap-3 md:gap-6 mb-8 md:mb-10">
-                        {Object.values(DrawTime).map((time) => {
-                            const isSelected = selectedDraw === time;
-                            const label = time.split(' ')[0];
-                            let icon = 'fa-sun';
-                            if (label === 'Tarde') icon = 'fa-cloud-sun';
-                            if (label === 'Noche') icon = 'fa-moon';
+            {/* RIGHT PANEL: TACTICAL INTERFACE (65%) */}
+            <div className="flex-1 relative flex flex-col bg-[#050508]">
+                
+                {/* Close Button (Desktop) */}
+                <button onClick={onClose} className="hidden md:block absolute top-6 right-6 text-slate-600 hover:text-white transition-colors z-20"><i className="fas fa-times text-xl"></i></button>
 
-                            return (
-                                <button
-                                    key={time}
-                                    onClick={() => setSelectedDraw(time)}
-                                    className={`relative h-16 sm:h-20 md:h-24 rounded-2xl border-2 flex flex-col items-center justify-center gap-1 sm:gap-2 backdrop-blur-md overflow-hidden transition-all duration-300 group
-                                        ${isSelected ? theme.activeDraw : 'border-white/10 bg-black/40 text-slate-500 hover:bg-white/5'}
-                                    `}
-                                >
-                                    <i className={`fas ${icon} text-lg sm:text-xl md:text-2xl ${isSelected ? 'animate-bounce' : ''}`}></i>
-                                    <span className="text-[8px] sm:text-[9px] md:text-[10px] font-black uppercase tracking-widest">{label}</span>
-                                </button>
-                            )
-                        })}
-                    </div>
-
-                    {/* INPUTS (Huge / Centered) */}
-                    <div className="flex flex-col md:flex-row gap-4 md:gap-8 items-stretch mb-8 md:mb-10">
-                        
-                        {/* WINNING NUMBER */}
-                        <div className="flex-1 relative group/field">
-                            <div className={`relative bg-black/90 rounded-3xl border-2 p-1 h-32 sm:h-40 md:h-48 overflow-hidden transition-colors duration-300 ${theme.border} shadow-lg`}>
-                                <div className="h-full rounded-[1.3rem] bg-gradient-to-b from-slate-900/50 to-black/80 flex flex-col items-center justify-center p-4 relative">
-                                    <label className={`text-[9px] sm:text-[10px] font-mono font-bold ${theme.text} uppercase tracking-wider mb-1 sm:mb-2`}>Número Ganador</label>
-                                    <input 
-                                        type="tel" 
-                                        maxLength={2}
-                                        value={winningNumber}
-                                        onChange={(e) => setWinningNumber(e.target.value.replace(/[^0-9]/g, ''))}
-                                        className={`bg-transparent text-6xl sm:text-7xl md:text-8xl font-mono font-black ${theme.text} drop-shadow-[0_0_20px_currentColor] text-center focus:outline-none w-full z-10 transition-all placeholder-white/5`}
-                                        placeholder="--"
-                                        autoFocus
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* REVENTADO TOGGLE & INPUT */}
-                        <div className="flex-1 flex flex-col gap-4">
-                            {/* Toggle Switch */}
-                            <div className="flex bg-black/60 p-1 rounded-2xl border border-white/10 h-12 sm:h-14">
-                                <button 
-                                    onClick={() => { setIsReventado(false); setReventadoNumber(''); }}
-                                    className={`flex-1 rounded-xl text-[9px] sm:text-[10px] font-bold uppercase tracking-wider transition-all ${!isReventado ? 'bg-white/10 text-white shadow-inner border border-white/10' : 'text-slate-500 hover:text-white'}`}
-                                >
-                                    Normal
-                                </button>
-                                <button 
-                                    onClick={() => { setIsReventado(true); }}
-                                    className={`flex-1 rounded-xl text-[9px] sm:text-[10px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${isReventado ? 'bg-red-900/50 text-red-500 border border-red-500/50 shadow-inner' : 'text-slate-500 hover:text-red-400'}`}
-                                >
-                                    <i className="fas fa-radiation"></i> Reventado
-                                </button>
-                            </div>
-
-                            {/* Input Area */}
-                            <div className={`flex-1 relative bg-black/90 rounded-3xl border-2 p-1 overflow-hidden transition-all duration-300 ${isReventado ? 'border-red-500 shadow-neon-red' : 'border-white/10 opacity-50'}`}>
-                                <div className="h-full rounded-[1.3rem] flex flex-col items-center justify-center p-4 relative min-h-[120px]">
-                                    <label className={`text-[9px] sm:text-[10px] font-mono font-bold ${isReventado ? 'text-red-500' : 'text-slate-500'} uppercase tracking-wider mb-1 sm:mb-2`}>
-                                        {isReventado ? 'BOLITA ROJA' : 'SIN RIESGO'}
-                                    </label>
-                                    <input 
-                                        type="tel" 
-                                        maxLength={2}
-                                        disabled={!isReventado}
-                                        value={reventadoNumber}
-                                        onChange={(e) => setReventadoNumber(e.target.value.replace(/[^0-9]/g, ''))}
-                                        className={`bg-transparent text-4xl sm:text-5xl md:text-6xl font-mono font-black ${isReventado ? 'text-red-500 drop-shadow-[0_0_15px_red]' : 'text-slate-700'} text-center focus:outline-none w-full z-10 transition-all placeholder-white/5`}
-                                        placeholder="--"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* HOLD TO PUBLISH BUTTON */}
-                    <div className="relative h-16 sm:h-20 md:h-24 w-full rounded-2xl bg-black border-2 border-white/10 overflow-hidden group/launch select-none shadow-2xl">
-                        {/* Fill Animation */}
+                <div className="flex-1 p-4 md:p-10 flex flex-col justify-center max-w-md mx-auto w-full h-full relative z-10">
+                    
+                    {/* --- DIGITAL DISPLAYS --- */}
+                    <div className="flex gap-4 mb-8">
+                        {/* Winner Display */}
                         <div 
-                            className={`absolute top-0 left-0 h-full ${theme.accent} transition-all duration-75 ease-linear opacity-100`}
-                            style={{ width: `${holdProgress}%` }}
-                        ></div>
+                            onClick={() => setActiveField('WINNER')}
+                            className={`flex-1 relative h-32 bg-black rounded-2xl border-2 overflow-hidden cursor-pointer transition-all duration-300 ${activeField === 'WINNER' ? theme.border + ' ' + theme.shadow : 'border-white/10 opacity-60'}`}
+                        >
+                            <div className="absolute top-2 left-3 text-[9px] font-bold text-slate-500 uppercase tracking-widest">Número Ganador</div>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <span className={`font-mono text-6xl md:text-7xl font-black tracking-tighter ${winningNumber ? theme.color : 'text-slate-800'}`}>
+                                    {winningNumber || '--'}
+                                </span>
+                            </div>
+                            {/* Blinking Cursor Indicator */}
+                            {activeField === 'WINNER' && <div className={`absolute bottom-2 right-3 w-2 h-2 rounded-full ${theme.glow} animate-pulse`}></div>}
+                        </div>
+
+                        {/* Reventados Toggle/Display */}
+                        <div 
+                            onClick={() => {
+                                if(!isReventado) setIsReventado(true);
+                                setActiveField('REVENTADO');
+                            }}
+                            className={`w-28 relative h-32 bg-black rounded-2xl border-2 overflow-hidden cursor-pointer transition-all duration-300 flex flex-col ${isReventado ? 'border-red-500 shadow-[0_0_20px_red]' : 'border-white/10'}`}
+                        >
+                            <div className="absolute top-2 left-0 w-full text-center text-[8px] font-bold text-slate-500 uppercase tracking-widest">Reventados</div>
+                            
+                            {isReventado ? (
+                                <div className="flex-1 flex items-center justify-center relative">
+                                    <span className={`font-mono text-4xl font-black text-red-500 drop-shadow-[0_0_10px_red]`}>
+                                        {reventadoNumber || '--'}
+                                    </span>
+                                    {activeField === 'REVENTADO' && <div className="absolute bottom-2 right-2 w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></div>}
+                                </div>
+                            ) : (
+                                <div className="flex-1 flex items-center justify-center">
+                                    <div className="flex flex-col items-center gap-1 opacity-40">
+                                        <i className="fas fa-power-off text-2xl text-slate-500"></i>
+                                        <span className="text-[8px] font-bold uppercase">OFF</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Toggle Switch Visual */}
+                            <div className={`h-8 w-full border-t border-white/10 flex items-center justify-center ${isReventado ? 'bg-red-900/40' : 'bg-white/5'}`}>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); setIsReventado(!isReventado); if(isReventado) setActiveField('WINNER'); }}
+                                    className={`text-[9px] font-bold uppercase tracking-wider ${isReventado ? 'text-red-400' : 'text-slate-500'}`}
+                                >
+                                    {isReventado ? 'DESACTIVAR' : 'ACTIVAR'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* --- TACTILE NUMPAD (THE CORE SOLUTION) --- */}
+                    <div className="grid grid-cols-3 gap-3 mb-8 select-none">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                            <button
+                                key={num}
+                                onClick={() => handleNumPress(num.toString())}
+                                className="h-16 rounded-xl bg-[#0f0f12] border border-white/5 hover:border-white/20 hover:bg-white/10 active:bg-white/20 active:scale-95 transition-all flex items-center justify-center text-2xl font-mono font-bold text-white shadow-lg"
+                            >
+                                {num}
+                            </button>
+                        ))}
+                        
+                        <button 
+                            onClick={handleClear}
+                            className="h-16 rounded-xl bg-red-900/20 border border-red-900/50 hover:bg-red-900/40 text-red-500 font-bold uppercase text-xs tracking-wider flex items-center justify-center active:scale-95 transition-all"
+                        >
+                            C
+                        </button>
                         
                         <button
-                            onMouseDown={startHold}
-                            onMouseUp={endHold}
-                            onMouseLeave={endHold}
-                            onTouchStart={startHold}
-                            onTouchEnd={endHold}
-                            disabled={loading || !winningNumber || (isReventado && !reventadoNumber)}
-                            className="absolute inset-0 flex items-center justify-center gap-4 w-full h-full disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                            onClick={() => handleNumPress('0')}
+                            className="h-16 rounded-xl bg-[#0f0f12] border border-white/5 hover:border-white/20 hover:bg-white/10 active:bg-white/20 active:scale-95 transition-all flex items-center justify-center text-2xl font-mono font-bold text-white shadow-lg"
                         >
-                            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 ${theme.border} flex items-center justify-center bg-black/50 ${isHolding ? 'scale-110' : ''} transition-transform shadow-lg`}>
-                                <i className={`fas ${isReventado ? 'fa-biohazard' : 'fa-fingerprint'} ${theme.text} text-lg sm:text-xl`}></i>
-                            </div>
-                            <div className="flex flex-col items-start mix-blend-difference text-white">
-                                <span className="text-xs sm:text-sm md:text-lg font-black uppercase tracking-[0.2em]">
-                                    {isHolding ? 'MANTÉN PRESIONADO...' : 'PUBLICAR RESULTADO'}
-                                </span>
-                                <span className="text-[7px] sm:text-[9px] font-mono text-slate-300 uppercase">
-                                    {isReventado ? 'CONFIRMAR RIESGO ACTIVO' : 'CONFIRMACIÓN SEGURA'}
-                                </span>
-                            </div>
+                            0
+                        </button>
+
+                        <button 
+                            onClick={handleBackspace}
+                            className="h-16 rounded-xl bg-[#0f0f12] border border-white/5 hover:border-white/20 hover:bg-white/10 active:bg-white/20 active:scale-95 transition-all flex items-center justify-center text-slate-400 hover:text-white"
+                        >
+                            <i className="fas fa-backspace"></i>
                         </button>
                     </div>
-                </>
-            )}
+
+                    {/* --- EXECUTION SLIDER --- */}
+                    <div className="relative h-16 w-full rounded-2xl bg-black border-2 border-white/10 overflow-hidden select-none touch-none shadow-2xl">
+                        {/* Background Stripes */}
+                        <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,rgba(255,255,255,0.03)_10px,rgba(255,255,255,0.03)_20px)]"></div>
+                        
+                        {/* Progress Fill */}
+                        <div 
+                            className={`absolute top-0 left-0 h-full transition-all ease-linear duration-75 ${theme.bgHex.replace('02','30')}`} 
+                            style={{ width: `${progress}%`, backgroundColor: isReventado ? '#7f1d1d' : theme.name === 'solar' ? '#7c2d12' : theme.name === 'vapor' ? '#581c87' : '#1e3a8a' }}
+                        ></div>
+
+                        {/* Interactive Button */}
+                        <button
+                            onMouseDown={handleInteractionStart}
+                            onMouseUp={handleInteractionEnd}
+                            onMouseLeave={handleInteractionEnd}
+                            onTouchStart={handleInteractionStart}
+                            onTouchEnd={handleInteractionEnd}
+                            disabled={loading || !winningNumber || (isReventado && !reventadoNumber) || success}
+                            className={`absolute inset-0 w-full h-full flex items-center justify-center gap-3 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed`}
+                        >
+                            {loading ? (
+                                <div className="flex items-center gap-3 text-white animate-pulse">
+                                    <i className="fas fa-satellite-dish animate-spin"></i>
+                                    <span className="font-display font-bold uppercase tracking-widest text-sm">Transmitiendo...</span>
+                                </div>
+                            ) : success ? (
+                                <div className="flex items-center gap-3 text-green-500 animate-in zoom-in">
+                                    <i className="fas fa-check-circle text-xl"></i>
+                                    <span className="font-display font-black uppercase tracking-widest text-sm">Confirmado</span>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center ${theme.border} ${theme.color} ${charging ? 'animate-ping' : ''}`}>
+                                        <i className={`fas ${isReventado ? 'fa-radiation' : 'fa-fingerprint'}`}></i>
+                                    </div>
+                                    <span className={`font-display font-black uppercase tracking-[0.2em] text-sm ${charging ? 'text-white' : 'text-slate-400'}`}>
+                                        {charging ? 'MANTENER...' : 'MANTENER PARA PUBLICAR'}
+                                    </span>
+                                </>
+                            )}
+                        </button>
+                    </div>
+
+                </div>
+            </div>
         </div>
-    </div>
+    </div>,
+    document.body
   );
 }
