@@ -51,17 +51,19 @@ const MatrixRain = memo(({
             // If width is stable but height shrinks significantly (keyboard open), DO NOT reset drops.
             // Just resize canvas to fit visible area to prevent "jump".
             const isWidthStable = Math.abs(width - stateRef.current.width) < 50;
-            const isHeightShrink = height < stateRef.current.height * 0.85; // >15% shrink usually keyboard
+            // const isHeightShrink = height < stateRef.current.height * 0.85; // Unused but kept for logic ref
             
             // Should we completely reset the rain simulation?
-            const shouldResetSim = forceReset || !isWidthStable || (width !== stateRef.current.width);
+            // Only reset if width changes significantly or forceReset is true
+            const shouldResetSim = forceReset || !isWidthStable || (stateRef.current.width === 0);
 
             // Update Internal State
             stateRef.current.width = width;
             stateRef.current.height = height;
 
-            // High DPI Scaling (Retina/4K fix)
-            const dpr = window.devicePixelRatio || 1;
+            // High DPI Scaling (Retina/4K fix) - CAPPED at 2x to prevent flickering on large screens
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            
             canvas.width = width * dpr;
             canvas.height = height * dpr;
             canvas.style.width = `${width}px`;
@@ -118,13 +120,21 @@ const MatrixRain = memo(({
 
         // Resize Observer with Debounce for Performance
         let resizeTimeout: any;
-        const resizeObserver = new ResizeObserver(() => {
-            // Cancel previous frame to avoid stacking
-            if (stateRef.current.animationId) cancelAnimationFrame(stateRef.current.animationId);
+        const resizeObserver = new ResizeObserver((entries) => {
+            if (!entries[0]) return;
+
+            // Clear any pending resize to avoid thrashing
+            if (resizeTimeout) clearTimeout(resizeTimeout);
             
-            // Immediate resize for responsiveness, but logic handles data preservation
-            initCanvas(false);
-            draw();
+            // Debounce: Wait 150ms for layout to stabilize before redrawing
+            resizeTimeout = setTimeout(() => {
+                // Cancel previous frame to avoid stacking
+                if (stateRef.current.animationId) cancelAnimationFrame(stateRef.current.animationId);
+                
+                // Resize logic
+                initCanvas(false);
+                draw();
+            }, 150);
         });
 
         resizeObserver.observe(container);
@@ -134,7 +144,7 @@ const MatrixRain = memo(({
         draw();
 
         return () => {
-            cancelAnimationFrame(stateRef.current.animationId);
+            if (stateRef.current.animationId) cancelAnimationFrame(stateRef.current.animationId);
             resizeObserver.disconnect();
             if (resizeTimeout) clearTimeout(resizeTimeout);
         };
