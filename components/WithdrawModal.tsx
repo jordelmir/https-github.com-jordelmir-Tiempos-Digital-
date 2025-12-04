@@ -78,7 +78,7 @@ export default function WithdrawModal({ isOpen, onClose, targetUser, onSuccess }
         setTimeout(() => setStatus('CUTTING'), 2000);
         setTimeout(() => setStatus('DROPPING'), 2600); 
         setTimeout(() => setStatus('FINISHED'), 3400);
-        setTimeout(() => { onSuccess?.(); onClose(); }, 5900);
+        setTimeout(() => { onSuccess?.(); onClose(); }, 8000); // Extended auto-close time to read balance
     } catch (e: any) {
         setStatus('ERROR');
         alert(e.message || "Error de conexión con el Núcleo.");
@@ -159,8 +159,22 @@ export default function WithdrawModal({ isOpen, onClose, targetUser, onSuccess }
                     )}
 
                     {status === 'FINISHED' && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center z-40 animate-in zoom-in-95 duration-500">
-                             <h4 className="text-3xl font-display font-black text-white uppercase italic tracking-wider mb-2 drop-shadow-lg">Transacción <br/><span className="text-cyber-orange text-glow">Finalizada</span></h4>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center z-40 animate-in zoom-in-95 duration-500 bg-black/90">
+                             <div className="w-20 h-20 bg-cyber-orange rounded-full flex items-center justify-center shadow-[0_0_50px_rgba(255,95,0,0.6)] mb-6 animate-bounce">
+                                <i className="fas fa-check text-4xl text-black"></i>
+                             </div>
+                             
+                             <h4 className="text-3xl font-display font-black text-white uppercase italic tracking-wider mb-1 drop-shadow-lg">Transacción <br/><span className="text-cyber-orange text-glow">Finalizada</span></h4>
+                             
+                             {/* NEW BALANCE DISPLAY */}
+                             <div className="mt-6 bg-[#050a14] border border-cyber-orange/30 p-4 rounded-xl text-center min-w-[200px] relative overflow-hidden group">
+                                <div className="absolute inset-0 bg-cyber-orange/5 animate-pulse"></div>
+                                <div className="text-[9px] font-mono text-slate-500 uppercase tracking-widest mb-1 relative z-10">Saldo Restante</div>
+                                <div className="text-2xl font-mono font-black text-white text-glow-sm relative z-10">
+                                    {formatCurrency(finalBalance)}
+                                </div>
+                             </div>
+
                              <button onClick={handleClose} className="mt-8 px-8 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full text-xs font-bold uppercase tracking-widest text-white transition-all hover:scale-105">Cerrar Consola</button>
                         </div>
                     )}
