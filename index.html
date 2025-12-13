@@ -108,203 +108,26 @@
         }
       }
     </script>
-    <style>
-      body {
-        background-color: #02040a;
-        color: #e2e8f0;
-        overflow-x: hidden; 
-        min-height: 100vh;
-        /* Prevent elastic scrolling on Mac/iOS */
-        overscroll-behavior-y: none;
-        -webkit-font-smoothing: antialiased;
-      }
-
-      /* --- GLOBAL STABILIZATION FIXES --- */
-      
-      /* Remove Number Input Spinners (Chrome, Safari, Edge, Opera) */
-      input::-webkit-outer-spin-button,
-      input::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-      }
-      /* Remove Number Input Spinners (Firefox) */
-      input[type=number] {
-        -moz-appearance: textfield;
-      }
-
-      /* Prevent Text Size Inflation on Mobile */
-      html {
-        text-size-adjust: 100%;
-        -webkit-text-size-adjust: 100%;
-      }
-
-      /* Hardware Acceleration for Heavy Containers */
-      .transform-gpu {
-        transform: translateZ(0);
-        will-change: transform, opacity;
-      }
-
-      /* Scrollbar Stabilization */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #02040a; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #1e3a8a; 
-        border-radius: 4px;
-        border: 2px solid #02040a; /* Creates padding effect */
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #00f0ff; 
-      }
-
-      /* --- CINEMATIC NOISE TEXTURE (THE GLUE) --- */
-      .cinematic-grain {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        z-index: 9998;
-        opacity: 0.035;
-        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-        mix-blend-mode: overlay;
-      }
-
-      /* --- NEURAL NETWORK BACKGROUND --- */
-      .neural-bg {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        z-index: -1;
-        background-color: #02040a;
-        background-image: radial-gradient(circle at 50% 50%, #0a1124 0%, #000000 100%);
-        transition: background-image 1s ease-in-out;
-      }
-
-      .neural-web {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 200%;
-        height: 200%;
-        background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%2300f0ff' stroke-width='0.5' stroke-opacity='0.15'%3E%3Cpath d='M10 10 L30 30 M30 30 L60 10 M60 10 L90 30 M30 30 L10 60 M10 60 L40 80 M40 80 L30 30 M60 10 L80 50 M80 50 L40 80 M80 50 L90 90 M90 90 L40 80'/%3E%3Ccircle cx='10' cy='10' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='30' cy='30' r='1.5' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='60' cy='10' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='90' cy='30' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='10' cy='60' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='40' cy='80' r='1.5' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='80' cy='50' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3Ccircle cx='90' cy='90' r='1' fill='%2300f0ff' fill-opacity='0.3'/%3E%3C/g%3E%3C/svg%3E");
-        opacity: 0.4;
-        animation: float 120s linear infinite;
-        mask-image: radial-gradient(circle at 50% 50%, black 30%, transparent 80%);
-      }
-
-      .neural-breath {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 80vw;
-        height: 80vw;
-        background: radial-gradient(circle, rgba(0, 240, 255, 0.08) 0%, rgba(188, 19, 254, 0.03) 40%, transparent 70%);
-        border-radius: 50%;
-        filter: blur(80px);
-        animation: breathe 8s ease-in-out infinite;
-      }
-
-      .star-dust {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-image: 
-          radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 3px),
-          radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 2px),
-          radial-gradient(white, rgba(255,255,255,.1) 2px, transparent 3px);
-        background-size: 550px 550px, 350px 350px, 250px 250px;
-        background-position: 0 0, 40px 60px, 130px 270px;
-        animation: twinkle 20s linear infinite;
-        opacity: 0.3;
-        z-index: -1;
-      }
-
-      @keyframes twinkle {
-        0% { transform: translateY(0); opacity: 0.3; }
-        50% { opacity: 0.5; }
-        100% { transform: translateY(-100px); opacity: 0.3; }
-      }
-      
-      .text-glow { text-shadow: 0 0 10px currentColor; }
-      .text-glow-sm { text-shadow: 0 0 5px currentColor; }
-      
-      .glass-panel {
-        background: rgba(5, 10, 20, 0.85);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-      }
-
-      .theme-transition {
-        transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform, filter;
-        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-        transition-duration: 700ms;
-      }
-
-      /* 3D Depth Classes (tz-*) to avoid Tailwind Conflict */
-      .tz-10 { transform: translateZ(10px); }
-      .tz-20 { transform: translateZ(20px); }
-      .tz-30 { transform: translateZ(30px); }
-      .tz-40 { transform: translateZ(40px); }
-      .tz-50 { transform: translateZ(50px); }
-      
-      .preserve-3d { transform-style: preserve-3d; }
-      .perspective-1000 { perspective: 1000px; }
-
-      .icon-glow-neon {
-        filter: drop-shadow(0 0 8px rgba(99,102,241,0.8)) drop-shadow(0 0 18px rgba(99,102,241,0.25));
-      }
-      .icon-glow-cyber {
-        filter: drop-shadow(0 0 12px rgba(0,255,200,0.85));
-      }
-      .icon-glow-minimal {
-        filter: drop-shadow(0 0 6px rgba(0,0,0,0.08));
-      }
-
-      .icon-trail path {
-        stroke-linecap: round;
-        stroke-linejoin: round;
-        stroke-dasharray: 1000;
-        stroke-dashoffset: 1000;
-        transition: stroke-dashoffset 1.6s linear, opacity 0.4s;
-      }
-      .icon-trail.trail-on path {
-        stroke-dashoffset: 0;
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        .icon-ultra { transition: none !important; animation: none !important; }
-        .icon-trail path { transition: none !important; }
-      }
-    </style>
     <!-- CRITICAL: Entry Point for Vite App -->
     <script type="module" src="/index.tsx"></script>
 <script type="importmap">
 {
   "imports": {
-    "react": "https://aistudiocdn.com/react@19.2.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@19.2.1/",
-    "react/": "https://aistudiocdn.com/react@19.2.1/",
-    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.86.0",
-    "zustand": "https://aistudiocdn.com/zustand@^5.0.8",
-    "zustand/": "https://aistudiocdn.com/zustand@^5.0.8/",
-    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
-    "vite": "https://aistudiocdn.com/vite@^7.2.4",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
-    "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.24",
-    "react-intersection-observer": "https://aistudiocdn.com/react-intersection-observer@^10.0.0",
-    "react-dom": "https://aistudiocdn.com/react-dom@19.2.1"
+    "react": "https://esm.sh/react@18.3.1",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "react-dom": "https://esm.sh/react-dom@18.3.1",
+    "react/jsx-runtime": "https://esm.sh/react@18.3.1/jsx-runtime",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.3",
+    "zustand": "https://esm.sh/zustand@4.5.0",
+    "zustand/middleware": "https://esm.sh/zustand@4.5.0/middleware",
+    "react-router-dom": "https://esm.sh/react-router-dom@6.23.1?deps=react@18.3.1,react-dom@18.3.1",
+    "framer-motion": "https://esm.sh/framer-motion@11.0.0?deps=react@18.3.1,react-dom@18.3.1",
+    "react-intersection-observer": "https://esm.sh/react-intersection-observer@9.8.0?deps=react@18.3.1,react-dom@18.3.1",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "zustand/": "https://esm.sh/zustand@^5.0.9/",
+    "vite": "https://esm.sh/vite@^7.2.7",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
   }
 }
 </script>

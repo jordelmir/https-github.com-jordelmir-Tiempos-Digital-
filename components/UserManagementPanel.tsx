@@ -34,31 +34,39 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
   const [payUser, setPayUser] = useState<AppUser | null>(null);
 
   // THEME ENGINE
-  const theme = activeTab === 'CLIENTES' 
-    ? { 
-        name: 'blue', 
-        hex: '#2463eb', 
-        bg: 'bg-cyber-blue', 
-        text: 'text-cyber-blue', 
-        border: 'border-cyber-blue', 
-        shadow: 'shadow-neon-blue', 
-        icon: 'fa-users',
-        glowHex: 'rgba(36,99,235,0.5)'
-      }
-    : { 
-        name: 'purple', 
-        hex: '#bc13fe', 
-        bg: 'bg-cyber-purple', 
-        text: 'text-cyber-purple', 
-        border: 'border-cyber-purple', 
-        shadow: 'shadow-neon-purple', 
-        icon: 'fa-user-tie',
-        glowHex: 'rgba(188,19,254,0.5)'
-      };
+  const theme = useMemo(() => {
+      return activeTab === 'CLIENTES' 
+        ? { 
+            name: 'blue', 
+            hex: '#2463eb', 
+            bg: 'bg-cyber-blue', 
+            text: 'text-cyber-blue', 
+            border: 'border-cyber-blue', 
+            shadow: 'shadow-neon-blue', 
+            icon: 'fa-users',
+            glowHex: 'rgba(36,99,235,0.5)',
+            // Explicit hover classes
+            hoverBorder: 'group-hover/row:border-cyber-blue',
+            hoverShadow: 'group-hover/row:shadow-[0_0_15px_#2463eb]',
+            focusText: 'focus:text-cyber-blue'
+          }
+        : { 
+            name: 'purple', 
+            hex: '#bc13fe', 
+            bg: 'bg-cyber-purple', 
+            text: 'text-cyber-purple', 
+            border: 'border-cyber-purple', 
+            shadow: 'shadow-neon-purple', 
+            icon: 'fa-user-tie',
+            glowHex: 'rgba(188,19,254,0.5)',
+            // Explicit hover classes
+            hoverBorder: 'group-hover/row:border-cyber-purple',
+            hoverShadow: 'group-hover/row:shadow-[0_0_15px_#bc13fe]',
+            focusText: 'focus:text-cyber-purple'
+          };
+  }, [activeTab]);
 
   // SEGREGATION LOGIC
-  // SuperAdmin sees all.
-  // Vendor sees only their clients (Logic enforced in MockDB/API simulation + here)
   let sourceList: AppUser[] = [];
 
   if (activeTab === 'CLIENTES') {
@@ -107,11 +115,11 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
       <VendorPaymentModal isOpen={!!payUser} targetUser={payUser} onClose={() => setPayUser(null)} onSuccess={onRefresh} />
       
       {/* --- SOLID BACKLIGHT SYSTEM (LIVING) --- */}
-      <div className={`absolute -inset-1 ${theme.bg} rounded-[2rem] opacity-20 blur-2xl transition-all duration-1000 animate-pulse`}></div>
-      <div className={`absolute -inset-[1px] ${theme.bg} rounded-[2rem] opacity-40 blur-md transition-all duration-700`}></div>
+      <div className={`absolute -inset-1 ${theme.bg} rounded-[2rem] opacity-20 blur-2xl transition-opacity duration-1000 animate-pulse`}></div>
+      <div className={`absolute -inset-[1px] ${theme.bg} rounded-[2rem] opacity-40 blur-md transition-opacity duration-700`}></div>
       
       {/* Main Container - SOLID CORE WITH PHOSPHORESCENT BORDER */}
-      <div className={`relative bg-[#050a14] border-2 ${theme.border} rounded-3xl overflow-hidden transition-all duration-500 z-10 shadow-2xl`}>
+      <div className={`relative bg-[#050a14] border-2 ${theme.border} rounded-3xl overflow-hidden transition-colors duration-500 z-10 shadow-2xl`}>
         
         {/* Header Area */}
         <div className="border-b border-white/5 bg-[#02040a]/80 backdrop-blur-xl relative overflow-hidden">
@@ -121,7 +129,7 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
 
             <div className="flex flex-col md:flex-row items-center justify-between p-6 pb-0 md:pb-0 relative z-10">
                 <h3 className="text-xl font-display font-black text-white uppercase tracking-widest flex items-center gap-4 mb-6 md:mb-0 drop-shadow-md">
-                    <div className={`w-12 h-12 rounded-xl bg-black border-2 ${theme.border} flex items-center justify-center ${theme.shadow} transition-all duration-500`}>
+                    <div className={`w-12 h-12 rounded-xl bg-black border-2 ${theme.border} flex items-center justify-center ${theme.shadow} transition-colors duration-500`}>
                         <i className={`fas ${theme.icon} ${theme.text} text-xl`}></i>
                     </div>
                     <span>Directorio <span className={`${theme.text} text-glow-sm transition-colors duration-500`}>
@@ -131,10 +139,10 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
 
                 {/* TAB CONTROLS - ONLY FOR ADMIN */}
                 {isAdmin && (
-                    <div className={`flex bg-black/60 p-1.5 rounded-2xl border-2 ${theme.border} shadow-lg transition-all duration-500`}>
+                    <div className={`flex bg-black/60 p-1.5 rounded-2xl border-2 ${theme.border} shadow-lg transition-colors duration-500`}>
                         <button 
                             onClick={() => setActiveTab('CLIENTES')} 
-                            className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 border-2 border-cyber-blue ${
+                            className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-colors duration-300 border-2 border-cyber-blue ${
                                 activeTab === 'CLIENTES' 
                                 ? 'bg-cyber-blue text-white shadow-[0_0_15px_#2463eb]' 
                                 : 'bg-transparent text-slate-500 shadow-[0_0_10px_rgba(36,99,235,0.2)] hover:text-cyber-blue hover:shadow-[0_0_15px_#2463eb]'
@@ -144,7 +152,7 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
                         </button>
                         <button 
                             onClick={() => setActiveTab('VENDEDORES')} 
-                            className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 border-2 border-cyber-purple ${
+                            className={`px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-colors duration-300 border-2 border-cyber-purple ${
                                 activeTab === 'VENDEDORES' 
                                 ? 'bg-cyber-purple text-white shadow-[0_0_15px_#bc13fe]' 
                                 : 'bg-transparent text-slate-500 shadow-[0_0_10px_rgba(188,19,254,0.2)] hover:text-cyber-purple hover:shadow-[0_0_15px_#bc13fe]'
@@ -167,14 +175,14 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
                         {/* Input Glow on Focus */}
                         <div className={`absolute -inset-0.5 ${theme.bg} rounded-xl blur opacity-0 group-focus-within/input:opacity-50 transition-opacity duration-500`}></div>
                         
-                        <div className={`relative flex items-center bg-black border-2 ${theme.border} rounded-xl overflow-hidden transition-all duration-500 shadow-inner group-focus-within/input:${theme.shadow}`}>
+                        <div className={`relative flex items-center bg-black border-2 ${theme.border} rounded-xl overflow-hidden transition-colors duration-500 shadow-inner group-focus-within/input:${theme.shadow}`}>
                             <div className={`pl-4 ${theme.text} opacity-70`}><i className="fas fa-search"></i></div>
                             <input 
                                 type="text" 
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 placeholder="Ej: 102340567 o +506..."
-                                className={`w-full bg-transparent border-none text-white font-mono text-sm px-4 py-3 focus:outline-none placeholder-slate-700 focus:text-${theme.name === 'blue' ? 'cyber-blue' : 'cyber-purple'}`}
+                                className={`w-full bg-transparent border-none text-white font-mono text-sm px-4 py-3 focus:outline-none placeholder-slate-700 ${theme.focusText}`}
                             />
                         </div>
                     </div>
@@ -186,7 +194,7 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
                         <button 
                             key={status} 
                             onClick={() => setFilterStatus(status as any)} 
-                            className={`flex-1 py-3 rounded-xl text-[10px] font-bold uppercase border-2 transition-all duration-300 ${
+                            className={`flex-1 py-3 rounded-xl text-[10px] font-bold uppercase border-2 transition-colors duration-300 ${
                                 filterStatus === status 
                                 ? `${theme.bg}/20 ${theme.border} ${theme.text} shadow-inner shadow-[0_0_10px_currentColor]` 
                                 : `border-white/10 text-slate-500 hover:border-white/30 hover:bg-white/5 hover:text-white hover:shadow-[0_0_10px_rgba(255,255,255,0.1)]`
@@ -235,10 +243,14 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
                         </tr>
                     ) : (
                         filteredUsers.map(u => (
-                            <tr key={u.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group/row hover:shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]">
+                            <tr 
+                                key={u.id} 
+                                className="relative border-b border-white/5 hover:bg-white/5 transition-colors duration-200 group/row"
+                            >
                                 <td className="p-4 pl-6">
                                     <div className="flex items-center gap-4">
-                                        <div className={`relative w-10 h-10 rounded-full bg-black flex items-center justify-center border-2 border-white/10 group-hover/row:${theme.border} group-hover/row:${theme.shadow.replace('shadow-', 'shadow-[0_0_15px_')} transition-all duration-300`}>
+                                        {/* Avatar: Fixed Transitions */}
+                                        <div className={`relative w-10 h-10 rounded-full bg-black flex items-center justify-center border-2 border-white/10 ${theme.hoverBorder} ${theme.hoverShadow} transition-[border-color,box-shadow] duration-300`}>
                                             <span className="font-display font-bold text-white">{u.name.substring(0,2).toUpperCase()}</span>
                                             <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-black rounded-full flex items-center justify-center">
                                                 <div className={`w-1.5 h-1.5 rounded-full ${u.status === 'Active' ? 'bg-green-500 shadow-[0_0_5px_lime]' : 'bg-red-500 shadow-[0_0_5px_red]'}`}></div>
@@ -257,11 +269,11 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
                                 <td className="p-4 text-right">
                                     <div className={`font-bold text-sm ${u.balance_bigint > 0 ? theme.text : 'text-slate-500'} text-glow-sm transition-colors duration-500`}>{formatCurrency(u.balance_bigint)}</div>
                                     {activeTab === 'VENDEDORES' && (
-                                        <button onClick={() => setPayUser(u)} className="mt-1 px-2 py-0.5 bg-cyber-purple/10 border border-cyber-purple/30 rounded text-[8px] font-bold text-cyber-purple hover:bg-cyber-purple hover:text-black transition-all ml-auto shadow-[0_0_10px_rgba(188,19,254,0.1)]">LIQUIDAR</button>
+                                        <button onClick={() => setPayUser(u)} className="mt-1 px-2 py-0.5 bg-cyber-purple/10 border border-cyber-purple/30 rounded text-[8px] font-bold text-cyber-purple hover:bg-cyber-purple hover:text-black transition-colors ml-auto shadow-[0_0_10px_rgba(188,19,254,0.1)]">LIQUIDAR</button>
                                     )}
                                 </td>
                                 <td className="p-4 text-center">
-                                    <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-bold uppercase border-2 transition-all duration-300 ${
+                                    <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-bold uppercase border-2 transition-colors duration-300 ${
                                         u.status === 'Active' 
                                         ? 'border-cyber-success text-cyber-success shadow-[0_0_10px_rgba(10,255,96,0.2)]' 
                                         : 'border-cyber-danger text-cyber-danger shadow-[0_0_10px_rgba(255,0,60,0.2)]'
@@ -272,28 +284,26 @@ export default function UserManagementPanel({ players, vendors, onRecharge, onWi
                                 </td>
                                 <td className="p-4 pr-6 text-right">
                                     <div className="flex items-center justify-end gap-3 opacity-90">
-                                        {/* RECHARGE ICON - GREEN NEON */}
+                                        {/* Actions: Simplified Transitions */}
                                         <button 
                                             onClick={() => onRecharge(u)} 
-                                            className="w-8 h-8 rounded-lg bg-black border-2 border-cyber-success flex items-center justify-center text-cyber-success shadow-neon-green hover:bg-cyber-success hover:text-black hover:scale-110 transition-all duration-300" 
+                                            className="w-8 h-8 rounded-lg bg-black border-2 border-cyber-success flex items-center justify-center text-cyber-success shadow-neon-green hover:bg-cyber-success hover:text-black hover:scale-110 transition-[background-color,color,transform,box-shadow,border-color] duration-300" 
                                             title="Recargar"
                                         >
                                             <i className="fas fa-bolt"></i>
                                         </button>
                                         
-                                        {/* WITHDRAW ICON - ORANGE NEON */}
                                         <button 
                                             onClick={() => onWithdraw(u)} 
-                                            className="w-8 h-8 rounded-lg bg-black border-2 border-cyber-orange flex items-center justify-center text-cyber-orange shadow-neon-orange hover:bg-cyber-orange hover:text-black hover:scale-110 transition-all duration-300" 
+                                            className="w-8 h-8 rounded-lg bg-black border-2 border-cyber-orange flex items-center justify-center text-cyber-orange shadow-neon-orange hover:bg-cyber-orange hover:text-black hover:scale-110 transition-[background-color,color,transform,box-shadow,border-color] duration-300" 
                                             title="Retirar"
                                         >
                                             <i className="fas fa-hand-holding-usd"></i>
                                         </button>
                                         
-                                        {/* LOCK ICON - RED NEON */}
                                         <button 
                                             onClick={() => setControlUser(u)} 
-                                            className="w-8 h-8 rounded-lg bg-black border-2 border-cyber-danger flex items-center justify-center text-cyber-danger shadow-neon-red hover:bg-cyber-danger hover:text-black hover:scale-110 transition-all duration-300" 
+                                            className="w-8 h-8 rounded-lg bg-black border-2 border-cyber-danger flex items-center justify-center text-cyber-danger shadow-neon-red hover:bg-cyber-danger hover:text-black hover:scale-110 transition-[background-color,color,transform,box-shadow,border-color] duration-300" 
                                             title="Bloquear/Eliminar"
                                         >
                                             <i className={`fas ${u.status === 'Active' ? 'fa-lock' : 'fa-unlock'}`}></i>

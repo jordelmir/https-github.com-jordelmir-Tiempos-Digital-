@@ -1,17 +1,11 @@
-
 // infra/supabase/edge-functions/createUser/index.ts
-// NOTE: Imports commented out to prevent frontend bundler errors. Uncomment for Deno deployment.
-// import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-// import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+// import { serve } from 'std/server';
+// import { createClient } from '@supabase/supabase-js';
 
+// Polyfill for environment to prevent build errors
 export {};
-
 declare const Deno: any;
-
-// Polyfill Deno for browser safety (prevents crash on load)
 const SafeDeno = typeof Deno !== 'undefined' ? Deno : { env: { get: () => '' } };
-
-// Mock for frontend safety
 const serve = (handler: any) => {}; 
 const createClient = (url: string, key: string) => ({ from: () => ({ insert: () => ({ select: () => ({ single: () => ({}) }) }) }), rpc: () => {} });
 
@@ -23,7 +17,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 serve(async (req: any) => {
   try {
     const body = await req.json();
-    const { name, email, role, balance_bigint, issuer_id } = body;
+    const { name, email, role, balance_bigint, issuer_id, cedula, phone } = body;
 
     // validate role and issuer
     if (!['SuperAdmin','Vendedor','Cliente'].includes(role)) throw new Error('invalid role');
@@ -31,7 +25,15 @@ serve(async (req: any) => {
     // create app_user row (auth linkage must be managed separately)
     const { data, error } = await (supabase as any)
       .from('app_users')
-      .insert([{ name, email, role, balance_bigint: balance_bigint ?? 0, issuer_id }])
+      .insert([{ 
+          name, 
+          email, 
+          role, 
+          balance_bigint: balance_bigint ?? 0, 
+          issuer_id,
+          cedula,
+          phone
+      }])
       .select()
       .single();
 

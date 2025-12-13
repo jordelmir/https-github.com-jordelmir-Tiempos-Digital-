@@ -1,17 +1,10 @@
-
 // infra/supabase/edge-functions/purgeSystem/index.ts
-// NOTE: Imports commented out to prevent frontend bundler errors. Uncomment for Deno deployment.
-// import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-// import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+// import { serve } from 'std/server';
+// import { createClient } from '@supabase/supabase-js';
 
 export {};
-
 declare const Deno: any;
-
-// Polyfill Deno for browser safety
 const SafeDeno = typeof Deno !== 'undefined' ? Deno : { env: { get: () => '' } };
-
-// Mock for frontend safety
 const serve = (handler: any) => {}; 
 const createClient = (url: string, key: string) => ({ from: () => ({ insert: () => {} }) });
 

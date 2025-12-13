@@ -1,4 +1,5 @@
-import React from "react";
+
+import React, { useEffect } from "react";
 import { motion, useAnimation } from "framer-motion";
 import { useInView } from "react-intersection-observer";
 import { useAnimationSync } from "../../context/AnimationSyncContext";
@@ -40,7 +41,7 @@ export default function AnimatedIconUltra({ children, profile = {}, className = 
   // Sync phase for subtle offset to avoid robotic unison
   const phase = sync.masterPhase;
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!enabled || !inView) {
       controls.stop();
       return;

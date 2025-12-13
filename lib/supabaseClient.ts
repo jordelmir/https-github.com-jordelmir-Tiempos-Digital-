@@ -8,7 +8,7 @@ const isDemo = true;
 
 let client: SupabaseClient;
 
-// --- PERSISTENCE ENGINE ---
+// --- PERSISTENCE ENGINE (SAFE MODE) ---
 const STORAGE_KEYS = {
     SESSION: 'tiempospro_demo_session',
     USERS: 'tiempospro_db_users',
@@ -18,19 +18,29 @@ const STORAGE_KEYS = {
     LEDGER: 'tiempospro_db_ledger',
     AUDIT: 'tiempospro_db_audit',
     SETTINGS: 'tiempospro_db_settings',
-    SYSTEM_SETTINGS_LIST: 'tiempospro_db_sys_settings_list' // New for maintenance module
+    SYSTEM_SETTINGS_LIST: 'tiempospro_db_sys_settings_list'
 };
 
-// Helper to load/save
+// Safe Helper to load/save without crashing
 const loadDB = (key: string, defaultData: any) => {
     if (typeof window === 'undefined') return defaultData;
-    const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : defaultData;
+    try {
+        const stored = localStorage.getItem(key);
+        return stored ? JSON.parse(stored) : defaultData;
+    } catch (e) {
+        console.error(`Error loading DB key ${key}:`, e);
+        return defaultData;
+    }
 };
 
 const saveDB = (key: string, data: any) => {
     if (typeof window === 'undefined') return;
-    localStorage.setItem(key, JSON.stringify(data));
+    try {
+        localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {
+        console.error(`Error saving DB key ${key}:`, e);
+        // If quota exceeded, we might need to purge old logs, but for now just log it.
+    }
 };
 
 // --- INITIAL DATA GENERATORS ---
@@ -59,19 +69,13 @@ const generateHistoricalLedger = () => {
     const now = new Date();
     let currentBalance = 150000000; // Starting capital 1.5M
 
-    // Iterate month by month
     for (let d = new Date(startDate); d <= now; d.setMonth(d.getMonth() + 1)) {
-        const monthName = d.toLocaleString('es-CR', { month: 'long' });
-        
-        // Generate 5-8 transactions per month
         const numTxs = 5 + Math.floor(Math.random() * 4);
-        
         for (let i = 0; i < numTxs; i++) {
-            const isIncome = Math.random() > 0.4; // 60% Income, 40% Expense
+            const isIncome = Math.random() > 0.4;
             const baseAmount = 500000 + Math.floor(Math.random() * 2000000);
-            const amount = isIncome ? baseAmount : -(baseAmount * 0.8); // Expenses slightly lower
+            const amount = isIncome ? baseAmount : -(baseAmount * 0.8);
             
-            // Random day in month
             const txDate = new Date(d);
             txDate.setDate(Math.floor(Math.random() * 28) + 1);
             txDate.setHours(Math.floor(Math.random() * 23), Math.floor(Math.random() * 59));
@@ -92,8 +96,6 @@ const generateHistoricalLedger = () => {
             });
         }
     }
-    
-    // Sort descending
     return txs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 };
 
@@ -145,8 +147,17 @@ const TEST_PLAYER = {
     updated_at: new Date().toISOString()
 };
 
-// --- DATABASE IN MEMORY (LINKED TO LOCALSTORAGE) ---
-let DB_USERS = loadDB(STORAGE_KEYS.USERS, [MOCK_ADMIN_PROFILE, TEST_VENDOR, TEST_PLAYER, ...generateUsers('Cliente', 35), ...generateUsers('Vendedor', 15)]);
+// --- DATABASE IN MEMORY ---
+// Define safely before loading
+const DEFAULT_USERS = [MOCK_ADMIN_PROFILE, TEST_VENDOR, TEST_PLAYER];
+
+let DB_USERS = loadDB(STORAGE_KEYS.USERS, DEFAULT_USERS);
+// Fallback if loadDB returns null/empty or corrupt data without Admin
+if (!Array.isArray(DB_USERS) || !DB_USERS.find((u:any) => u.role === 'SuperAdmin')) {
+    DB_USERS = [...DEFAULT_USERS, ...generateUsers('Cliente', 35), ...generateUsers('Vendedor', 15)];
+    saveDB(STORAGE_KEYS.USERS, DB_USERS);
+}
+
 let DB_BETS = loadDB(STORAGE_KEYS.BETS, []);
 let DB_RESULTS = loadDB(STORAGE_KEYS.RESULTS, [
     { id: 'res-1', date: new Date().toISOString().split('T')[0], draw_time: 'Mediodía (12:55)', winning_number: '--', is_reventado: false, status: 'OPEN', created_at: new Date().toISOString() },
@@ -155,9 +166,8 @@ let DB_RESULTS = loadDB(STORAGE_KEYS.RESULTS, [
 ]);
 let DB_LIMITS = loadDB(STORAGE_KEYS.LIMITS, []);
 
-// Use generated history if empty
 let loadedLedger = loadDB(STORAGE_KEYS.LEDGER, []);
-if (loadedLedger.length === 0) {
+if (!Array.isArray(loadedLedger) || loadedLedger.length === 0) {
     loadedLedger = generateHistoricalLedger();
     saveDB(STORAGE_KEYS.LEDGER, loadedLedger);
 }
@@ -179,13 +189,12 @@ let DB_AUDIT = loadDB(STORAGE_KEYS.AUDIT, [{
     metadata: { version: '3.3.0' },
     hash: 'sha256-init'
 }]);
-// Legacy Settings
+
 let DB_SETTINGS = loadDB(STORAGE_KEYS.SETTINGS, {
     multiplier_tiempos: 90,
     multiplier_reventados: 200
 });
 
-// New System Settings List (Array for Maintenance Module)
 let DB_SYS_SETTINGS_LIST = loadDB(STORAGE_KEYS.SYSTEM_SETTINGS_LIST, [
     { key: 'GLOBAL_LIMIT', value: 50000, description: 'Límite de exposición por defecto', group: 'RISK', updated_at: new Date().toISOString(), updated_by: 'system' },
     { key: 'MARKET_STATUS', value: 'OPEN', description: 'Estado global del mercado', group: 'CORE', updated_at: new Date().toISOString(), updated_by: 'system' },
@@ -194,7 +203,6 @@ let DB_SYS_SETTINGS_LIST = loadDB(STORAGE_KEYS.SYSTEM_SETTINGS_LIST, [
     { key: 'FEE_PERCENT', value: 0.05, description: 'Comisión de pasarela', group: 'FINANCE', updated_at: new Date().toISOString(), updated_by: 'system' }
 ]);
 
-// --- EXPOSED HELPERS FOR EDGE API SIMULATION ---
 export const MockDB = {
     getUsers: () => DB_USERS,
     saveUser: (user: any) => {
@@ -241,13 +249,11 @@ export const MockDB = {
         DB_AUDIT.unshift(newLog);
         saveDB(STORAGE_KEYS.AUDIT, DB_AUDIT);
     },
-    // Legacy Settings
     getSettings: () => DB_SETTINGS,
     saveSettings: (newSettings: any) => {
         DB_SETTINGS = { ...DB_SETTINGS, ...newSettings };
         saveDB(STORAGE_KEYS.SETTINGS, DB_SETTINGS);
     },
-    // New Maintenance Settings
     getSettingsList: () => DB_SYS_SETTINGS_LIST,
     updateSetting: (key: string, value: any) => {
         const idx = DB_SYS_SETTINGS_LIST.findIndex((s: any) => s.key === key);
@@ -256,37 +262,30 @@ export const MockDB = {
             saveDB(STORAGE_KEYS.SYSTEM_SETTINGS_LIST, DB_SYS_SETTINGS_LIST);
         }
     },
-    
-    // --- ATOMIC PURGE LOGIC ---
     analyzePurge: (target: PurgeTarget, days: number): PurgeAnalysis => {
         const now = Date.now();
         const cutoff = now - (days * 24 * 60 * 60 * 1000);
         let list: any[] = [];
-        
         switch(target) {
             case 'BETS': list = DB_BETS; break;
             case 'AUDIT': list = DB_AUDIT; break;
             case 'LEDGER_HISTORY': list = DB_LEDGER; break;
             case 'RESULTS': list = DB_RESULTS; break;
         }
-        
         const count = list.filter(item => new Date(item.created_at || item.timestamp).getTime() < cutoff).length;
-        
         return {
             target,
             cutoffDate: new Date(cutoff).toISOString(),
             recordCount: count,
-            estimatedSizeKB: Math.round(count * 0.5), // Approx 0.5KB per record
+            estimatedSizeKB: Math.round(count * 0.5),
             riskLevel: target === 'LEDGER_HISTORY' ? 'HIGH' : target === 'BETS' ? 'MEDIUM' : 'LOW',
             canProceed: true
         };
     },
-    
     executePurge: (target: PurgeTarget, days: number): number => {
         const now = Date.now();
         const cutoff = now - (days * 24 * 60 * 60 * 1000);
         let initialCount = 0;
-        
         if (target === 'BETS') {
             initialCount = DB_BETS.length;
             DB_BETS = DB_BETS.filter(item => new Date(item.created_at).getTime() >= cutoff);
@@ -313,44 +312,41 @@ export const MockDB = {
         }
         return 0;
     },
-
-    // --- UTILITIES ---
     saveDB: saveDB
 };
 
-
 if (isDemo) {
-  // Mock Implementation
   client = {
     supabaseUrl: 'https://demo.local',
     auth: {
       getUser: async () => {
-        const hasSession = localStorage.getItem(STORAGE_KEYS.SESSION);
-        if (hasSession) {
-            const stored = JSON.parse(hasSession);
-            return { data: { user: stored.user }, error: null };
-        }
+        try {
+            const hasSession = localStorage.getItem(STORAGE_KEYS.SESSION);
+            if (hasSession) {
+                const stored = JSON.parse(hasSession);
+                if (stored && stored.user) return { data: { user: stored.user }, error: null };
+            }
+        } catch(e) { console.warn("Session parse error"); }
         return { data: { user: null }, error: null };
       },
       getSession: async () => {
-        const hasSession = localStorage.getItem(STORAGE_KEYS.SESSION);
-        if (hasSession) {
-            const stored = JSON.parse(hasSession);
-            return { data: { session: stored }, error: null };
-        }
+        try {
+            const hasSession = localStorage.getItem(STORAGE_KEYS.SESSION);
+            if (hasSession) {
+                const stored = JSON.parse(hasSession);
+                return { data: { session: stored }, error: null };
+            }
+        } catch(e) {}
         return { data: { session: null }, error: null };
       },
       signInWithPassword: async ({ email }: any) => {
         await new Promise(resolve => setTimeout(resolve, 800));
-        
         let targetProfile = DB_USERS.find((u: any) => u.email === email);
-        
         if (!targetProfile) {
              if (email === TEST_VENDOR.email) targetProfile = TEST_VENDOR;
              else if (email === TEST_PLAYER.email) targetProfile = TEST_PLAYER;
              else targetProfile = MOCK_ADMIN_PROFILE;
         }
-
         const authUser = {
             id: targetProfile.auth_uid,
             email: targetProfile.email,
@@ -358,9 +354,8 @@ if (isDemo) {
             role: 'authenticated',
             created_at: new Date().toISOString()
         };
-
         const sessionData = { access_token: 'mock-jwt-token', user: authUser };
-        localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(sessionData));
+        saveDB(STORAGE_KEYS.SESSION, sessionData);
         return { data: { user: authUser, session: sessionData }, error: null };
       },
       signOut: async () => {
@@ -405,20 +400,15 @@ if (isDemo) {
         then: (callback: (res: any) => void) => {
             setTimeout(() => {
                 let data: any[] = [];
-                
-                // Get Active User Context from Storage for RLS Simulation
                 const sessionStr = localStorage.getItem(STORAGE_KEYS.SESSION);
                 const session = sessionStr ? JSON.parse(sessionStr) : null;
                 const authUid = session?.user?.id;
                 
-                // Find Profile based on Auth ID
-                const currentUser = DB_USERS.find((u: any) => u.auth_uid === authUid);
-                const isAdmin = currentUser?.role === 'SuperAdmin';
+                const currentUser = DB_USERS.find((u: any) => u.auth_uid === authUid) || MOCK_ADMIN_PROFILE;
                 const isVendor = currentUser?.role === 'Vendedor';
 
                 if (table === 'app_users') {
                     if (currentFilterValue === 'Cliente') {
-                        // RLS LOGIC FOR VENDORS
                         if (isVendor) {
                             data = DB_USERS.filter((u: any) => u.role === 'Cliente' && u.issuer_id === currentUser.id);
                         } else {
